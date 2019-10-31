@@ -1,0 +1,763 @@
+// MDL v1 utf8
+network  {
+  watchlist = ""
+}
+module itkImageFileWriter {
+  internal  {
+    frame = "-2109 -924 128 56"
+    moduleGroupName = ImageExport
+    windows  {
+      window _default {
+        geometry = "859 350 840 412"
+        sizeHint = "256 403"
+        wasOpen = no
+      }
+      window _automatic {
+        geometry = "445 262 500 600"
+        sizeHint = "260 223"
+        wasOpen = no
+      }
+    }
+  }
+  fields  {
+    instanceName = itkImageFileWriter
+    useCompression = FALSE
+    correctSubVoxelShift = TRUE
+    forceDirectionCosineWrite = TRUE
+    outputVoxelType = "unsigned int8"
+    info = ""
+    unresolvedFileName = T:/IRCAD/Data/vessel-segmentation-1.nii
+  }
+}
+module itkImageFileReader {
+  internal  {
+    frame = "-1374 65 136 56"
+    moduleGroupName = "Data Import"
+    windows  {
+      window _default {
+        geometry = "107 302 729 395"
+        sizeHint = "328 395"
+        wasOpen = no
+      }
+      window _automatic {
+        geometry = "234 251 500 600"
+        sizeHint = "260 223"
+        wasOpen = no
+      }
+    }
+  }
+  fields  {
+    instanceName = itkImageFileReader
+    fileDataType = int16
+    autoDetermineDataType = TRUE
+    correctSubVoxelShift = TRUE
+    fileDimension = 3
+    info = "Loading okay."
+    numDims = 3
+    fileType = TypeNotApplicable
+    componentType = int16
+    pixelType = SCALAR
+    loaderType = NiftiImageIO
+    outputMetaDataStr = "ITK_FileNotes : 
+aux_file : 
+bitpix : 16
+cal_max : 0
+cal_min : 0
+datatype : 4
+descrip : 
+dim[0] : 3
+dim[1] : 512
+dim[2] : 512
+dim[3] : 129
+dim[4] : 1
+dim[5] : 1
+dim[6] : 1
+dim[7] : 1
+dim_info : 
+intent_code : 0
+intent_name : 
+intent_p1 : 0
+intent_p2 : 0
+intent_p3 : 0
+pixdim[0] : 1
+pixdim[1] : 0.57
+pixdim[2] : 0.57
+pixdim[3] : 1.6
+pixdim[4] : 0
+pixdim[5] : 0
+pixdim[6] : 0
+pixdim[7] : 0
+qform_code : 1
+qoffset_x : -0
+qoffset_y : -0
+qoffset_z : 0
+quatern_b : 0
+quatern_c : 0
+quatern_d : 1
+scl_inter : 0
+scl_slope : 1
+sform_code : 0
+slice_code : 
+slice_duration : 0
+slice_end : 0
+slice_start : 0
+srow_x : 0 0 0 0
+srow_y : 0 0 0 0
+srow_z : 0 0 0 0
+toffset : 0
+vox_offset : 352
+xyzt_units : 
+"
+    suppressErrorPosting = FALSE
+    unresolvedFileName = T:/IRCAD/Data/ct-volume-1.nii
+  }
+}
+module Bypass {
+  internal  {
+    frame = "-1358 -319 104 56"
+    moduleGroupName = "Data Import"
+    showNetworkPanel = true
+  }
+  fields  {
+    instanceName = Bypass
+    noBypass = FALSE
+  }
+}
+module Arithmetic {
+  internal  {
+    frame = "-1809 -577 88 72"
+    moduleGroupName = ImageExport
+    showNetworkPanel = true
+    windows  {
+      window _default {
+        geometry = "918 359 577 511"
+        sizeHint = "577 511"
+        wasOpen = no
+      }
+    }
+  }
+  fields  {
+    instanceName = Arithmetic
+    expression = " a + 2*b"
+    i1 = 0
+    i2 = 0
+    i3 = 0
+    i4 = 0
+    i5 = 0
+    i6 = 0
+    d1 = 0
+    d2 = 0
+    d3 = 0
+    d4 = 0
+    d5 = 0
+    d6 = 0
+    d7 = 0
+    d8 = 0
+    d9 = 0
+    d10 = 0
+    d11 = 0
+    d12 = 0
+    minValue = 0
+    maxValue = 2
+    setMinMaxValues = TRUE
+    dataType = int8
+    setDataType = FALSE
+    updateMode = AutoUpdate
+    applyMode = AutoApply
+    domainErrorHandling = ErrorMessage
+    numberOfInputs = 2
+    expressionComment = ""
+    scalarVariablesComment = ""
+  }
+}
+module itkImageFileReader {
+  internal  {
+    frame = "-1034 65 144 56"
+    moduleGroupName = "Data Import"
+    windows  {
+      window _default {
+        geometry = "803 372 328 395"
+        sizeHint = "328 395"
+        wasOpen = no
+      }
+      window _automatic {
+        geometry = "919 320 500 600"
+        sizeHint = "260 223"
+        wasOpen = no
+      }
+    }
+  }
+  fields  {
+    instanceName = itkImageFileReader1
+    fileDataType = "unsigned int8"
+    autoDetermineDataType = TRUE
+    correctSubVoxelShift = TRUE
+    fileDimension = 3
+    info = "Loading okay."
+    numDims = 3
+    fileType = TypeNotApplicable
+    componentType = "unsigned int8"
+    pixelType = SCALAR
+    loaderType = NiftiImageIO
+    outputMetaDataStr = "ITK_FileNotes : 
+aux_file : 
+bitpix : 8
+cal_max : 0
+cal_min : 0
+datatype : 2
+descrip : 
+dim[0] : 3
+dim[1] : 512
+dim[2] : 512
+dim[3] : 129
+dim[4] : 1
+dim[5] : 1
+dim[6] : 1
+dim[7] : 1
+dim_info : 
+intent_code : 0
+intent_name : 
+intent_p1 : 0
+intent_p2 : 0
+intent_p3 : 0
+pixdim[0] : 1
+pixdim[1] : 0.57
+pixdim[2] : 0.57
+pixdim[3] : 1.6
+pixdim[4] : 0
+pixdim[5] : 0
+pixdim[6] : 0
+pixdim[7] : 0
+qform_code : 1
+qoffset_x : -0
+qoffset_y : -0
+qoffset_z : 0
+quatern_b : 0
+quatern_c : 0
+quatern_d : 1
+scl_inter : 0
+scl_slope : 1
+sform_code : 0
+slice_code : 
+slice_duration : 0
+slice_end : 0
+slice_start : 0
+srow_x : 0 0 0 0
+srow_y : 0 0 0 0
+srow_z : 0 0 0 0
+toffset : 0
+vox_offset : 352
+xyzt_units : 
+"
+    suppressErrorPosting = FALSE
+    unresolvedFileName = T:/IRCAD/Data/vessel-segmentation-1.nii
+  }
+}
+module MakeName {
+  internal  {
+    frame = "-1186 57 96 56"
+    moduleGroupName = "Data Import"
+    windows  {
+      window _default {
+        geometry = "981 470 905 445"
+        sizeHint = "457 445"
+        wasOpen = no
+      }
+    }
+  }
+  fields  {
+    instanceName = MakeName
+    inputName = T:/IRCAD/Data/ct-volume-1.nii
+    extensions = "\\-[0-9]*.nii"
+    extRegExp = TRUE
+    outputTemplate = $d/vessel-segmentation$e
+    outputName = T:/IRCAD/Data/vessel-segmentation-1.nii
+    predefined = void
+    dicomTagA = PatientsName
+    dicomTagB = PatientID
+    dicomTagC = InstitutionName
+    dicomTagD = Modality
+    dicomTagE = AcquisitionDate
+    dicomTagF = AcquisitionTime
+    dicomValueA = ""
+    dicomValueB = ""
+    dicomValueC = ""
+    dicomValueD = ""
+    dicomValueE = ""
+    dicomValueF = ""
+    userStringS = ""
+    userStringT = ""
+    trimSpaces = TRUE
+  }
+}
+module Threshold {
+  internal  {
+    frame = "-1027 -651 88 72"
+    moduleGroupName = Visualization
+    showNetworkPanel = true
+    windows  {
+      window _default {
+        geometry = "456 374 279 302"
+        sizeHint = "248 302"
+        wasOpen = no
+      }
+    }
+  }
+  fields  {
+    instanceName = Threshold
+    threshold = 2
+    relativeThreshold = FALSE
+    comparisonOperator = Equal
+    conditionTrueWriteValue = UserDef
+    userConditionTrueValue = 1
+    conditionFalseWriteValue = UserDef
+    userConditionFalseValue = 0
+  }
+}
+module Threshold {
+  internal  {
+    frame = "-1359 -579 96 72"
+    moduleGroupName = Visualization
+    showNetworkPanel = true
+    windows  {
+      window _default {
+        geometry = "843 418 279 302"
+        sizeHint = "248 302"
+        wasOpen = no
+      }
+    }
+  }
+  fields  {
+    instanceName = Threshold1
+    threshold = 1
+    relativeThreshold = FALSE
+    comparisonOperator = Equal
+    conditionTrueWriteValue = UserDef
+    userConditionTrueValue = 1
+    conditionFalseWriteValue = UserDef
+    userConditionFalseValue = 0
+  }
+}
+module View2D {
+  internal  {
+    frame = "-1347 -1291 120 56"
+    moduleGroupName = Visualization
+    windows  {
+      window _default {
+        geometry = "179 291 400 400"
+        sizeHint = "400 400"
+        wasOpen = no
+      }
+    }
+  }
+  fields  {
+    instanceName = View2D
+    inventorInputOn = TRUE
+    inventorOutputOn = FALSE
+    view2DExtensionsOn = TRUE
+    startSlice = 64
+    numSlices = 1
+    numXSlices = 1
+    sliceStep = 1
+    slab = 1
+    blendMode = BLEND_REPLACE
+    timePoint = 0
+    maxTimePoint = 0
+    filterMode = FILTER_LINEAR
+    standardKeys = TRUE
+    cineMode = CINE_ZT
+    cineDirection = CINE_FORWARD
+    cineRepeat = CINE_ONCE
+    cineSpeed = 0.1
+    cineAlwaysReset = TRUE
+    snapToCenter = TRUE
+    zoomMode = VIEW2D_AUTO_ZOOM
+    unzoomOnImageChange = FALSE
+    sliceZoom = 1
+    sliceZoomSynced = 1
+    baseColor = "1 1 1"
+    margin = "2 2"
+    sliceOrigin = "0 0"
+    useShaders = TRUE
+    useManagedInteraction = FALSE
+    lutCenter = -0.5
+    lutWidth = 2047
+    annotationOn = TRUE
+    annotationMode = ANNO_MODE_AUTO
+    annotationSizeMode = ANNO_SHOW_HIDE
+    annotationCol = "0.899999976158142 0.899999976158142 0.899999976158142"
+    annotationFontSize = ANNO_SIZE_AUTO
+    annoCoords = Voxel
+    annoCTValue = AsIs
+    borderOn = FALSE
+    borderColor = "0.899999976158142 0.899999976158142 0.899999976158142"
+    valueHighPrecision = TRUE
+    showColorChannelValues = FALSE
+    colorChannelSeparator = " / "
+    maxPrecision = 4
+    enableSlicing = TRUE
+    useRelativeLUTIfNoInputImage = TRUE
+    hiResRendering = TRUE
+  }
+}
+module SoView2DOverlay {
+  internal  {
+    frame = "-1315 -931 168 56"
+    moduleGroupName = Visualization
+    showNetworkPanel = true
+    windows  {
+      window _default {
+        geometry = "209 518 436 472"
+        sizeHint = "436 472"
+        wasOpen = no
+      }
+    }
+  }
+  fields  {
+    instanceName = SoView2DOverlay
+    interactionProviderID = ""
+    drawingOn = TRUE
+    editingOn = TRUE
+    fixZOn = TRUE
+    color = "1 1 1"
+    selectionTolerance = 4
+    needsValidVoxel = TRUE
+    button1 = IGNORED
+    button2 = IGNORED
+    button3 = IGNORED
+    shift = IGNORED
+    control = IGNORED
+    alt = IGNORED
+    wantsAllEvents = TRUE
+    wantsKeyEvents = TRUE
+    wantsMouseWheelEvents = FALSE
+    setEventHandled = FALSE
+    ignoreHandledEvents = FALSE
+    createNewMode = FALSE
+    renderOnSlab = TRUE
+    clipToSlice = TRUE
+    cursorShape = UNDEFINED_CURSOR
+    overlayName = ""
+    cacheTextures = TRUE
+    blendMode = BLEND_ADD
+    overwriteCurrentTimePoint = FALSE
+    timePoint = 0
+    maxTimePoint = 0
+    filterMode = FILTER_LINEAR
+    inheritFilterMode = TRUE
+    lutPrecision = VIEW2D_LUT_AUTO
+    alphaFactor = 1
+    baseColor = "1 0 0"
+    useWorldCoords = TRUE
+    applyLut = TRUE
+    isCheckerTiling = FALSE
+    checkerTileSize = 2
+    areCheckerTilesInverted = FALSE
+  }
+}
+module SoView2DOverlay {
+  internal  {
+    frame = "-931 -939 168 56"
+    moduleGroupName = Visualization
+    showNetworkPanel = true
+    windows  {
+      window _default {
+        geometry = "1077 446 436 472"
+        sizeHint = "436 472"
+        wasOpen = no
+      }
+    }
+  }
+  fields  {
+    instanceName = SoView2DOverlay1
+    interactionProviderID = ""
+    drawingOn = TRUE
+    editingOn = TRUE
+    fixZOn = TRUE
+    color = "1 1 1"
+    selectionTolerance = 4
+    needsValidVoxel = TRUE
+    button1 = IGNORED
+    button2 = IGNORED
+    button3 = IGNORED
+    shift = IGNORED
+    control = IGNORED
+    alt = IGNORED
+    wantsAllEvents = TRUE
+    wantsKeyEvents = TRUE
+    wantsMouseWheelEvents = FALSE
+    setEventHandled = FALSE
+    ignoreHandledEvents = FALSE
+    createNewMode = FALSE
+    renderOnSlab = TRUE
+    clipToSlice = TRUE
+    cursorShape = UNDEFINED_CURSOR
+    overlayName = ""
+    cacheTextures = TRUE
+    blendMode = BLEND_ADD
+    overwriteCurrentTimePoint = FALSE
+    timePoint = 0
+    maxTimePoint = 0
+    filterMode = FILTER_LINEAR
+    inheritFilterMode = TRUE
+    lutPrecision = VIEW2D_LUT_AUTO
+    alphaFactor = 1
+    baseColor = "0 0 1"
+    useWorldCoords = TRUE
+    applyLut = TRUE
+    isCheckerTiling = FALSE
+    checkerTileSize = 2
+    areCheckerTilesInverted = FALSE
+  }
+}
+module SoGroup {
+  internal  {
+    frame = "-1251 -1131 152 56"
+    moduleGroupName = Visualization
+  }
+  fields  {
+    instanceName = SoGroup2
+  }
+}
+module DrawVoxels3D {
+  internal  {
+    frame = "-1451 -723 120 56"
+    moduleGroupName = Visualization
+    windows  {
+      window _default {
+        geometry = "554 221 297 332"
+        sizeHint = "294 332"
+        wasOpen = no
+      }
+    }
+  }
+  fields  {
+    instanceName = DrawVoxels3DArteries
+    memoryMode = WholeVolume
+    voxelPosition = "0 0 0"
+    cDimensionPosition = 0
+    tDimensionPosition = 0
+    uDimensionPosition = 0
+    voxelWriteValue = 1
+    drawMode = DiskZ
+    drawSize = 3
+    drawThickness = 1
+    sizeCoordinateSystem = World
+    resetMode = CopyInput
+  }
+}
+module SoView2DDrawVoxels3D {
+  internal  {
+    frame = "-1495 -915 176 56"
+    moduleGroupName = Visualization
+    windows  {
+      window _default {
+        geometry = "170 365 330 177"
+        sizeHint = "330 177"
+        wasOpen = no
+      }
+    }
+  }
+  fields  {
+    instanceName = SoView2DDrawVoxels3D1
+    interactionProviderID = ""
+    drawingOn = TRUE
+    editingOn = TRUE
+    fixZOn = TRUE
+    color = "1 1 1"
+    selectionTolerance = 4
+    needsValidVoxel = FALSE
+    button1 = PRESSED
+    button2 = IGNORED
+    button3 = IGNORED
+    shift = PRESSED
+    control = IGNORED
+    alt = IGNORED
+    wantsAllEvents = FALSE
+    wantsKeyEvents = FALSE
+    wantsMouseWheelEvents = FALSE
+    setEventHandled = FALSE
+    ignoreHandledEvents = FALSE
+    createNewMode = FALSE
+    renderOnSlab = FALSE
+    clipToSlice = FALSE
+    cursorShape = UNDEFINED_CURSOR
+  }
+}
+module Bypass {
+  internal  {
+    frame = "-1047 -571 112 56"
+    moduleGroupName = Visualization
+    showNetworkPanel = true
+  }
+  fields  {
+    instanceName = Bypass1
+    noBypass = FALSE
+  }
+}
+module SoView2DDrawVoxels3D {
+  internal  {
+    frame = "-1119 -939 176 56"
+    moduleGroupName = Visualization
+    windows  {
+      window _default {
+        geometry = "170 365 330 177"
+        sizeHint = "330 177"
+        wasOpen = no
+      }
+    }
+  }
+  fields  {
+    instanceName = SoView2DDrawVoxels3D2
+    interactionProviderID = ""
+    drawingOn = TRUE
+    editingOn = TRUE
+    fixZOn = TRUE
+    color = "1 1 1"
+    selectionTolerance = 4
+    needsValidVoxel = FALSE
+    button1 = PRESSED
+    button2 = IGNORED
+    button3 = IGNORED
+    shift = IGNORED
+    control = PRESSED
+    alt = IGNORED
+    wantsAllEvents = FALSE
+    wantsKeyEvents = FALSE
+    wantsMouseWheelEvents = FALSE
+    setEventHandled = FALSE
+    ignoreHandledEvents = FALSE
+    createNewMode = FALSE
+    renderOnSlab = FALSE
+    clipToSlice = FALSE
+    cursorShape = UNDEFINED_CURSOR
+  }
+}
+module MakeName {
+  internal  {
+    frame = "-1911 -870 104 56"
+    moduleGroupName = ImageExport
+    windows  {
+      window _default {
+        geometry = "-62 581 905 445"
+        sizeHint = "457 445"
+        wasOpen = no
+      }
+    }
+  }
+  fields  {
+    instanceName = MakeName1
+    inputName = T:/IRCAD/Data/ct-volume-1.nii
+    extensions = "\\-[0-9]*.nii"
+    extRegExp = TRUE
+    outputTemplate = $d/vessel-segmentation_revised$e
+    outputName = T:/IRCAD/Data/vessel-segmentation_revised-1.nii
+    predefined = void
+    dicomTagA = PatientsName
+    dicomTagB = PatientID
+    dicomTagC = InstitutionName
+    dicomTagD = Modality
+    dicomTagE = AcquisitionDate
+    dicomTagF = AcquisitionTime
+    dicomValueA = ""
+    dicomValueB = ""
+    dicomValueC = ""
+    dicomValueD = ""
+    dicomValueE = ""
+    dicomValueF = ""
+    userStringS = ""
+    userStringT = ""
+    trimSpaces = TRUE
+  }
+}
+module DrawVoxels3D {
+  internal  {
+    frame = "-1015 -739 112 56"
+    moduleGroupName = Visualization
+    windows  {
+      window _default {
+        geometry = "466 245 297 332"
+        sizeHint = "294 332"
+        wasOpen = no
+      }
+    }
+  }
+  fields  {
+    instanceName = DrawVoxels3DVeins
+    memoryMode = WholeVolume
+    voxelPosition = "0 0 0"
+    cDimensionPosition = 0
+    tDimensionPosition = 0
+    uDimensionPosition = 0
+    voxelWriteValue = 1
+    drawMode = DiskZ
+    drawSize = 3
+    drawThickness = 1
+    sizeCoordinateSystem = World
+    resetMode = CopyInput
+  }
+}
+connections  {
+  itkImageFileWriter.input0 = Arithmetic.output0
+  itkImageFileWriter.fileName = MakeName1.outputName
+  Bypass.input0 = itkImageFileReader.output0
+  Arithmetic.input0 = DrawVoxels3DArteries.output0
+  Arithmetic.input1 = DrawVoxels3DVeins.output0
+  itkImageFileReader1.unresolvedFileName = MakeName.outputName
+  MakeName.inputName = itkImageFileReader.fileName
+  Threshold.input0 = Bypass1.output0
+  Threshold1.input0 = Bypass1.output0
+  View2D.inImage = Bypass.output0
+  View2D.inInvPreLUT = SoGroup2.self
+  SoView2DOverlay.image = DrawVoxels3DArteries.output0
+  SoView2DOverlay1.image = DrawVoxels3DVeins.output0
+  SoGroup2.children = "SoView2DDrawVoxels3D1.self SoView2DDrawVoxels3D2.self SoView2DOverlay.self SoView2DOverlay1.self"
+  DrawVoxels3DArteries.input0 = Threshold1.output0
+  SoView2DDrawVoxels3D1.inputDrawVoxels3D = DrawVoxels3DArteries.outSelf
+  Bypass1.input0 = itkImageFileReader1.output0
+  SoView2DDrawVoxels3D2.inputDrawVoxels3D = DrawVoxels3DVeins.outSelf
+  MakeName1.inputName = itkImageFileReader.fileName
+  DrawVoxels3DVeins.input0 = Threshold.output0
+  DrawVoxels3DVeins.voxelWriteValue = DrawVoxels3DArteries.voxelWriteValue
+  DrawVoxels3DVeins.drawSize = DrawVoxels3DArteries.drawSize
+  DrawVoxels3DVeins.drawThickness = DrawVoxels3DArteries.drawThickness
+}
+networkModel  {
+  parentItems  {
+    0  {
+      MLABNetworkModelItem MLABNetworkModelItemGroup {
+        uniqueId = 259
+        objectName = "Data Import"
+        parentUniqueId = 0
+        color  {
+          r = 45
+          g = 226
+          b = 226
+          a = 40
+        }
+      }
+      MLABNetworkModelItem MLABNetworkModelItemGroup {
+        uniqueId = 114
+        objectName = Visualization
+        parentUniqueId = 0
+        color  {
+          r = 45
+          g = 226
+          b = 226
+          a = 40
+        }
+      }
+      MLABNetworkModelItem MLABNetworkModelItemGroup {
+        uniqueId = 305
+        objectName = ImageExport
+        parentUniqueId = 0
+        color  {
+          r = 45
+          g = 226
+          b = 226
+          a = 40
+        }
+      }
+    }
+  }
+}

@@ -4,7 +4,6 @@ import numpy as np
 import csv
 import os
 import SimpleITK as sitk
-import SegmentationNetworkBasis.NetworkBasis.metric as Metric
 import SegmentationNetworkBasis.NetworkBasis.image as Image
 from SegmentationNetworkBasis import config as cfg
 
@@ -20,10 +19,10 @@ def make_csv_file(eval_file_path):
 
 
 def make_csv_header():
-    header_row = ['File Number', 'Slices', 'Voxels (#)', #'Volume',
-                  'Artery Voxels (#)', 'Artery Voxels (%)', #'Artery Volume',
+    header_row = ['File Number', 'Slices', 'Voxels (#)',
+                  'Artery Voxels (#)', 'Artery Voxels (%)',
                   'Mean Artery HU', 'STD Artery HU', 'Min Artery HU', 'Max Artery HU',
-                  'Vein Voxels (#)', 'Vein Voxels (%)', #'Vein Volume',
+                  'Vein Voxels (#)', 'Vein Voxels (%)',
                   'Mean Vein HU', 'STD Vein HU', 'Min Vein HU', 'Max Vein HU',
                   'Background Voxels (#)', 'Background Voxels (%)',
                   'Mean Image HU', 'STD Image HU', 'Min Image HU', 'Max Image HU',
@@ -105,7 +104,7 @@ if __name__ == '__main__':
     if not os.path.exists(stats_directory):
         os.makedirs(stats_directory)
 
-    for data_set in ['../ircad.csv', '../btcv.csv']:
+    for data_set in ['../synth.csv', '../ircad.csv', '../btcv.csv']:
         get_statistics(data_set)
 
 

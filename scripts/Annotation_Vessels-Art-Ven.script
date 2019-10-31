@@ -1,0 +1,145 @@
+// write your script here!
+
+Interface  {
+
+
+  Parameters {
+    Field volumefilename {
+      internalName = itkImageFileReader.unresolvedFileName
+    }    
+    Field resetArteries {
+      internalName = DrawVoxels3DArteries.reset
+    } 
+    Field PinselDurchmesser           { 
+      internalName = DrawVoxels3DArteries.drawSize 
+    }
+    Field PinselDicke      { 
+      internalName = DrawVoxels3DArteries.drawThickness
+    }
+    Field voxelWriteValueArteries      { 
+      internalName = DrawVoxels3DArteries.voxelWriteValue
+    }
+    Field resetVeins {
+      internalName = DrawVoxels3DVeins.reset
+    }
+    Field SavingInfo {
+      type = String
+      value = ""
+      editable = NO 
+    }
+    Field modeArteries {
+      type  = Int
+      value = 1
+    }
+    Field ersterschritt {
+      type  = String
+      value = "" 
+    }
+    Field zweiterschritt {
+      type  = String
+      value = ""
+    }
+    Field dritterschritt {
+      type  = String
+      value = ""
+    }
+  }
+}
+
+
+Commands {
+  source = $(LOCAL)/Annotation_Vessels-Art-Ven.py
+
+  FieldListener {
+    listenField = modeArteries
+    command     = ChangedModeArteries
+  }
+  
+  FieldListener {
+    listenField = itkImageFileWriter.save
+    command     = SavedMask
+  }
+  
+  FieldListener {
+    listenField = volumefilename
+    command     = LoadedData
+  }
+}
+
+Window  {
+  Horizontal {
+    expandX = YES
+    expandY = YES
+
+    Viewer View2D.self {
+      type            = SoRenderArea
+      minimumWidth    = 200
+      minimumHeight   = 200
+      preferredWidth  = 500
+      preferredHeight = 500
+    }
+    Vertical {
+      alignX  = Right
+      expandX = Preferred
+      margin  = 5
+      width   = 100
+      Box "1. Schritt" {
+     
+        FieldLabel ersterschritt  {
+          title = "CT Bild laden.
+Dateiname muss der Konvention  ct-volume-<Index> folgen.
+Vorannotation vessel-segmentation-<Index> wird automatisch mitgeladen."
+        }
+        Field volumefilename {
+          title        = "Name:"
+          maximumWidth = 300
+          browseButton = yes
+        }
+      }      
+      Box "2. Schritt" {
+        FieldLabel zweiterschritt{
+          title = "Zum Annotieren von Aterien: Mausklick + gedrückte Shift-Taste
+Zum Annotieren von Venen: Mausklick + gedrückte Control-Taste
+          
+Bildbeschriftung an/aus: Strg+A
+Shift+Mausrad: Bild verschieben
+NumPad5: Bild resetten
+Rechte Maustaste: Kontrast einstellen
++/-: rein- und rauszoomen"
+        }
+        RadioButtonGroup modeArteries {
+          title     = "Modus"
+          items {
+            item 1 { title = "Annotieren"    }
+            item 0 { title = "Entfernen" }
+          }
+        }
+        Box Einstellungen {
+          Horizontal {
+            Field PinselDurchmesser      { step = 1 }
+            Field PinselDicke { step = 2 }
+          }
+        }
+        Box Zurücksetzen {
+          Horizontal {
+            Button resetArteries {}
+            Button resetVeins {}
+          }
+        }    
+      }
+
+      Box "3. Schritt" {
+        FieldLabel dritterschritt {
+          title = "Save Button klicken, um zu speichern.
+Neue Maske wird unter vessel-segmentation_revised-<Index> gespeichert."
+        }
+        Horizontal {
+          Button itkImageFileWriter.save{}
+          Field SavingInfo{
+            title = ""
+          }
+        }
+      }
+    }
+  }
+}

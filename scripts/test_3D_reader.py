@@ -1,11 +1,14 @@
-from LiverSeg.liversegloader import LiverSegLoader
-from LiverSeg.liversegloader import LiverSegRatioLoader
-import SimpleITK as sitk
+from vesselsegloader import VesselSegLoader
+from vesselsegloader import VesselSegRatioLoader
 import tensorflow as tf
 import pandas as pd
 import numpy as np
+import SimpleITK as sitk
 import os
-from LiverSeg.SegmentationNetworkBasis import config as cfg
+from SegmentationNetworkBasis import config as cfg
+
+experiment_name = 'reader_test3D'
+logs_path = os.path.join('..\\tmp', experiment_name)
 
 if cfg.ONSERVER:
     os.environ["CUDA_VISIBLE_DEVICES"] = "1"
@@ -19,17 +22,28 @@ else:
 def _reader_test(training_dataset, mode):
     global_step = tf.Variable(0, name='global_step', trainable=False, dtype=tf.int64)
 
-    valid_writer = tf.summary.create_file_writer(os.path.join('..\\tmp', 'reader_test3D', ''))
+    valid_writer = tf.summary.create_file_writer(logs_path)
     with valid_writer.as_default():
             for x_train, y_train in training_dataset:
                 try:
+                    with tf.name_scope('01_Input_and_Predictions'):
+                        tf.summary.image('train_seg_lbl', tf.expand_dims(
+                            tf.cast(tf.argmax(tf.gather(tf.squeeze(y_train[:, y_train.shape[1] // 2, :, :, :]),
+                                              [0, cfg.batch_size - 1]), -1) * (
+                                             255 // (cfg.num_classes_seg - 1)), tf.uint8), axis=-1),
+                                         global_step, 2)
+
+                        tf.summary.image('train_img', tf.cast((tf.gather(x_train[:, x_train.shape[1] // 2, :, :],
+                                                                         [0, cfg.batch_size - 1]) + 1) * 255 / 2,
+                                                              tf.uint8), global_step, 2)
+
                     for b in range(cfg.batch_size):
                         sample_img = tf.gather(x_train, [b])
                         sitk.WriteImage(sitk.GetImageFromArray(np.squeeze(sample_img.numpy())),
-                                        'train_vol' + '-' + str(b) + '.nii')
-                        sample_img = tf.gather(y_train[:, :, :, :, 1], [b])
+                                        os.path.join(logs_path, 'train_vol' + '-' + str(b) + '.nii'))
+                        sample_img = tf.cast(tf.argmax(tf.gather(y_train, [b]), -1), tf.uint8)
                         sitk.WriteImage(sitk.GetImageFromArray(np.squeeze(sample_img.numpy())),
-                                        'label_vol' + '-' + str(b) + '.nii')
+                                        os.path.join(logs_path, 'label_vol' + '-' + str(b) + '.nii'))
 
                     if cfg.normalizing_method == cfg.NORMALIZING.WINDOW:
                         tf.summary.histogram('train_data_WINDOW', x_train, global_step, 20)
@@ -45,16 +59,16 @@ def _reader_test(training_dataset, mode):
     print('-----------------------------------------------------------')
 
 
-def run_liver_ratio_test(train_csv, mode):
+def run_vessel_ratio_test(train_csv, mode):
     np.random.seed(42)
     train_files = pd.read_csv(train_csv, dtype=object).as_matrix()
-    if mode == LiverSegLoader.MODES.APPLY:
+    if mode == VesselSegLoader.MODES.APPLY:
         train_files = train_files[0]
     else:
         train_files = train_files[0:2]
     loader_name = 'lits_liver_ratio_loader'
 
-    training_dataset = LiverSegRatioLoader(name=loader_name, mode=mode)\
+    training_dataset = VesselSegRatioLoader(name=loader_name, mode=mode)\
             (train_files, batch_size=cfg.batch_size, n_epochs=cfg.training_epochs, read_threads=cfg.vald_reader_instances)
 
     print('Testing: ' + loader_name + ' ' + str(cfg.random_sampling_mode))
@@ -78,4 +92,4 @@ if __name__ == '__main__':
     cfg.random_sampling_mode = cfg.SAMPLINGMODES.CONSTRAINED_LABEL
     cfg.normalizing_method = cfg.NORMALIZING.WINDOW
 
-    run_liver_ratio_test(train_csv, LiverSegLoader.MODES.TRAIN)
+    run_vessel_ratio_test(train_csv, VesselSegLoader.MODES.TRAIN)

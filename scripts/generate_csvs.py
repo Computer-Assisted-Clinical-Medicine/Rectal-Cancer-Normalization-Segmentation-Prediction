@@ -3,7 +3,7 @@ import os
 import glob
 from SegmentationNetworkBasis import config as cfg
 
-data_sets = [('ircad', 'T:\IRCAD'), ('btcv', 'T:\BTCV')]
+data_sets = [('ircad', 'T:\IRCAD'), ('btcv', 'T:\BTCV'), ('synth', 'T:\DVN-Synth')]
 
 for (data_name, data_path) in data_sets:
     print('Data Set: ', data_name)
