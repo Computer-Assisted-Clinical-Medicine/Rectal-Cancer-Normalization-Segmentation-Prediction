@@ -29,15 +29,15 @@ def _reader_test(training_dataset, mode):
                     with tf.name_scope('01_Input_and_Predictions'):
                         tf.summary.image('train_seg_lbl', tf.expand_dims(
                             tf.cast(tf.argmax(tf.gather(tf.squeeze(y_train[:, y_train.shape[1] // 2, :, :, :]),
-                                              [0, cfg.batch_size - 1]), -1) * (
+                                                        [0, cfg.batch_size_train - 1]), -1) * (
                                              255 // (cfg.num_classes_seg - 1)), tf.uint8), axis=-1),
                                          global_step, 2)
 
                         tf.summary.image('train_img', tf.cast((tf.gather(x_train[:, x_train.shape[1] // 2, :, :],
-                                                                         [0, cfg.batch_size - 1]) + 1) * 255 / 2,
+                                                                         [0, cfg.batch_size_train - 1]) + 1) * 255 / 2,
                                                               tf.uint8), global_step, 2)
 
-                    for b in range(cfg.batch_size):
+                    for b in range(cfg.batch_size_train):
                         sample_img = tf.gather(x_train, [b])
                         sitk.WriteImage(sitk.GetImageFromArray(np.squeeze(sample_img.numpy())),
                                         os.path.join(logs_path, 'train_vol' + '-' + str(b) + '.nii'))
@@ -69,7 +69,7 @@ def run_vessel_ratio_test(train_csv, mode):
     loader_name = 'lits_liver_ratio_loader'
 
     training_dataset = VesselSegRatioLoader(name=loader_name, mode=mode)\
-            (train_files, batch_size=cfg.batch_size, n_epochs=cfg.training_epochs, read_threads=cfg.vald_reader_instances)
+            (train_files, batch_size=cfg.batch_size_train, n_epochs=cfg.training_epochs, read_threads=cfg.vald_reader_instances)
 
     print('Testing: ' + loader_name + ' ' + str(cfg.random_sampling_mode))
     _reader_test(training_dataset, mode)
@@ -87,7 +87,7 @@ if __name__ == '__main__':
     cfg.train_input_shape = [cfg.num_slices, cfg.train_dim, cfg.train_dim, cfg.num_channels]
     cfg.train_label_shape = [cfg.num_slices, cfg.train_dim, cfg.train_dim, cfg.num_classes_seg]
     print(cfg.train_input_shape, cfg.train_label_shape)
-    cfg.batch_size = 2
+    cfg.batch_size_train = 2
 
     cfg.random_sampling_mode = cfg.SAMPLINGMODES.CONSTRAINED_LABEL
     cfg.normalizing_method = cfg.NORMALIZING.WINDOW

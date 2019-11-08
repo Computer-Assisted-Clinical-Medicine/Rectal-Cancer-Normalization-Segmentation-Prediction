@@ -7,7 +7,7 @@ import shutil
 from SegmentationNetworkBasis import config as cfg
 from BodyContourSegmentation import extract_body_contour
 
-data_path = 'T:\IRCAD\\3Dircadb1'
+data_path = 'D:\Image_Data\Patient_Data\IRCAD_new\\3Dircadb1'
 
 for f in range(1, 21):
 
@@ -27,8 +27,8 @@ for f in range(1, 21):
 
     im_folder = os.path.join(data_path, "3Dircadb1." + str(f)+"\PATIENT_DICOM\PATIENT_DICOM")
 
-    mask_out = "T:\IRCAD\Data\\" + cfg.label_file_name_prefix + str(f)+".nii"
-    im_out = "T:\IRCAD\Data\\" + cfg.sampe_file_name_prefix + str(f)+".nii"
+    mask_out = "D:\Image_Data\Patient_Data\IRCAD_new\Data\\" + cfg.label_file_name_prefix + str(f)+".nii"
+    im_out = "D:\Image_Data\Patient_Data\IRCAD_new\Data\\" + cfg.sampe_file_name_prefix + str(f)+".nii"
 
     # convert individual vessel masks
     for arterty in ['artery']:
@@ -68,8 +68,8 @@ for f in range(1, 21):
         masked_img = sitk.Mask(data_img, body_mask, -1000)
         sitk.WriteImage(masked_img, im_out)
         print("  Image done")
-    except:
-        print("  Couldn't convert Image " + im_folder)
+    except Exception as err:
+        print("  Couldn't convert Image " + im_folder, err)
 
     # fuse vessel labels
     data_img = sitk.ReadImage(im_out)
