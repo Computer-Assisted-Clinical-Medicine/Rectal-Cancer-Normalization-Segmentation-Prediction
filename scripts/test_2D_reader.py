@@ -31,11 +31,11 @@ def _reader_test(training_dataset, mode):
 
                         if cfg.normalizing_method == cfg.NORMALIZING.WINDOW:
                             tf.summary.image('train_img_WINDOW',
-                                             tf.cast((tf.gather(x_train, [0, cfg.batch_size - 1]) + 1) * 255 / 2, tf.uint8),
+                                             tf.cast((tf.gather(x_train, [0, cfg.batch_size_train - 1]) + 1) * 255 / 2, tf.uint8),
                                              global_step, 1)
                         else:
                             tf.summary.image('train_img_MEAN_STD',
-                                             tf.cast((tf.gather(x_train, [0, cfg.batch_size - 1]) + 1) * 255 / 4.5,
+                                             tf.cast((tf.gather(x_train, [0, cfg.batch_size_train - 1]) + 1) * 255 / 4.5,
                                                      tf.uint8),
                                              global_step, 1)
 
@@ -55,25 +55,25 @@ def _reader_test(training_dataset, mode):
                     try:
                         if cfg.normalizing_method == cfg.NORMALIZING.WINDOW:
                             tf.summary.image('train_img_WINDOW',
-                                             tf.cast((tf.gather(x_train, [0, cfg.batch_size - 1]) + 1) * 255 / 2, tf.uint8),
+                                             tf.cast((tf.gather(x_train, [0, cfg.batch_size_train - 1]) + 1) * 255 / 2, tf.uint8),
                                              global_step, 2)
                         else:
                             tf.summary.image('train_img_MEAN_STD',
-                                             tf.cast((tf.gather(x_train, [0, cfg.batch_size - 1]) + 1) * 255 / 4.5, tf.uint8),
+                                             tf.cast((tf.gather(x_train, [0, cfg.batch_size_train - 1]) + 1) * 255 / 4.5, tf.uint8),
                                              global_step, 2)
 
                         tf.summary.image('train_art_lbl',
                                          tf.expand_dims(
-                                             tf.cast(tf.gather(y_train, [0, cfg.batch_size - 1])[:, :, :, 1] * 255, tf.uint8),
+                                             tf.cast(tf.gather(y_train, [0, cfg.batch_size_train - 1])[:, :, :, 1] * 255, tf.uint8),
                                              axis=-1), global_step, 2)
                         tf.summary.image('train_vein_lbl',
                                          tf.expand_dims(
-                                             tf.cast(tf.gather(y_train, [0, cfg.batch_size - 1])[:, :, :, 2] * 255,
+                                             tf.cast(tf.gather(y_train, [0, cfg.batch_size_train - 1])[:, :, :, 2] * 255,
                                                      tf.uint8),
                                              axis=-1), global_step, 2)
                         tf.summary.image('train_seg_lbl',
                                          tf.expand_dims(
-                                             tf.cast(tf.argmax(tf.gather(y_train, [0, cfg.batch_size - 1]),-1) *(255//(cfg.num_classes_seg-1)),
+                                             tf.cast(tf.argmax(tf.gather(y_train, [0, cfg.batch_size_train - 1]), -1) * (255 // (cfg.num_classes_seg - 1)),
                                                      tf.uint8), axis=-1), global_step, 2)
 
                         if cfg.normalizing_method == cfg.NORMALIZING.WINDOW:
@@ -100,7 +100,7 @@ def run_vessel_test(train_csv, mode):
     loader_name = 'vessel_loader'
 
     training_dataset = VesselSegLoader(name=loader_name, mode=mode)\
-            (train_files, batch_size=cfg.batch_size, n_epochs=cfg.training_epochs, read_threads=cfg.vald_reader_instances)
+            (train_files, batch_size=cfg.batch_size_train, n_epochs=cfg.training_epochs, read_threads=cfg.vald_reader_instances)
 
     print('Testing: ' + loader_name + ' ' + str(cfg.random_sampling_mode))
     _reader_test(training_dataset, mode)
@@ -116,7 +116,7 @@ def run_vessel_ratio_test(train_csv, mode):
     loader_name = 'vessel_ratio_loader'
 
     training_dataset = VesselSegRatioLoader(name=loader_name, mode=mode)\
-            (train_files, batch_size=cfg.batch_size, n_epochs=cfg.training_epochs, read_threads=cfg.vald_reader_instances)
+            (train_files, batch_size=cfg.batch_size_train, n_epochs=cfg.training_epochs, read_threads=cfg.vald_reader_instances)
 
     print('Testing: ' + loader_name + ' ' + str(cfg.random_sampling_mode))
     _reader_test(training_dataset, mode)
