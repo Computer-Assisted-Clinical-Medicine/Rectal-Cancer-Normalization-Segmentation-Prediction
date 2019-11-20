@@ -49,7 +49,7 @@ def get_metrics(file):
     folder, file_number = os.path.split(file[0])
     result_metrics['File Number'] = file_number
     label_img = sitk.ReadImage(os.path.join(folder, (cfg.label_file_name_prefix + file_number + '.nii')))
-    data_img = sitk.ReadImage(os.path.join(folder, (cfg.sampe_file_name_prefix + file_number + '.nii')))
+    data_img = sitk.ReadImage(os.path.join(folder, (cfg.sample_file_name_prefix + file_number + '.nii')))
     data_info = Image.get_data_info(label_img)
     result_metrics['Slices'] = data_info['orig_size'][2]
     result_metrics['X/Y Spacing'] = data_info['orig_spacing'][0]
@@ -104,7 +104,7 @@ if __name__ == '__main__':
     if not os.path.exists(stats_directory):
         os.makedirs(stats_directory)
 
-    for data_set in ['../synth.csv', '../ircad.csv', '../btcv.csv']:
+    for data_set in ['../xcat.csv', '../synth.csv', '../ircad.csv', '../btcv.csv']:
         get_statistics(data_set)
 
 

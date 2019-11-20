@@ -28,7 +28,7 @@ for f in range(1, 21):
     im_folder = os.path.join(data_path, "3Dircadb1." + str(f)+"\PATIENT_DICOM\PATIENT_DICOM")
 
     mask_out = "D:\Image_Data\Patient_Data\IRCAD_new\Data\\" + cfg.label_file_name_prefix + str(f)+".nii"
-    im_out = "D:\Image_Data\Patient_Data\IRCAD_new\Data\\" + cfg.sampe_file_name_prefix + str(f)+".nii"
+    im_out = "D:\Image_Data\Patient_Data\IRCAD_new\Data\\" + cfg.sample_file_name_prefix + str(f) + ".nii"
 
     # convert individual vessel masks
     for arterty in ['artery']:

@@ -14,7 +14,7 @@ data_path = 'T:\DVN-Synth'
 for f in range(1, 137):  # Test Data does not have vessel annotations
     orig_label = os.path.join(data_path, 'seg', str(f) +".nii.gz")
     out_label = os.path.join(data_path, 'Data', cfg.label_file_name_prefix + str(f)+".nii")
-    out_img = os.path.join(data_path, 'Data', cfg.sampe_file_name_prefix + str(f)+".nii")
+    out_img = os.path.join(data_path, 'Data', cfg.sample_file_name_prefix + str(f) + ".nii")
     orig_img = os.path.join(data_path, 'raw', str(f) +".nii.gz")
 
     # convert image

@@ -16,7 +16,7 @@ cropping_info = pd.read_csv(os.path.join(data_path, 'cropping.csv'), dtype=objec
 for f in range(1, 41):  # Test Data does not have vessel annotations
     orig_label = os.path.join(data_path, 'label_btcv_multiorgan', "label" + "%04d" % f +".nii.gz")
     out_label = os.path.join(data_path, 'Data', cfg.label_file_name_prefix + str(f)+".nii")
-    out_img = os.path.join(data_path, 'Data', cfg.sampe_file_name_prefix + str(f)+".nii")
+    out_img = os.path.join(data_path, 'Data', cfg.sample_file_name_prefix + str(f) + ".nii")
     if f < 41:
         orig_img = os.path.join(data_path, 'RawData', 'Training', 'img', "img" + "%04d" % f + ".nii.gz")
     else:
