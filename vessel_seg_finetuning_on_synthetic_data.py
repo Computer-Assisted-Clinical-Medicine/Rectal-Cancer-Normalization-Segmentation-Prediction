@@ -66,13 +66,13 @@ def _set_parameters_according_to_dimension(hyper_parameters):
         cfg.batch_size_test = 1
 
 
-def training(train_csv, vald_csv, seed=42, **hyper_parameters):
+def training(seed=42, **hyper_parameters):
     tf.keras.backend.clear_session()
     # inits
     np.random.seed(seed)
     tf.random.set_seed(seed)
-    train_files = pd.read_csv(train_csv, dtype=object).as_matrix()
-    vald_files = pd.read_csv(vald_csv, dtype=object).as_matrix()
+    train_files = pd.read_csv(cfg.train_csv, dtype=object).as_matrix()
+    vald_files = pd.read_csv(cfg.vald_csv, dtype=object).as_matrix()
 
     training_dataset = VesselSegRatioLoader(name='training_loader') \
         (train_files, batch_size=cfg.batch_size_train, n_epochs=cfg.training_epochs,
@@ -89,7 +89,34 @@ def training(train_csv, vald_csv, seed=42, **hyper_parameters):
               summary_steps_per_epoch=cfg.summary_steps_per_epoch, **(hyper_parameters["train_parameters"]))
 
 
-def testing(test_csv, seed=42, **hyper_parameters):
+def finetuning(seed=42, **hyper_parameters):
+    tf.keras.backend.clear_session()
+    # inits
+    np.random.seed(seed)
+    tf.random.set_seed(seed)
+    fine_files = pd.read_csv(cfg.fine_csv, dtype=object).as_matrix()
+    vald_files = pd.read_csv(cfg.vald_csv, dtype=object).as_matrix()
+
+    training_dataset = VesselSegRatioLoader(name='training_loader') \
+        (fine_files, batch_size=cfg.batch_size_train, n_epochs=cfg.training_epochs,
+         read_threads=cfg.train_reader_instances)
+    validation_dataset = VesselSegRatioLoader(mode=VesselSegRatioLoader.MODES.VALIDATE, name='validation_loader') \
+        (vald_files, batch_size=cfg.batch_size_train,
+         read_threads=cfg.vald_reader_instances)
+
+    folder_name = _make_folder_name(hyper_parameters, 0)
+    net = hyper_parameters['architecture'](hyper_parameters['loss'], do_finetune=True,
+                                           model_path=os.path.join(hyper_parameters['experiment_path'], folder_name),
+                                           **(hyper_parameters["init_parameters"]))
+
+    folder_name = _make_folder_name(hyper_parameters, seed)
+    write_configurations(hyper_parameters['experiment_path'], folder_name, net, cfg)
+    # Train the network with the dataset iterators
+    net.finetune(hyper_parameters['experiment_path'], folder_name, training_dataset, validation_dataset,
+              summary_steps_per_epoch=cfg.summary_steps_per_epoch, **(hyper_parameters["train_parameters"]))
+
+
+def applying(seed=42, **hyper_parameters):
     '''!
     do testing
 
@@ -99,10 +126,12 @@ def testing(test_csv, seed=42, **hyper_parameters):
     # inits
     np.random.seed(seed)
     tf.random.set_seed(seed)
-    test_files = pd.read_csv(test_csv, dtype=object).as_matrix()
+    test_files = pd.read_csv(cfg.test_csv, dtype=object).as_matrix()
     testloader = VesselSegLoader(mode=VesselSegLoader.MODES.APPLY, name='test_loader')
 
     folder_name = _make_folder_name(hyper_parameters, seed)
+    if hyper_parameters["evaluate_on_finetuned"]:
+        folder_name = folder_name + '-f'
     net = hyper_parameters['architecture'](hyper_parameters['loss'], is_training=False, model_path=os.path.join(hyper_parameters['experiment_path'], folder_name), **(hyper_parameters["init_parameters"]))
 
     for f in test_files:
@@ -110,15 +139,17 @@ def testing(test_csv, seed=42, **hyper_parameters):
         net.apply(test_dataset, f)
 
 
-def evaluate(test_csv, seed=42, **hyper_parameters):
+def evaluate(seed=42, **hyper_parameters):
     '''!
     do testing
 
     '''
 
     np.random.seed(seed)
-    test_files = pd.read_csv(test_csv, dtype=object).as_matrix()
+    test_files = pd.read_csv(cfg.test_csv, dtype=object).as_matrix()
     folder_name = _make_folder_name(hyper_parameters, seed)
+    if hyper_parameters["evaluate_on_finetuned"]:
+        folder_name = folder_name + '-f'
     test_path = os.path.join(hyper_parameters['experiment_path'], folder_name + '_test')
     apply_path = os.path.join(hyper_parameters['experiment_path'], folder_name + '_apply')
     if not os.path.exists(test_path):
@@ -147,42 +178,14 @@ def evaluate(test_csv, seed=42, **hyper_parameters):
         except RuntimeError as err:
             print("    !!! Evaluation of " + folder_name + ' failed for' + f[0], err)
 
-if __name__ == '__main__':
 
-    np.random.seed(42)
-    cfg.organ = cfg.ORGANS.LIVER
-
-    ircad_csv = 'ircad.csv'
-    all_ircad_files = pd.read_csv(ircad_csv, dtype=object).as_matrix()
-    # btcv_csv = 'btcv.csv'
-    # all_btcv_files = pd.read_csv(btcv_csv, dtype=object).as_matrix()
-    # synth_csv = 'synth.csv'
-    # all_synth_files = pd.read_csv(synth_csv, dtype=object).as_matrix()
-    xcat_csv = 'xcat.csv'
-    all_xcat_files = pd.read_csv(xcat_csv, dtype=object).as_matrix()
-    # gan_csv = 'xcat.csv'
-    # all_gan_files = pd.read_csv(gan_csv, dtype=object).as_matrix()
-
-
-    train_csv = 'train.csv'
-    vald_csv = 'vald.csv'
-    test_csv = 'test.csv'
-    k_fold = 4
-
-    init_parameters = {"regularize": [True, 'L2', 0.0000001], "drop_out": [True, 0.2],
-                       "do_batch_normalization": True, "do_bias": False, "cross_hair": False}
-    train_parameters = {"l_r": 0.001, "optimizer": "Adam"}
-    hyper_parameters = {"init_parameters": init_parameters, "train_parameters": train_parameters}
-
+def experiment_1(data, hyper_parameters, k_fold):
+    hyper_parameters["evaluate_on_finetuned"] = False
     # Experiment 1: Train on individual Data sets
-    for (data_name, data_set) in [('xcat', all_xcat_files), ('ircad', all_ircad_files)]:  #, ('btcv', all_btcv_files), ('synth', all_synth_files),
-                                  # , 'gan', all_gan_files]:
+    for (data_name, data_set) in data:
+        np.random.seed(42)
 
         hyper_parameters['experiment_path'] = os.path.join(logs_path, 'individual_2D3D_' + data_name)
-        train_files = []
-        vald_files = []
-        test_files = []
-        part_train = int(cfg.data_train_split * data_set.size)
         all_indices = np.random.permutation(range(0, data_set.size))
         test_folds = np.array_split(all_indices, k_fold)
 
@@ -196,27 +199,17 @@ if __name__ == '__main__':
             vald_files = data_set[vald_indices]
             test_files = data_set[test_indices]
 
-            # train_indices = all_indices[0:part_train]
-            # vald_indices = all_indices[part_train:part_train + cfg.number_of_vald]
-            # test_indices = all_indices[part_train + cfg.number_of_vald:]
-            # train_files.extend(data_set[train_indices])
-            # vald_files.extend(data_set[vald_indices])
-            # test_files.extend(data_set[test_indices])
-            #
-            # train_files.extend(data_set[train_indices])
-            # vald_files.extend(data_set[vald_indices])
-            # test_files.extend(data_set[test_indices])
-
-            np.savetxt(train_csv, train_files, fmt='%s', header='path')
-            np.savetxt(vald_csv, vald_files, fmt='%s', header='path')
-            np.savetxt(test_csv, test_files, fmt='%s', header='path')
+            np.savetxt(cfg.train_csv, train_files, fmt='%s', header='path')
+            np.savetxt(cfg.vald_csv, vald_files, fmt='%s', header='path')
+            np.savetxt(cfg.test_csv, test_files, fmt='%s', header='path')
 
             cfg.num_files = len(train_files)
 
-            print('  Data Set ' + data_name + str(f) + ': ' + str(train_indices.size) + ' train cases, ' + str(test_indices.size)
+            print('  Data Set ' + data_name + str(f) + ': ' + str(train_indices.size) + ' train cases, '
+                  + str(test_indices.size)
                   + ' test cases, ' + str(vald_indices.size) + ' vald cases')
 
-            cfg.training_epochs = 60
+            cfg.training_epochs = 1
 
             for d in [2, 3]:
                 hyper_parameters["dimensions"] = d
@@ -229,7 +222,7 @@ if __name__ == '__main__':
                         try:
                             cfg.random_sampling_mode = cfg.SAMPLINGMODES.CONSTRAINED_LABEL
                             cfg.percent_of_object_samples = 50
-                            training(train_csv, vald_csv, **hyper_parameters, seed=f)
+                            training(**hyper_parameters, seed=f)
                             pass
                         except Exception as err:
                             print('Training ' + data_name,
@@ -238,20 +231,134 @@ if __name__ == '__main__':
 
                         try:
                             cfg.random_sampling_mode = cfg.SAMPLINGMODES.UNIFORM
-                            testing(test_csv, **hyper_parameters, seed=f)
+                            applying(**hyper_parameters, seed=f)
                         except Exception as err:
-                            print('Testing ' + data_name,
+                            print('Applying ' + data_name,
                                   hyper_parameters['architecture'].get_name() + hyper_parameters['loss'] + 'failed!')
                             print(err)
 
                         try:
-                            evaluate(test_csv, **hyper_parameters, seed=f)
+                            evaluate(**hyper_parameters, seed=f)
                         except Exception as err:
-                            print('Testing ' + data_name,
+                            print('Evaluating ' + data_name,
                                   hyper_parameters['architecture'].get_name() + hyper_parameters['loss'] + 'failed!')
                             print(err)
 
 
-
-
+def experiment_2(data_train, data_fine, hyper_parameters, k_fold):
+    hyper_parameters["evaluate_on_finetuned"] = True
     # Experiment 2: Pretrain on synthetic, Finetune on Real
+    for (fine_data_name, fine_data_set) in data_fine:
+        np.random.seed(42)
+        all_indices = np.random.permutation(range(0, fine_data_set.size))
+        test_folds = np.array_split(all_indices, k_fold)
+
+        for (train_data_name, train_data_set) in data_train:
+            np.random.seed(42)
+
+            train_indices = np.random.permutation(range(0, train_data_set.size))
+            train_files = train_data_set[train_indices]
+            np.savetxt(cfg.train_csv, train_files, fmt='%s', header='path')
+
+            hyper_parameters['experiment_path'] = os.path.join(logs_path,
+                                                   'trainandfinetune_2D3D_' + train_data_name + '_' + fine_data_name)
+
+            for f in range(k_fold):
+                test_indices = test_folds[f]
+                remaining_indices = np.setdiff1d(all_indices, test_folds[f])
+                vald_indices = remaining_indices[:cfg.number_of_vald]
+                fine_indices = remaining_indices[cfg.number_of_vald:]
+
+                fine_files = fine_data_set[fine_indices]
+                vald_files = fine_data_set[vald_indices]
+                test_files = fine_data_set[test_indices]
+
+                np.savetxt(cfg.fine_csv, fine_files, fmt='%s', header='path')
+                np.savetxt(cfg.vald_csv, vald_files, fmt='%s', header='path')
+                np.savetxt(cfg.test_csv, test_files, fmt='%s', header='path')
+
+                print('  Data Set ' + train_data_name + '_' + fine_data_name + str(f) + ': '
+                      + str(train_indices.size) + ' train cases, ' + str(fine_indices.size) + ' fine cases, '
+                      + str(test_indices.size) + ' test cases, ' + str(vald_indices.size) + ' vald cases')
+
+                for d in [2, 3]:
+                    hyper_parameters["dimensions"] = d
+                    _set_parameters_according_to_dimension(hyper_parameters)
+                    for l in ['WDL']:  # 'CEL', 'TVE', , 'DICE']:
+                        hyper_parameters["loss"] = l
+                        for a in [FCN, UNet, VNet]:
+                            hyper_parameters['architecture'] = a
+
+                            if f == 0:
+                                try:
+                                    cfg.num_files = len(train_files)
+                                    cfg.training_epochs = 2
+                                    cfg.random_sampling_mode = cfg.SAMPLINGMODES.CONSTRAINED_LABEL
+                                    cfg.percent_of_object_samples = 50
+                                    training(**hyper_parameters, seed=f)
+                                    pass
+                                except Exception as err:
+                                    print('Training ' + train_data_name,
+                                          hyper_parameters['architecture'].get_name() + hyper_parameters[
+                                              'loss'] + 'failed!')
+                                    print(err)
+
+                            try:
+                                cfg.num_files = len(fine_files)
+                                cfg.training_epochs = 1
+                                cfg.random_sampling_mode = cfg.SAMPLINGMODES.CONSTRAINED_LABEL
+                                cfg.percent_of_object_samples = 50
+                                finetuning(**hyper_parameters, seed=f)
+                                pass
+                            except Exception as err:
+                                print('Training ' + train_data_name,
+                                      hyper_parameters['architecture'].get_name() + hyper_parameters[
+                                          'loss'] + 'failed!')
+                                print(err)
+
+                            try:
+                                cfg.random_sampling_mode = cfg.SAMPLINGMODES.UNIFORM
+                                applying(**hyper_parameters, seed=f)
+                            except Exception as err:
+                                print('Applying ' + fine_data_name,
+                                      hyper_parameters['architecture'].get_name() + hyper_parameters[
+                                          'loss'] + 'failed!')
+                                print(err)
+
+                            try:
+                                evaluate(**hyper_parameters, seed=f)
+                            except Exception as err:
+                                print('Evaluating ' + fine_data_name,
+                                      hyper_parameters['architecture'].get_name() + hyper_parameters[
+                                          'loss'] + 'failed!')
+                                print(err)
+
+if __name__ == '__main__':
+
+    np.random.seed(42)
+
+    ircad_csv = 'ircad.csv'
+    all_ircad_files = pd.read_csv(ircad_csv, dtype=object).as_matrix()
+    # btcv_csv = 'btcv.csv'
+    # all_btcv_files = pd.read_csv(btcv_csv, dtype=object).as_matrix()
+    # synth_csv = 'synth.csv'
+    # all_synth_files = pd.read_csv(synth_csv, dtype=object).as_matrix()
+    xcat_csv = 'xcat.csv'
+    all_xcat_files = pd.read_csv(xcat_csv, dtype=object).as_matrix()
+    # gan_csv = 'xcat.csv'
+    # all_gan_files = pd.read_csv(gan_csv, dtype=object).as_matrix()
+
+
+    k_fold = 4
+
+    init_parameters = {"regularize": [True, 'L2', 0.0000001], "drop_out": [True, 0.2],
+                       "do_batch_normalization": True, "do_bias": False, "cross_hair": False}
+    train_parameters = {"l_r": 0.001, "optimizer": "Adam"}
+    hyper_parameters = {"init_parameters": init_parameters, "train_parameters": train_parameters}
+
+
+    experiment_1([('xcat', all_xcat_files), ('ircad', all_ircad_files)], hyper_parameters, k_fold)
+    # experiment_2([('xcat', all_xcat_files)], [('ircad', all_ircad_files)], hyper_parameters, k_fold)
+
+
+
