@@ -209,7 +209,7 @@ def experiment_1(data, hyper_parameters, k_fold):
                   + str(test_indices.size)
                   + ' test cases, ' + str(vald_indices.size) + ' vald cases')
 
-            cfg.training_epochs = 1
+            cfg.training_epochs = 30
 
             for d in [2, 3]:
                 hyper_parameters["dimensions"] = d
@@ -292,7 +292,7 @@ def experiment_2(data_train, data_fine, hyper_parameters, k_fold):
                             if f == 0:
                                 try:
                                     cfg.num_files = len(train_files)
-                                    cfg.training_epochs = 2
+                                    cfg.training_epochs = 20
                                     cfg.random_sampling_mode = cfg.SAMPLINGMODES.CONSTRAINED_LABEL
                                     cfg.percent_of_object_samples = 50
                                     training(**hyper_parameters, seed=f)
@@ -305,7 +305,7 @@ def experiment_2(data_train, data_fine, hyper_parameters, k_fold):
 
                             try:
                                 cfg.num_files = len(fine_files)
-                                cfg.training_epochs = 1
+                                cfg.training_epochs = 10
                                 cfg.random_sampling_mode = cfg.SAMPLINGMODES.CONSTRAINED_LABEL
                                 cfg.percent_of_object_samples = 50
                                 finetuning(**hyper_parameters, seed=f)
@@ -358,7 +358,7 @@ if __name__ == '__main__':
 
 
     experiment_1([('xcat', all_xcat_files), ('ircad', all_ircad_files)], hyper_parameters, k_fold)
-    # experiment_2([('xcat', all_xcat_files)], [('ircad', all_ircad_files)], hyper_parameters, k_fold)
+    experiment_2([('xcat', all_xcat_files)], [('ircad', all_ircad_files)], hyper_parameters, k_fold)
 
 
 
