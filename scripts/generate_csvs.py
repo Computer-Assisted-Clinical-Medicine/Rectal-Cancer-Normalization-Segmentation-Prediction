@@ -3,8 +3,8 @@ import os
 import glob
 from SegmentationNetworkBasis import config as cfg
 
-data_sets = [('ircad', 'D:\Image_Data\Patient_Data\IRCAD_new'), ('xcat', 'D:\Image_Data\\Numerical_Phantoms\\XCAT\\NRRD_Breathe'),
-             ('gan', 'D:\Image_Data\Patient_Data\IRCAD_new\Synthetic'), ('btcv', 'T:\BTCV'), ('synth', 'T:\DVN-Synth')]
+data_sets = [('btcv', 'D:\Image_Data\Patient_Data\BTCV'), ('ircad', 'D:\Image_Data\Patient_Data\IRCAD_new'), ('xcat', 'D:\Image_Data\\Numerical_Phantoms\\XCAT\\NRRD_Breathe'),
+             ('gan', 'D:\Image_Data\Patient_Data\IRCAD_new\Synthetic'), ('synth', 'T:\DVN-Synth')]
 
 for (data_name, data_path) in data_sets:
     print('Data Set: ', data_name)
