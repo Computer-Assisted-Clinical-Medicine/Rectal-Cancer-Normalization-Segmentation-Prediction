@@ -8,7 +8,7 @@ import tensorflow as tf
 
 from SegmentationNetworkBasis import config as cfg
 from SegmentationNetworkBasis.NetworkBasis.util import write_configurations, write_metrics_to_csv, make_csv_file
-from SegmentationNetworkBasis.architecture import UNet, VNet, DVN
+from SegmentationNetworkBasis.architecture import UNet, VNet, DVN, CombiNet
 import SegmentationNetworkBasis.NetworkBasis.image as image
 from vesselsegloader import VesselSegRatioLoader
 from vesselsegloader import VesselSegLoader
@@ -21,7 +21,7 @@ if cfg.ONSERVER:
     physical_devices = tf.config.experimental.list_physical_devices('GPU')
     tf.config.experimental.set_memory_growth(physical_devices[0], True)
 else:
-    logs_path = os.path.join("R:", experiment_name)
+    logs_path = os.path.join("R:\\", experiment_name)
 
 
 def _make_folder_name(hyper_parameters, seed):
@@ -200,6 +200,7 @@ def evaluate(seed=42, model_path='', **hyper_parameters):
         except RuntimeError as err:
             print("    !!! Evaluation of " + folder_name + ' failed for' + f[0], err)
 
+
 def fuse_probabilities_over_folds(k_fold, seed=42, **hyper_parameters):
     '''!
     do testing
@@ -241,7 +242,7 @@ def fuse_probabilities_over_folds(k_fold, seed=42, **hyper_parameters):
                                 ('prediction' + '-' + version + '-' + file_number + '.nii')))
         print('        Fused predictions for ', file_number)
 
-		
+
 def fuse_probabilities_over_networks(dimensions_and_architectures, seed=42, **hyper_parameters):
     '''!
     do testing
@@ -269,13 +270,15 @@ def fuse_probabilities_over_networks(dimensions_and_architectures, seed=42, **hy
             prediction_path = os.path.join(apply_path, ('prediction' + '-' + version + '-' + file_number + '.nii'))
             predictions.append(sitk.ReadImage(prediction_path))
 
+        hyper_parameters['architecture'] = CombiNet
+        hyper_parameters["dimensions"] = 'n'
         folder_name = _make_folder_name(hyper_parameters, 'fused')
         apply_path = os.path.join(hyper_parameters['experiment_path'], folder_name + '_apply')
         if not os.path.exists(apply_path):
             os.makedirs(apply_path)
-        fused_probabilities = 1 / k_fold * sitk.GetArrayFromImage(predictions[0])
+        fused_probabilities = 1 / len(dimensions_and_architectures) * sitk.GetArrayFromImage(predictions[0])
         for p in predictions[1:]:
-            fused_probabilities = fused_probabilities + 1 / k_fold * sitk.GetArrayFromImage(p)
+            fused_probabilities = fused_probabilities + 1 / len(dimensions_and_architectures) * sitk.GetArrayFromImage(p)
 
         data_info = image.get_data_info(p)
         fused_prediction = np.argmax(fused_probabilities, -1)
@@ -284,6 +287,7 @@ def fuse_probabilities_over_networks(dimensions_and_architectures, seed=42, **hy
         sitk.WriteImage(pred_img, os.path.join(apply_path,
                                 ('prediction' + '-' + version + '-' + file_number + '.nii')))
         print('        Fused predictions for ', file_number)
+
 
 def experiment_1(data, hyper_parameters, k_fold, dimensions_and_architectures, losses):
     hyper_parameters["evaluate_on_finetuned"] = False
@@ -540,7 +544,7 @@ def experiment_4(data, hyper_parameters, k_fold, dimensions_and_architectures, l
     for (data_name, data_set) in data:
         np.random.seed(42)
 
-        hyper_parameters['experiment_path'] = os.path.join(logs_path, 'individual_final5f-fin_' + data_name)
+        hyper_parameters['experiment_path'] = os.path.join(logs_path, 'apply_' + data_name + '_mullti')
         all_indices = np.random.permutation(range(0, data_set.size))
         test_folds = np.array_split(all_indices, k_fold)
 
@@ -566,44 +570,47 @@ def experiment_4(data, hyper_parameters, k_fold, dimensions_and_architectures, l
 
             cfg.training_epochs = cfg.epochs_for_training
 
-			for l in losses:
-				hyper_parameters["loss"] = l
-				for d, a in dimensions_and_architectures:
-					hyper_parameters["dimensions"] = d
-					_set_parameters_according_to_dimension(hyper_parameters)
-					hyper_parameters['architecture'] = a
+            for l in losses:
+                hyper_parameters["loss"] = l
+                for d, a in dimensions_and_architectures:
+                    hyper_parameters["dimensions"] = d
+                    _set_parameters_according_to_dimension(hyper_parameters)
+                    hyper_parameters['architecture'] = a
 
-					cfg.write_probabilities = True
-					cfg.target_type_label = sitk.sitkVectorFloat32
-					cfg.adapt_resolution = True
+                    # cfg.write_probabilities = True
+                    # cfg.target_type_label = sitk.sitkVectorFloat32
+                    # cfg.adapt_resolution = True
+                    #
+                    # try:
+                    # 	cfg.random_sampling_mode = cfg.SAMPLINGMODES.UNIFORM
+                    # 	applying(seed=f, **hyper_parameters)
+                    # except Exception as err:
+                    # 	print('Applying ' + data_name,
+                    # 			hyper_parameters['architecture'].get_name() + hyper_parameters['loss'] + 'failed!')
+                    # 	print(err)
+                    # pass
 
-					try:
-						cfg.random_sampling_mode = cfg.SAMPLINGMODES.UNIFORM
-						applying(seed=f, **hyper_parameters)
-					except Exception as err:
-						print('Applying ' + data_name,
-								hyper_parameters['architecture'].get_name() + hyper_parameters['loss'] + 'failed!')
-						print(err)
-					pass
+                cfg.write_probabilities = False
+                cfg.target_type_label = sitk.sitkUInt8
+                cfg.adapt_resolution = False
+                # fuse_probabilities_over_networks(dimensions_and_architectures, seed=f, **hyper_parameters)
+                hyper_parameters['architecture'] = CombiNet
+                hyper_parameters["dimensions"] = 'n'
 
-				cfg.write_probabilities = False
-				cfg.target_type_label = sitk.sitkUInt8
-				cfg.adapt_resolution = False
-				fuse_probabilities_over_networks(dimensions_and_architectures, seed=f, **hyper_parameters)
-		
-				try:
-					evaluate(seed='fused',  **hyper_parameters)
-				except Exception as err:
-					print('Evaluating ' + test_data_name,
-						  hyper_parameters['architecture'].get_name() + hyper_parameters[
-							  'loss'] + 'failed!')
-					print(err)
-		
-				print('------------------------------------------')
+                try:
+                    evaluate(seed='fused',  **hyper_parameters)
+                except Exception as err:
+                    print('Evaluating ' + data_name,
+                          hyper_parameters['architecture'].get_name() + hyper_parameters[
+                              'loss'] + 'failed!')
+                    print(err)
+
+                print('------------------------------------------')
             
             evaluation.combine_evaluation_results_from_folds(hyper_parameters['experiment_path'],
-                                                             losses, dimensions_and_architectures)
+                                                             losses, (['n', CombiNet],))
             evaluation.make_boxplot_graphic(hyper_parameters['experiment_path'], dimensions_and_architectures, losses)
+
 
 if __name__ == '__main__':
 
@@ -622,7 +629,7 @@ if __name__ == '__main__':
 
     k_fold = 5
     losses = ['CEL+DICE']
-    dimensions_and_architectures = ([2, UNet], [2, VNet], [2, DVN], [3, UNet],[3, VNet], [3, DVN])  #[2, UNet],    [3, VNet] ,[2, UNet], [2, VNet], [2, DVN], [3, UNet],[3, VNet], [3, DVN]
+    dimensions_and_architectures = ([2, UNet], [3, VNet])  #[2, UNet],    [3, VNet] ,[2, UNet], [2, VNet], [2, DVN], [3, UNet],[3, VNet], [3, DVN]
 
     init_parameters = {"regularize": [True, 'L2', 0.0000001], "drop_out": [True, 0.01], "activation": "elu",
                        "do_batch_normalization": False, "do_bias": True, "cross_hair": False}
@@ -639,7 +646,7 @@ if __name__ == '__main__':
     # # experiment_2([('gan', all_gan_files), ('xcat', all_xcat_files)], [('ircad', all_ircad_files)], hyper_parameters, k_fold,
     #              dimensions_and_architectures, losses)
 
-    experiment_3(['ircad'], [('btcv', all_btcv_files)], hyper_parameters, k_fold,
-                 dimensions_and_architectures, losses)
+    # experiment_3(['ircad'], [('btcv', all_btcv_files)], hyper_parameters, k_fold,
+    #              dimensions_and_architectures, losses)
 
     experiment_4([('ircad', all_ircad_files)], hyper_parameters, k_fold, dimensions_and_architectures, losses)
