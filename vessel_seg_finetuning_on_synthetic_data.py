@@ -7,7 +7,7 @@ import tensorflow as tf
 
 from SegmentationNetworkBasis import config as cfg
 from SegmentationNetworkBasis.NetworkBasis.util import write_configurations, write_metrics_to_csv, make_csv_file
-from SegmentationNetworkBasis.architecture import ShallowVNet, UNet, VNet, FCN
+from SegmentationNetworkBasis.architecture import ShallowVNet, UNet, VNet, DVN
 from vesselsegloader import VesselSegRatioLoader
 from vesselsegloader import VesselSegLoader
 import evaluation

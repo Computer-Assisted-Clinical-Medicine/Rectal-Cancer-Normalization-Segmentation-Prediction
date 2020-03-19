@@ -104,7 +104,7 @@ if __name__ == '__main__':
     if not os.path.exists(stats_directory):
         os.makedirs(stats_directory)
 
-    for data_set in ['../xcat.csv', '../synth.csv', '../ircad.csv', '../btcv.csv']:
+    for data_set in ['../btcv.csv', '../xcat.csv', '../synth.csv', '../ircad.csv']:
         get_statistics(data_set)
 
 
