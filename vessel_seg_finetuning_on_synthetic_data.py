@@ -1,5 +1,6 @@
 import os
 import time
+import SimpleITK as sitk
 
 import numpy as np
 import pandas as pd
@@ -7,7 +8,8 @@ import tensorflow as tf
 
 from SegmentationNetworkBasis import config as cfg
 from SegmentationNetworkBasis.NetworkBasis.util import write_configurations, write_metrics_to_csv, make_csv_file
-from SegmentationNetworkBasis.architecture import ShallowVNet, UNet, VNet, DVN
+from SegmentationNetworkBasis.architecture import UNet, VNet, DVN
+import SegmentationNetworkBasis.NetworkBasis.image as image
 from vesselsegloader import VesselSegRatioLoader
 from vesselsegloader import VesselSegLoader
 import evaluation
@@ -15,7 +17,7 @@ import evaluation
 experiment_name = "vessel_segmentation"
 if cfg.ONSERVER:
     logs_path = os.path.join("tmp", experiment_name)
-    os.environ["CUDA_VISIBLE_DEVICES"] = "1"
+    os.environ["CUDA_VISIBLE_DEVICES"] = "0"
     physical_devices = tf.config.experimental.list_physical_devices('GPU')
     tf.config.experimental.set_memory_growth(physical_devices[0], True)
 else:
@@ -99,15 +101,13 @@ def training(seed=42, **hyper_parameters):
               summary_steps_per_epoch=cfg.summary_steps_per_epoch, **(hyper_parameters["train_parameters"]))
 
 
-def finetuning(seed=42, **hyper_parameters):
+def finetuning(model_path, seed=42, **hyper_parameters):
     tf.keras.backend.clear_session()
     # inits
     np.random.seed(seed)
     tf.random.set_seed(seed)
     fine_files = pd.read_csv(cfg.fine_csv, dtype=object).as_matrix()
     vald_files = pd.read_csv(cfg.vald_csv, dtype=object).as_matrix()
-
-    cfg.training_epochs = 80
 
     training_dataset = VesselSegRatioLoader(name='training_loader') \
         (fine_files, batch_size=cfg.batch_size_train, n_epochs=cfg.training_epochs,
@@ -116,23 +116,18 @@ def finetuning(seed=42, **hyper_parameters):
         (vald_files, batch_size=cfg.batch_size_train,
          read_threads=cfg.vald_reader_instances)
 
-    cfg.training_epochs = 20
-    folder_name = _make_folder_name(hyper_parameters, 0)
-
-    cfg.training_epochs = 80
-
     net = hyper_parameters['architecture'](hyper_parameters['loss'], do_finetune=True,
-                                           model_path=os.path.join(hyper_parameters['experiment_path'], folder_name),
-                                           **(hyper_parameters["init_parameters"]))
+                                           model_path=model_path, **(hyper_parameters["init_parameters"]))
 
-    folder_name = _make_folder_name(hyper_parameters, seed)
-    write_configurations(hyper_parameters['experiment_path'], folder_name, net, cfg)
+    original_folder = "-".join(os.path.basename(model_path).split('-')[0:2])
+    folder_name = original_folder + '-' +_make_folder_name(hyper_parameters, seed)
+    write_configurations(hyper_parameters['experiment_path'], folder_name + '-f', net, cfg)
     # Train the network with the dataset iterators
     net.finetune(hyper_parameters['experiment_path'], folder_name, training_dataset, validation_dataset,
               summary_steps_per_epoch=cfg.summary_steps_per_epoch, **(hyper_parameters["train_parameters"]))
 
 
-def applying(seed=42, **hyper_parameters):
+def applying(seed=42, model_path='', **hyper_parameters):
     '''!
     do testing
 
@@ -145,9 +140,13 @@ def applying(seed=42, **hyper_parameters):
     test_files = pd.read_csv(cfg.test_csv, dtype=object).as_matrix()
     testloader = VesselSegLoader(mode=VesselSegLoader.MODES.APPLY, name='test_loader')
 
-    folder_name = _make_folder_name(hyper_parameters, seed)
     if hyper_parameters["evaluate_on_finetuned"]:
-        folder_name = folder_name + '-f'
+        cfg.training_epochs = cfg.epochs_for_finetuning
+        original_folder = "-".join(os.path.basename(model_path).split('-')[0:2])
+        folder_name = original_folder + '-' + _make_folder_name(hyper_parameters, seed) + '-f'
+    else:
+        cfg.training_epochs = cfg.epochs_for_training
+        folder_name = _make_folder_name(hyper_parameters, seed)
     net = hyper_parameters['architecture'](hyper_parameters['loss'], is_training=False, model_path=os.path.join(hyper_parameters['experiment_path'], folder_name), **(hyper_parameters["init_parameters"]))
 
     for f in test_files:
@@ -157,25 +156,30 @@ def applying(seed=42, **hyper_parameters):
     tf.keras.backend.clear_session()
 
 
-def evaluate(seed=42, **hyper_parameters):
+def evaluate(seed=42, model_path='', **hyper_parameters):
     '''!
     do testing
 
     '''
 
-    np.random.seed(seed)
+    np.random.seed(42)
     test_files = pd.read_csv(cfg.test_csv, dtype=object).as_matrix()
-    folder_name = _make_folder_name(hyper_parameters, seed)
     if hyper_parameters["evaluate_on_finetuned"]:
-        folder_name = folder_name + '-f'
+        cfg.training_epochs = cfg.epochs_for_finetuning
+        original_folder = "-".join(os.path.basename(model_path).split('-')[0:2])
+        folder_name = original_folder + '-' + _make_folder_name(hyper_parameters, seed) + '-f'
+    else:
+        cfg.training_epochs = cfg.epochs_for_training
+        folder_name = _make_folder_name(hyper_parameters, seed)
+
     test_path = os.path.join(hyper_parameters['experiment_path'], folder_name + '_test')
     apply_path = os.path.join(hyper_parameters['experiment_path'], folder_name + '_apply')
+
+    version = str(cfg.training_epochs)
+
     if not os.path.exists(test_path):
         os.makedirs(test_path)
-    latest_model = tf.train.latest_checkpoint(os.path.join(hyper_parameters['experiment_path'], folder_name, 'model'))
-    _, model_base = os.path.split(latest_model)
-    file, ext = os.path.splitext(model_base)
-    version = file.split('-')[-1]
+
     eval_file_path = os.path.join(test_path, 'evaluation-' + folder_name + '-' + version + '.csv')
     header_row = evaluation.make_csv_header()
     make_csv_file(eval_file_path, header_row)
@@ -196,14 +200,98 @@ def evaluate(seed=42, **hyper_parameters):
         except RuntimeError as err:
             print("    !!! Evaluation of " + folder_name + ' failed for' + f[0], err)
 
+def fuse_probabilities_over_folds(k_fold, seed=42, **hyper_parameters):
+    '''!
+    do testing
 
-def experiment_1(data, hyper_parameters, k_fold, dimensions, losses, architectures):
+    '''
+
+    np.random.seed(seed)
+    tf.random.set_seed(seed)
+    test_files = pd.read_csv(cfg.test_csv, dtype=object).as_matrix()
+    cfg.training_epochs = cfg.epochs_for_training
+    for file in test_files:
+        predictions = []
+        for f in range(0, k_fold):
+            folder_name = _make_folder_name(hyper_parameters, seed)
+            latest_model = tf.train.latest_checkpoint(os.path.join(hyper_parameters['experiment_path'], folder_name, 'model'))
+            _, model_base = os.path.split(latest_model)
+            name, ext = os.path.splitext(model_base)
+            version = name.split('-')[-1]
+
+            apply_path = os.path.join(hyper_parameters['experiment_path'], folder_name + '_apply')
+
+            folder, file_number = os.path.split(file[0])
+            prediction_path = os.path.join(apply_path, ('prediction' + '-' + version + '-' + file_number + '.nii'))
+            predictions.append(sitk.ReadImage(prediction_path))
+
+        folder_name = _make_folder_name(hyper_parameters, 'fused')
+        apply_path = os.path.join(hyper_parameters['experiment_path'], folder_name + '_apply')
+        if not os.path.exists(apply_path):
+            os.makedirs(apply_path)
+        fused_probabilities = 1 / k_fold * sitk.GetArrayFromImage(predictions[0])
+        for p in predictions[1:]:
+            fused_probabilities = fused_probabilities + 1 / k_fold * sitk.GetArrayFromImage(p)
+
+        data_info = image.get_data_info(p)
+        fused_prediction = np.argmax(fused_probabilities, -1)
+        pred_img = image.np_array_to_itk_image(fused_prediction, data_info, cfg.label_background_value,
+                                               cfg.adapt_resolution, cfg.target_type_label)
+        sitk.WriteImage(pred_img, os.path.join(apply_path,
+                                ('prediction' + '-' + version + '-' + file_number + '.nii')))
+        print('        Fused predictions for ', file_number)
+
+		
+def fuse_probabilities_over_networks(dimensions_and_architectures, seed=42, **hyper_parameters):
+    '''!
+    do testing
+
+    '''
+
+    np.random.seed(seed)
+    tf.random.set_seed(seed)
+    test_files = pd.read_csv(cfg.test_csv, dtype=object).as_matrix()
+    cfg.training_epochs = cfg.epochs_for_training
+    for file in test_files:
+        predictions = []
+        for d, a in dimensions_and_architectures:
+            hyper_parameters["dimensions"] = d
+            hyper_parameters['architecture'] = a
+            folder_name = _make_folder_name(hyper_parameters, seed)
+            latest_model = tf.train.latest_checkpoint(os.path.join(hyper_parameters['experiment_path'], folder_name, 'model'))
+            _, model_base = os.path.split(latest_model)
+            name, ext = os.path.splitext(model_base)
+            version = name.split('-')[-1]
+
+            apply_path = os.path.join(hyper_parameters['experiment_path'], folder_name + '_apply')
+
+            folder, file_number = os.path.split(file[0])
+            prediction_path = os.path.join(apply_path, ('prediction' + '-' + version + '-' + file_number + '.nii'))
+            predictions.append(sitk.ReadImage(prediction_path))
+
+        folder_name = _make_folder_name(hyper_parameters, 'fused')
+        apply_path = os.path.join(hyper_parameters['experiment_path'], folder_name + '_apply')
+        if not os.path.exists(apply_path):
+            os.makedirs(apply_path)
+        fused_probabilities = 1 / k_fold * sitk.GetArrayFromImage(predictions[0])
+        for p in predictions[1:]:
+            fused_probabilities = fused_probabilities + 1 / k_fold * sitk.GetArrayFromImage(p)
+
+        data_info = image.get_data_info(p)
+        fused_prediction = np.argmax(fused_probabilities, -1)
+        pred_img = image.np_array_to_itk_image(fused_prediction, data_info, cfg.label_background_value,
+                                               cfg.adapt_resolution, cfg.target_type_label)
+        sitk.WriteImage(pred_img, os.path.join(apply_path,
+                                ('prediction' + '-' + version + '-' + file_number + '.nii')))
+        print('        Fused predictions for ', file_number)
+
+def experiment_1(data, hyper_parameters, k_fold, dimensions_and_architectures, losses):
     hyper_parameters["evaluate_on_finetuned"] = False
     # Experiment 1: Train on individual Data sets
     for (data_name, data_set) in data:
         np.random.seed(42)
 
-        hyper_parameters['experiment_path'] = os.path.join(logs_path, 'individual_final5f_' + data_name)
+        hyper_parameters['experiment_path'] = os.path.join(logs_path, 'individual_final5f-fin_' + data_name)
         all_indices = np.random.permutation(range(0, data_set.size))
         test_folds = np.array_split(all_indices, k_fold)
 
@@ -227,53 +315,53 @@ def experiment_1(data, hyper_parameters, k_fold, dimensions, losses, architectur
                   + str(test_indices.size)
                   + ' test cases, ' + str(vald_indices.size) + ' vald cases')
 
-            cfg.training_epochs = 80
+            cfg.training_epochs = cfg.epochs_for_training
 
-            for d in dimensions:
+            for d, a in dimensions_and_architectures:
                 hyper_parameters["dimensions"] = d
                 _set_parameters_according_to_dimension(hyper_parameters)
-                for a in architectures:
-                    hyper_parameters['architecture'] = a
-                    for l in losses:
-                        hyper_parameters["loss"] = l
+                hyper_parameters['architecture'] = a
+                for l in losses:
+                    hyper_parameters["loss"] = l
 
-                        try:
-                            cfg.random_sampling_mode = cfg.SAMPLINGMODES.CONSTRAINED_LABEL
-                            cfg.percent_of_object_samples = 50
-                            training(**hyper_parameters, seed=f)
-                            pass
-                        except Exception as err:
-                            print('Training ' + data_name,
-                                  hyper_parameters['architecture'].get_name() + hyper_parameters['loss'] + 'failed!')
-                            print(err)
+                    # try:
+                    #     cfg.random_sampling_mode = cfg.SAMPLINGMODES.CONSTRAINED_LABEL
+                    #     cfg.percent_of_object_samples = 50
+                    #     training(**hyper_parameters, seed=f)
+                    #     pass
+                    # except Exception as err:
+                    #     print('Training ' + data_name,
+                    #           hyper_parameters['architecture'].get_name() + hyper_parameters['loss'] + 'failed!')
+                    #     print(err)
+                    #
+                    # time.sleep(20)
 
-                        try:
-                            cfg.random_sampling_mode = cfg.SAMPLINGMODES.UNIFORM
-                            applying(**hyper_parameters, seed=f)
-                        except Exception as err:
-                            print('Applying ' + data_name,
-                                  hyper_parameters['architecture'].get_name() + hyper_parameters['loss'] + 'failed!')
-                            print(err)
+                    # try:
+                    #     cfg.random_sampling_mode = cfg.SAMPLINGMODES.UNIFORM
+                    #     applying(**hyper_parameters, seed=f)
+                    # except Exception as err:
+                    #     print('Applying ' + data_name,
+                    #           hyper_parameters['architecture'].get_name() + hyper_parameters['loss'] + 'failed!')
+                    #     print(err)
+                    #
+                    try:
+                        evaluate(**hyper_parameters, seed=f)
+                    except Exception as err:
+                        print('Evaluating ' + data_name,
+                              hyper_parameters['architecture'].get_name() + hyper_parameters['loss'] + 'failed!')
+                        print(err)
 
-                        try:
-                            evaluate(**hyper_parameters, seed=f)
-                        except Exception as err:
-                            print('Evaluating ' + data_name,
-                                  hyper_parameters['architecture'].get_name() + hyper_parameters['loss'] + 'failed!')
-                            print(err)
-
-        try:
-            evaluation.combine_evaluation_results_from_folds(hyper_parameters['experiment_path'],
-                                                             k_fold, dimensions, losses, architectures)
-            pass
-        except Exception as err:
-            print('Could not combine results!')
-            print(err)
-
-        evaluation.make_boxplot_graphic(hyper_parameters['experiment_path'], dimensions, losses, architectures)
+        # # try:
+        evaluation.combine_evaluation_results_from_folds(hyper_parameters['experiment_path'],
+                                                         losses, dimensions_and_architectures)
+        evaluation.make_boxplot_graphic(hyper_parameters['experiment_path'], dimensions_and_architectures, losses)
+        #     pass
+        # except Exception as err:
+        #     print('Could not combine results!')
+        #     print(err)
 
 
-def experiment_2(data_train, data_fine, hyper_parameters, k_fold, dimensions, losses, architectures):
+def experiment_2(data_train, data_fine, hyper_parameters, k_fold, dimensions_and_architectures, losses):
     hyper_parameters["evaluate_on_finetuned"] = True
     # Experiment 2: Pretrain on synthetic, Finetune on Real
     for (fine_data_name, fine_data_set) in data_fine:
@@ -291,7 +379,7 @@ def experiment_2(data_train, data_fine, hyper_parameters, k_fold, dimensions, lo
             hyper_parameters['experiment_path'] = os.path.join(logs_path,
                                                    'trainandfinetune_' + train_data_name + '_' + fine_data_name)
 
-            for f in range(k_fold):
+            for f in range(0, 1): #
                 test_indices = test_folds[f]
                 remaining_indices = np.setdiff1d(all_indices, test_folds[f])
                 vald_indices = remaining_indices[:cfg.number_of_vald]
@@ -309,37 +397,42 @@ def experiment_2(data_train, data_fine, hyper_parameters, k_fold, dimensions, lo
                       + str(train_indices.size) + ' train cases, ' + str(fine_indices.size) + ' fine cases, '
                       + str(test_indices.size) + ' test cases, ' + str(vald_indices.size) + ' vald cases')
 
-                for d in dimensions:
+                for d, a in dimensions_and_architectures:
                     hyper_parameters["dimensions"] = d
+                    hyper_parameters['architecture'] = a
                     _set_parameters_according_to_dimension(hyper_parameters)
-                    for l in losses:
-                        hyper_parameters["loss"] = l
-                        for a in architectures:
-                            hyper_parameters['architecture'] = a
+                    for l1 in losses:
+                        hyper_parameters["loss"] = l1
 
-                            if f == 0:
-                                try:
-                                    # cfg.num_files = len(train_files)
-                                    # hyper_parameters['train_parameters']['l_r'] = 0.001
-                                    # cfg.training_epochs = 20
-                                    # cfg.random_sampling_mode = cfg.SAMPLINGMODES.CONSTRAINED_LABEL
-                                    # cfg.percent_of_object_samples = 50
-                                    # training(**hyper_parameters, seed=f)
-                                    pass
-                                except Exception as err:
-                                    print('Training ' + train_data_name,
-                                          hyper_parameters['architecture'].get_name() + hyper_parameters[
-                                              'loss'] + 'failed!')
-                                    print(err)
+                        cfg.training_epochs = cfg.epochs_for_training
 
-                            # fine tuning epochs are set in fine tune function
+                        # if f == 0:
+                            # try:
+                            #     cfg.num_files = len(train_files)
+                            #     hyper_parameters['train_parameters']['l_r'] = 0.001
+                            #     cfg.training_epochs = 20
+                            #     cfg.random_sampling_mode = cfg.SAMPLINGMODES.CONSTRAINED_LABEL
+                            #     cfg.percent_of_object_samples = 50
+                            #     training(**hyper_parameters, seed=f)
+                            #     pass
+                            # except Exception as err:
+                            #     print('Training ' + train_data_name,
+                            #           hyper_parameters['architecture'].get_name() + hyper_parameters[
+                            #               'loss'] + 'failed!')
+                            #     print(err)
+
+                        model_path = os.path.join(hyper_parameters['experiment_path'],
+                                                                            _make_folder_name(hyper_parameters, f))
+                        cfg.training_epochs = cfg.epochs_for_finetuning
+                        for l2 in losses:
+                            hyper_parameters["loss"] = l2
 
                             try:
                                 cfg.num_files = len(fine_files)
                                 hyper_parameters['train_parameters']['l_r'] = 0.0001
                                 cfg.random_sampling_mode = cfg.SAMPLINGMODES.CONSTRAINED_LABEL
                                 cfg.percent_of_object_samples = 50
-                                finetuning(**hyper_parameters, seed=f)
+                                finetuning(model_path, **hyper_parameters, seed=f)
                                 pass
                             except Exception as err:
                                 print('Training ' + train_data_name,
@@ -347,32 +440,170 @@ def experiment_2(data_train, data_fine, hyper_parameters, k_fold, dimensions, lo
                                           'loss'] + 'failed!')
                                 print(err)
 
-                            # try:
-                            #     cfg.random_sampling_mode = cfg.SAMPLINGMODES.UNIFORM
-                            #     applying(**hyper_parameters, seed=f)
-                            # except Exception as err:
-                            #     print('Applying ' + fine_data_name,
-                            #           hyper_parameters['architecture'].get_name() + hyper_parameters[
-                            #               'loss'] + 'failed!')
-                            #     print(err)
-                            #
-                            # try:
-                            #     evaluate(**hyper_parameters, seed=f)
-                            # except Exception as err:
-                            #     print('Evaluating ' + fine_data_name,
-                            #           hyper_parameters['architecture'].get_name() + hyper_parameters[
-                            #               'loss'] + 'failed!')
-                            #     print(err)
+                            try:
+                                cfg.random_sampling_mode = cfg.SAMPLINGMODES.UNIFORM
+                                applying(seed=f, model_path=model_path, **hyper_parameters)
+                            except Exception as err:
+                                print('Applying ' + fine_data_name,
+                                      hyper_parameters['architecture'].get_name() + hyper_parameters[
+                                          'loss'] + 'failed!')
+                                print(err)
 
-        try:
-            evaluation.combine_evaluation_results_from_folds(
-                hyper_parameters['experiment_path'],
-                k_fold, dimensions, losses, architectures)
-            evaluation.make_boxplot_graphic(hyper_parameters['experiment_path'], dimensions, losses, architectures)
-        except Exception as err:
-            print('Could not combine results for fold ' + str(f) + ' failed!')
-            print(err)
+                            try:
+                                evaluate(seed=f, model_path=model_path, **hyper_parameters)
+                            except Exception as err:
+                                print('Evaluating ' + fine_data_name,
+                                      hyper_parameters['architecture'].get_name() + hyper_parameters[
+                                          'loss'] + 'failed!')
+                                print(err)
 
+            try:
+                evaluation.combine_evaluation_results_from_folds(hyper_parameters['experiment_path'],
+                    [d for d, a in dimensions_and_architectures], losses, [a for d, a in dimensions_and_architectures],
+                                                                 evaluate_on_finetuned=True)
+            except Exception as err:
+                print('Could not combine results !')
+                print(err)
+
+            try:
+                evaluation.make_boxplot_graphic(hyper_parameters['experiment_path'], dimensions_and_architectures, losses,
+                                                                 evaluate_on_finetuned=True)
+            except Exception as err:
+                print('Could not generate plots!')
+                print(err)
+
+
+def experiment_3(data_train, data_test, hyper_parameters, k_fold, dimensions_and_architectures, losses):
+    # Experiment 3: Apply networks from Experiment 1 as multi-observer
+    cfg.training_epochs = cfg.epochs_for_training
+    hyper_parameters["evaluate_on_finetuned"] = False
+    for (test_data_name, test_data_set) in data_test:
+        np.random.seed(42)
+
+        for train_data_name in data_train:
+            np.random.seed(42)
+
+            hyper_parameters['experiment_path'] = os.path.join(logs_path,
+                                                   'apply_' + train_data_name + '_' + test_data_name)
+
+            test_files = test_data_set
+            np.savetxt(cfg.test_csv, test_files, fmt='%s', header='path')
+
+            print('  Data Set ' + train_data_name + '_' + test_data_name + ': '
+                  + str(test_files.size) + ' test cases')
+
+            # for d, a in dimensions_and_architectures:
+            #     hyper_parameters["dimensions"] = d
+            #     hyper_parameters['architecture'] = a
+            #     print('-----------------' + a.get_name() + str(d) + '-------------------------')
+            #     _set_parameters_according_to_dimension(hyper_parameters)
+            #     for l in losses:
+            #         hyper_parameters["loss"] = l
+            #         cfg.write_probabilities = True
+            #         cfg.target_type_label = sitk.sitkVectorFloat32
+            #         cfg.adapt_resolution = True
+            #         for f in range(0, k_fold):
+            #
+            #             # try:
+            #             #     cfg.random_sampling_mode = cfg.SAMPLINGMODES.UNIFORM
+            #             #     applying(seed=f, **hyper_parameters)
+            #             # except Exception as err:
+            #             #     print('Applying ' + test_data_name,
+            #             #           hyper_parameters['architecture'].get_name() + hyper_parameters[
+            #             #               'loss'] + 'failed!')
+            #             #     print(err)
+            #             pass
+            #
+            #         cfg.write_probabilities = False
+            #         cfg.target_type_label = sitk.sitkUInt8
+            #         cfg.adapt_resolution = False
+            #         # fuse_probabilities_over_folds(k_fold, seed=f, **hyper_parameters)
+            #
+            #         try:
+            #             evaluate(seed='fused',  **hyper_parameters)
+            #         except Exception as err:
+            #             print('Evaluating ' + test_data_name,
+            #                   hyper_parameters['architecture'].get_name() + hyper_parameters[
+            #                       'loss'] + 'failed!')
+            #             print(err)
+            #
+            #         print('------------------------------------------')
+            #
+            evaluation.combine_evaluation_results_from_folds(hyper_parameters['experiment_path'],
+                                                             losses, dimensions_and_architectures)
+            evaluation.make_boxplot_graphic(hyper_parameters['experiment_path'], dimensions_and_architectures, losses)
+
+
+def experiment_4(data, hyper_parameters, k_fold, dimensions_and_architectures, losses):
+    hyper_parameters["evaluate_on_finetuned"] = False
+    # Experiment 1: Train on individual Data sets
+    for (data_name, data_set) in data:
+        np.random.seed(42)
+
+        hyper_parameters['experiment_path'] = os.path.join(logs_path, 'individual_final5f-fin_' + data_name)
+        all_indices = np.random.permutation(range(0, data_set.size))
+        test_folds = np.array_split(all_indices, k_fold)
+
+        for f in range(0, k_fold):
+            test_indices = test_folds[f]
+            remaining_indices = np.setdiff1d(all_indices, test_folds[f])
+            vald_indices = remaining_indices[:cfg.number_of_vald]
+            train_indices = remaining_indices[cfg.number_of_vald:]
+
+            train_files = data_set[train_indices]
+            vald_files = data_set[vald_indices]
+            test_files = data_set[test_indices]
+
+            np.savetxt(cfg.train_csv, train_files, fmt='%s', header='path')
+            np.savetxt(cfg.vald_csv, vald_files, fmt='%s', header='path')
+            np.savetxt(cfg.test_csv, test_files, fmt='%s', header='path')
+
+            cfg.num_files = len(train_files)
+
+            print('  Data Set ' + data_name + str(f) + ': ' + str(train_indices.size) + ' train cases, '
+                  + str(test_indices.size)
+                  + ' test cases, ' + str(vald_indices.size) + ' vald cases')
+
+            cfg.training_epochs = cfg.epochs_for_training
+
+			for l in losses:
+				hyper_parameters["loss"] = l
+				for d, a in dimensions_and_architectures:
+					hyper_parameters["dimensions"] = d
+					_set_parameters_according_to_dimension(hyper_parameters)
+					hyper_parameters['architecture'] = a
+
+					cfg.write_probabilities = True
+					cfg.target_type_label = sitk.sitkVectorFloat32
+					cfg.adapt_resolution = True
+
+					try:
+						cfg.random_sampling_mode = cfg.SAMPLINGMODES.UNIFORM
+						applying(seed=f, **hyper_parameters)
+					except Exception as err:
+						print('Applying ' + data_name,
+								hyper_parameters['architecture'].get_name() + hyper_parameters['loss'] + 'failed!')
+						print(err)
+					pass
+
+				cfg.write_probabilities = False
+				cfg.target_type_label = sitk.sitkUInt8
+				cfg.adapt_resolution = False
+				fuse_probabilities_over_networks(dimensions_and_architectures, seed=f, **hyper_parameters)
+		
+				try:
+					evaluate(seed='fused',  **hyper_parameters)
+				except Exception as err:
+					print('Evaluating ' + test_data_name,
+						  hyper_parameters['architecture'].get_name() + hyper_parameters[
+							  'loss'] + 'failed!')
+					print(err)
+		
+				print('------------------------------------------')
+            
+            evaluation.combine_evaluation_results_from_folds(hyper_parameters['experiment_path'],
+                                                             losses, dimensions_and_architectures)
+            evaluation.make_boxplot_graphic(hyper_parameters['experiment_path'], dimensions_and_architectures, losses)
 
 if __name__ == '__main__':
 
@@ -380,28 +611,35 @@ if __name__ == '__main__':
 
     ircad_csv = 'ircad.csv'
     all_ircad_files = pd.read_csv(ircad_csv, dtype=object).as_matrix()
-    # btcv_csv = 'btcv.csv'
-    # all_btcv_files = pd.read_csv(btcv_csv, dtype=object).as_matrix()
+    btcv_csv = 'btcv.csv'
+    all_btcv_files = pd.read_csv(btcv_csv, dtype=object).as_matrix()
     # synth_csv = 'synth.csv'
     # all_synth_files = pd.read_csv(synth_csv, dtype=object).as_matrix()
-    xcat_csv = 'xcat.csv'
-    all_xcat_files = pd.read_csv(xcat_csv, dtype=object).as_matrix()
-    gan_csv = 'gan.csv'
-    all_gan_files = pd.read_csv(gan_csv, dtype=object).as_matrix()
+    # xcat_csv = 'xcat.csv'
+    # all_xcat_files = pd.read_csv(xcat_csv, dtype=object).as_matrix()
+    # gan_csv = 'gan.csv'
+    # all_gan_files = pd.read_csv(gan_csv, dtype=object).as_matrix()
 
     k_fold = 5
-    losses = ['DICE', 'CEL']  #'WCEL', 'NCEL', 'ECEL', 'WDL',
-    dimensions = [2]
-    architectures = [UNet, VNet]  #, FCN
+    losses = ['CEL+DICE']
+    dimensions_and_architectures = ([2, UNet], [2, VNet], [2, DVN], [3, UNet],[3, VNet], [3, DVN])  #[2, UNet],    [3, VNet] ,[2, UNet], [2, VNet], [2, DVN], [3, UNet],[3, VNet], [3, DVN]
 
-    init_parameters = {"regularize": [True, 'L2', 0.0000001], "activation": "relu", "drop_out": [True, 0.01],
+    init_parameters = {"regularize": [True, 'L2', 0.0000001], "drop_out": [True, 0.01], "activation": "elu",
                        "do_batch_normalization": False, "do_bias": True, "cross_hair": False}
     train_parameters = {"l_r": 0.001, "optimizer": "Adam"}
     hyper_parameters = {"init_parameters": init_parameters, "train_parameters": train_parameters}
 
+    cfg.epochs_for_training = 80
+
     # experiment_1([('xcat', all_xcat_files)], hyper_parameters, k_fold, dimensions, losses, architectures)
-    # experiment_1([('ircad', all_ircad_files)], hyper_parameters, k_fold, dimensions, losses, architectures)
-    experiment_2([('xcat', all_xcat_files), ('gan', all_gan_files)], [('ircad', all_ircad_files)], hyper_parameters, k_fold, dimensions, losses, architectures)
+    # experiment_1([('ircad', all_ircad_files)], hyper_parameters, k_fold, dimensions_and_architectures, losses)
 
+    # cfg.epochs_for_training = 20
+    # cfg.epochs_for_finetuning = 20
+    # # experiment_2([('gan', all_gan_files), ('xcat', all_xcat_files)], [('ircad', all_ircad_files)], hyper_parameters, k_fold,
+    #              dimensions_and_architectures, losses)
 
+    experiment_3(['ircad'], [('btcv', all_btcv_files)], hyper_parameters, k_fold,
+                 dimensions_and_architectures, losses)
 
+    experiment_4([('ircad', all_ircad_files)], hyper_parameters, k_fold, dimensions_and_architectures, losses)
