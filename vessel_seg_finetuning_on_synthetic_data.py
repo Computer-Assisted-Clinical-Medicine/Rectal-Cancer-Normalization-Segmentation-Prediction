@@ -250,14 +250,22 @@ def fuse_probabilities_over_networks(dimensions_and_architectures, seed=42, **hy
     '''
 
     np.random.seed(seed)
+    np.seterr(under='ignore')
     tf.random.set_seed(seed)
     test_files = pd.read_csv(cfg.test_csv, dtype=object).as_matrix()
     cfg.training_epochs = cfg.epochs_for_training
     for file in test_files:
         predictions = []
+        weights = []
         for d, a in dimensions_and_architectures:
             hyper_parameters["dimensions"] = d
             hyper_parameters['architecture'] = a
+            if a.get_name() == 'UNet':
+            # if d == 2:
+                weights.append(0.3)
+            else:
+                weights.append(0.2)
+            # weights.append(0.25)
             folder_name = _make_folder_name(hyper_parameters, seed)
             latest_model = tf.train.latest_checkpoint(os.path.join(hyper_parameters['experiment_path'], folder_name, 'model'))
             _, model_base = os.path.split(latest_model)
@@ -272,13 +280,13 @@ def fuse_probabilities_over_networks(dimensions_and_architectures, seed=42, **hy
 
         hyper_parameters['architecture'] = CombiNet
         hyper_parameters["dimensions"] = 'n'
-        folder_name = _make_folder_name(hyper_parameters, 'fused')
+        folder_name = _make_folder_name(hyper_parameters, seed)
         apply_path = os.path.join(hyper_parameters['experiment_path'], folder_name + '_apply')
         if not os.path.exists(apply_path):
             os.makedirs(apply_path)
-        fused_probabilities = 1 / len(dimensions_and_architectures) * sitk.GetArrayFromImage(predictions[0])
-        for p in predictions[1:]:
-            fused_probabilities = fused_probabilities + 1 / len(dimensions_and_architectures) * sitk.GetArrayFromImage(p)
+        fused_probabilities = weights[0] * sitk.GetArrayFromImage(predictions[0])
+        for w, p in zip(weights[1:], predictions[1:]):
+            fused_probabilities = fused_probabilities + w * sitk.GetArrayFromImage(p)
 
         data_info = image.get_data_info(p)
         fused_prediction = np.argmax(fused_probabilities, -1)
@@ -544,7 +552,7 @@ def experiment_4(data, hyper_parameters, k_fold, dimensions_and_architectures, l
     for (data_name, data_set) in data:
         np.random.seed(42)
 
-        hyper_parameters['experiment_path'] = os.path.join(logs_path, 'apply_' + data_name + '_mullti')
+        hyper_parameters['experiment_path'] = os.path.join(logs_path, 'apply_' + data_name + '_multi')
         all_indices = np.random.permutation(range(0, data_set.size))
         test_folds = np.array_split(all_indices, k_fold)
 
@@ -577,28 +585,28 @@ def experiment_4(data, hyper_parameters, k_fold, dimensions_and_architectures, l
                     _set_parameters_according_to_dimension(hyper_parameters)
                     hyper_parameters['architecture'] = a
 
-                    # cfg.write_probabilities = True
-                    # cfg.target_type_label = sitk.sitkVectorFloat32
-                    # cfg.adapt_resolution = True
-                    #
-                    # try:
-                    # 	cfg.random_sampling_mode = cfg.SAMPLINGMODES.UNIFORM
-                    # 	applying(seed=f, **hyper_parameters)
-                    # except Exception as err:
-                    # 	print('Applying ' + data_name,
-                    # 			hyper_parameters['architecture'].get_name() + hyper_parameters['loss'] + 'failed!')
-                    # 	print(err)
-                    # pass
+                    cfg.write_probabilities = True
+                    cfg.target_type_label = sitk.sitkVectorFloat32
+                    cfg.adapt_resolution = True
+
+                    try:
+                        cfg.random_sampling_mode = cfg.SAMPLINGMODES.UNIFORM
+                        # applying(seed=f, **hyper_parameters)
+                    except Exception as err:
+                        print('Applying ' + data_name,
+                        hyper_parameters['architecture'].get_name() + hyper_parameters['loss'] + 'failed!')
+                        print(err)
+                    pass
 
                 cfg.write_probabilities = False
                 cfg.target_type_label = sitk.sitkUInt8
                 cfg.adapt_resolution = False
-                # fuse_probabilities_over_networks(dimensions_and_architectures, seed=f, **hyper_parameters)
+                fuse_probabilities_over_networks(dimensions_and_architectures, seed=f, **hyper_parameters)
                 hyper_parameters['architecture'] = CombiNet
                 hyper_parameters["dimensions"] = 'n'
 
                 try:
-                    evaluate(seed='fused',  **hyper_parameters)
+                    evaluate(seed=f,  **hyper_parameters)
                 except Exception as err:
                     print('Evaluating ' + data_name,
                           hyper_parameters['architecture'].get_name() + hyper_parameters[
@@ -607,9 +615,140 @@ def experiment_4(data, hyper_parameters, k_fold, dimensions_and_architectures, l
 
                 print('------------------------------------------')
             
+        evaluation.combine_evaluation_results_from_folds(hyper_parameters['experiment_path'],
+                                                         losses, (['n', CombiNet],))
+        # evaluation.make_boxplot_graphic(hyper_parameters['experiment_path'], (['n', CombiNet],), losses)
+
+
+def experiment_5(data_train, data_test, hyper_parameters, k_fold, dimensions_and_architectures, losses):
+    hyper_parameters["evaluate_on_finetuned"] = False
+    # Experiment 5: train on ircad, test on btcv
+    for (test_data_name, test_data_set) in data_test:
+        np.random.seed(42)
+        test_indices = np.random.permutation(range(0, test_data_set.size))
+        train_files = test_data_set[test_indices]
+        np.savetxt(cfg.test_csv, train_files, fmt='%s', header='path')
+
+        for (train_data_name, train_data_set) in data_train:
+            np.random.seed(42)
+            train_indices = np.random.permutation(range(0, train_data_set.size))
+            train_files = train_data_set[train_indices]
+            np.savetxt(cfg.train_csv, train_files, fmt='%s', header='path')
+            vald_files = train_data_set[:2]
+            np.savetxt(cfg.vald_csv, vald_files, fmt='%s', header='path')
+
+            hyper_parameters['experiment_path'] = os.path.join(logs_path,
+                                                   'trainandtest_' + train_data_name + '_' + test_data_name)
+
+            print('  Data Set ' + train_data_name + '_' + test_data_name + ': '
+                  + str(train_indices.size) + ' train cases, '
+                  + str(test_indices.size) + ' test cases, ' + str(2) + ' vald cases')
+
+            for d, a in dimensions_and_architectures:
+                hyper_parameters["dimensions"] = d
+                hyper_parameters['architecture'] = a
+                _set_parameters_according_to_dimension(hyper_parameters)
+                for l in losses:
+                    hyper_parameters["loss"] = l
+
+                    cfg.training_epochs = cfg.epochs_for_training
+
+                    # try:
+                    #     cfg.num_files = len(train_files)
+                    #     hyper_parameters['train_parameters']['l_r'] = 0.001
+                    #     cfg.random_sampling_mode = cfg.SAMPLINGMODES.CONSTRAINED_LABEL
+                    #     cfg.percent_of_object_samples = 50
+                    #     training(**hyper_parameters, seed=42)
+                    #     pass
+                    # except Exception as err:
+                    #     print('Training ' + train_data_name,
+                    #           hyper_parameters['architecture'].get_name() + hyper_parameters[
+                    #               'loss'] + 'failed!')
+                    #     print(err)
+
+                    model_path = os.path.join(hyper_parameters['experiment_path'],
+                                                                        _make_folder_name(hyper_parameters, 42))
+
+                    # try:
+                    #     cfg.random_sampling_mode = cfg.SAMPLINGMODES.UNIFORM
+                    #     applying(seed=42, model_path=model_path, **hyper_parameters)
+                    # except Exception as err:
+                    #     print('Applying ' + test_data_name,
+                    #           hyper_parameters['architecture'].get_name() + hyper_parameters[
+                    #               'loss'] + 'failed!')
+                    #     print(err)
+
+                    try:
+                        evaluate(seed=42, model_path=model_path, **hyper_parameters)
+                    except Exception as err:
+                        print('Evaluating ' + test_data_name,
+                              hyper_parameters['architecture'].get_name() + hyper_parameters[
+                                  'loss'] + 'failed!')
+                        print(err)
+
+                        print('------------------------------------------')
+
             evaluation.combine_evaluation_results_from_folds(hyper_parameters['experiment_path'],
-                                                             losses, (['n', CombiNet],))
-            evaluation.make_boxplot_graphic(hyper_parameters['experiment_path'], dimensions_and_architectures, losses)
+                                                             losses, dimensions_and_architectures)
+            # evaluation.make_boxplot_graphic(hyper_parameters['experiment_path'], dimensions_and_architectures, losses)
+
+
+def experiment_6(data_test, hyper_parameters, k_fold, dimensions_and_architectures, losses):
+    hyper_parameters["evaluate_on_finetuned"] = False
+    # Experiment 6: Apply ensemble over networks
+    for (test_data_name, test_data_set) in data_test:
+        np.random.seed(42)
+        hyper_parameters['experiment_path'] = os.path.join(logs_path, 'apply_' + test_data_name + '_multi')
+        test_indices = np.random.permutation(range(0, test_data_set.size))
+        train_files = test_data_set[test_indices]
+        np.savetxt(cfg.test_csv, train_files, fmt='%s', header='path')
+
+        cfg.num_files = len(train_files)
+
+        print('  Data Set ' + test_data_name + str(42) + ': ' + str(test_indices.size) + ' test cases')
+
+        cfg.training_epochs = cfg.epochs_for_training
+
+        for l in losses:
+            hyper_parameters["loss"] = l
+            for d, a in dimensions_and_architectures:
+                hyper_parameters["dimensions"] = d
+                _set_parameters_according_to_dimension(hyper_parameters)
+                hyper_parameters['architecture'] = a
+
+                cfg.write_probabilities = True
+                cfg.target_type_label = sitk.sitkVectorFloat32
+                cfg.adapt_resolution = True
+
+                # try:
+                #     cfg.random_sampling_mode = cfg.SAMPLINGMODES.UNIFORM
+                #     applying(seed=42, **hyper_parameters)
+                # except Exception as err:
+                #     print('Applying ' + test_data_name,
+                #           hyper_parameters['architecture'].get_name() + hyper_parameters['loss'] + 'failed!')
+                #     print(err)
+                # pass
+
+            cfg.write_probabilities = False
+            cfg.target_type_label = sitk.sitkUInt8
+            cfg.adapt_resolution = False
+            fuse_probabilities_over_networks(dimensions_and_architectures, seed=42, **hyper_parameters)
+            hyper_parameters['architecture'] = CombiNet
+            hyper_parameters["dimensions"] = 'n'
+
+            try:
+                evaluate(seed=42, **hyper_parameters)
+            except Exception as err:
+                print('Evaluating ' + data_test,
+                      hyper_parameters['architecture'].get_name() + hyper_parameters[
+                          'loss'] + 'failed!')
+                print(err)
+
+            print('------------------------------------------')
+
+    evaluation.combine_evaluation_results_from_folds(hyper_parameters['experiment_path'],
+                                                     losses, (['n', CombiNet],))
+    # evaluation.make_boxplot_graphic(hyper_parameters['experiment_path'], (['n', CombiNet],), losses)
 
 
 if __name__ == '__main__':
@@ -629,7 +768,7 @@ if __name__ == '__main__':
 
     k_fold = 5
     losses = ['CEL+DICE']
-    dimensions_and_architectures = ([2, UNet], [3, VNet])  #[2, UNet],    [3, VNet] ,[2, UNet], [2, VNet], [2, DVN], [3, UNet],[3, VNet], [3, DVN]
+    dimensions_and_architectures = ([2, UNet], [2, VNet], [3, UNet],[3, VNet])  #   [2, UNet], [2, VNet], [2, DVN], [3, UNet],[3, VNet], [3, DVN]
 
     init_parameters = {"regularize": [True, 'L2', 0.0000001], "drop_out": [True, 0.01], "activation": "elu",
                        "do_batch_normalization": False, "do_bias": True, "cross_hair": False}
@@ -649,4 +788,9 @@ if __name__ == '__main__':
     # experiment_3(['ircad'], [('btcv', all_btcv_files)], hyper_parameters, k_fold,
     #              dimensions_and_architectures, losses)
 
-    experiment_4([('ircad', all_ircad_files)], hyper_parameters, k_fold, dimensions_and_architectures, losses)
+    # experiment_4([('ircad', all_ircad_files)], hyper_parameters, k_fold, dimensions_and_architectures, losses)
+
+    # experiment_5([('ircad', all_ircad_files)], [('btcv', all_btcv_files)], hyper_parameters, k_fold,
+    #              dimensions_and_architectures, losses)
+
+    experiment_6([('btcv', all_btcv_files)], hyper_parameters, k_fold, dimensions_and_architectures, losses)

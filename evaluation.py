@@ -15,9 +15,10 @@ from SegmentationNetworkBasis import config as cfg
 
 def make_csv_header():
     header_row = ['File Number', 'Slices']
-    for organ in ['Vein', 'Artery', 'Combined']:
+    for organ in ['Vein', 'Artery']:
         header_row += [organ + ' Volume (L)', organ + ' Volume (P)',
                    'Dice - ' + organ,
+                   'Confusion Rate - ' + organ,
                    'Connectivity - ' + organ,
                    'Fragmentation - ' + organ,
                    # 'Volume Similarity - ' + organ,
@@ -46,7 +47,7 @@ def evaluate_segmentation_prediction(result_metrics, prediction_path, label_path
     label_img.SetOrigin(data_info['orig_origin'])
     label_img.SetSpacing(data_info['orig_spacing'])
 
-    for organ, value in zip(['Artery', 'Vein', 'Combined'], [1, 2, 0]):
+    for organ, value in zip(['Artery', 'Vein'], [1, 2, 0]):
 
         if organ == 'Combined':
             selected_label_img = label_img > value
@@ -64,6 +65,14 @@ def evaluate_segmentation_prediction(result_metrics, prediction_path, label_path
         result_metrics['False Negative - ' + organ] = orig_fn
         result_metrics['False Positive - ' + organ] = orig_fp
         print('  Original Overlap Meassures ' + organ + ':', orig_dice, orig_vs, orig_fn, orig_fp)
+
+        if organ == 'Artery':
+            non_target_class = 2
+        else:
+            non_target_class = 1
+        cr = Metric.confusion_rate_sitk(pred_img, label_img, value, non_target_class)
+        result_metrics['Confusion Rate - ' + organ] = cr
+        print('  Confusion Rate ' + organ + ':', cr)
 
         connect = Metric.get_connectivity_sitk(selected_pred_img)
         result_metrics['Connectivity - ' + organ] = connect
@@ -171,9 +180,9 @@ def _gather_individual_results(combination_name, search_path, indiv_eval_file_pa
         average_results[0] = combination_name
         mean_statistics.append(average_results)
 
-        # std_results = np.std(results, axis=0).tolist()
-        # std_results[0] = combination_name
-        # std_statistics.append(std_results)
+        std_results = np.std(results, axis=0).tolist()
+        std_results[0] = combination_name
+        std_statistics.append(std_results)
 
 
 def make_boxplot_graphic(experiment_path, dimensions_and_architectures, losses, evaluate_on_finetuned=False):
