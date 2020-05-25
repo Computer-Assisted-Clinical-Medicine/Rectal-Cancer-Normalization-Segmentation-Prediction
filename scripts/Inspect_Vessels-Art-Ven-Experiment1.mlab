@@ -542,7 +542,7 @@ module SoGVRVolumeRenderer {
     moduleGroupName = Visualization
     windows  {
       window _default {
-        geometry = "771 271 393 596"
+        geometry = "760 286 393 596"
         sizeHint = "393 596"
         wasOpen = no
       }
@@ -646,17 +646,17 @@ module SoExaminerViewer {
     moduleGroupName = Visualization
     windows  {
       window _viewer {
-        geometry = "2037 128 944 1042"
+        geometry = "1928 30 944 1002"
         sizeHint = "400 400"
         wasOpen = yes
       }
       window _automatic {
-        geometry = "55 798 500 629"
+        geometry = "179 195 500 600"
         sizeHint = "260 223"
-        wasOpen = yes
+        wasOpen = no
       }
       window _default {
-        geometry = "106 502 574 368"
+        geometry = "18 569 574 368"
         sizeHint = "574 368"
         wasOpen = no
       }
@@ -690,7 +690,7 @@ module SoExaminerViewer {
     snapCount = 0
     inputDevicesList = ""
     headlight = TRUE
-    decoration = TRUE
+    decoration = FALSE
     popupMenuEnabled = FALSE
     viewing = TRUE
     autoClipping = TRUE
@@ -711,11 +711,11 @@ module SoExaminerViewer {
     stereoViewing = FALSE
     stereoOffset = 3
     height = 0.78539819
-    position = "65.2954406738281 525.311645507812 115.845291137695"
-    orientation = "0.0976132601499557 -0.678306877613068 -0.728266000747681 2.84929251670837"
-    nearDistance = 107.82236
-    farDistance = 609.43774
-    focalDistance = 361.78506
+    position = "191.654357910156 -213.173446655273 112.050094604492"
+    orientation = "-0.999433398246765 -0.025518499314785 0.0219503827393055 4.75569486618042"
+    nearDistance = 207.7382
+    farDistance = 599.45343
+    focalDistance = 403.40036
     forceRedrawOnInteraction = FALSE
     button1events = TO_SCENE_OR_VIEWER
     button2events = TO_VIEWER
@@ -735,8 +735,20 @@ module SoExaminerViewer {
 }
 module SoBackground {
   internal  {
-    frame = "-343 -331 112 56"
+    frame = "-439 -379 112 56"
     moduleGroupName = Visualization
+    windows  {
+      window _default {
+        geometry = "905 497 125 145"
+        sizeHint = "125 145"
+        wasOpen = no
+      }
+      window _automatic {
+        geometry = "717 269 500 600"
+        sizeHint = "260 223"
+        wasOpen = no
+      }
+    }
   }
   fields  {
     instanceName = SoBackground
@@ -752,7 +764,7 @@ module SoGVRVolumeRenderer {
     moduleGroupName = Visualization
     windows  {
       window _default {
-        geometry = "771 271 393 596"
+        geometry = "1183 261 393 596"
         sizeHint = "393 596"
         wasOpen = no
       }
@@ -956,11 +968,11 @@ module SoGVRVolumeRenderer {
 }
 module SoExaminerViewer {
   internal  {
-    frame = "945 -610 144 56"
+    frame = "937 -603 144 56"
     moduleGroupName = "2D U-Net"
     windows  {
       window _viewer {
-        geometry = "2888 30 944 1042"
+        geometry = "1928 30 944 1002"
         sizeHint = "400 400"
         wasOpen = yes
       }
@@ -1004,7 +1016,7 @@ module SoExaminerViewer {
     snapCount = 7
     inputDevicesList = ""
     headlight = TRUE
-    decoration = TRUE
+    decoration = FALSE
     popupMenuEnabled = FALSE
     viewing = TRUE
     autoClipping = TRUE
@@ -1025,11 +1037,11 @@ module SoExaminerViewer {
     stereoViewing = FALSE
     stereoOffset = 3
     height = 0.78539819
-    position = "65.2954406738281 525.311645507812 115.845291137695"
-    orientation = "0.0976132601499557 -0.678306877613068 -0.728266000747681 2.84929251670837"
-    nearDistance = 107.82236
-    farDistance = 609.43774
-    focalDistance = 361.78506
+    position = "191.654357910156 -213.173446655273 112.050094604492"
+    orientation = "-0.999433398246765 -0.025518499314785 0.0219503827393055 4.75569486618042"
+    nearDistance = 207.7382
+    farDistance = 599.45343
+    focalDistance = 403.40036
     forceRedrawOnInteraction = FALSE
     button1events = TO_VIEWER
     button2events = TO_VIEWER
@@ -1200,7 +1212,7 @@ module SoRenderArea {
     moduleGroupName = Visualization
     windows  {
       window _viewer {
-        geometry = "2943 373 400 400"
+        geometry = "2888 30 944 1002"
         sizeHint = "400 400"
         wasOpen = yes
       }
@@ -1356,14 +1368,14 @@ module SoView2D {
     moduleGroupName = Visualization
     windows  {
       window _default {
-        geometry = "510 481 1052 501"
+        geometry = "244 299 539 501"
         sizeHint = "439 501"
         wasOpen = no
       }
       window _automatic {
-        geometry = "25 592 500 600"
+        geometry = "17 686 500 600"
         sizeHint = "260 223"
-        wasOpen = yes
+        wasOpen = no
       }
     }
   }
@@ -1456,7 +1468,7 @@ module SoRenderArea {
     moduleGroupName = "2D U-Net"
     windows  {
       window _viewer {
-        geometry = "2888 30 944 1042"
+        geometry = "2888 30 944 1002"
         sizeHint = "400 400"
         wasOpen = yes
       }
@@ -1857,7 +1869,7 @@ module SoExaminerViewer {
     moduleGroupName = "2D V-Net"
     windows  {
       window _viewer {
-        geometry = "1928 30 944 1042"
+        geometry = "1928 30 944 1002"
         sizeHint = "400 400"
         wasOpen = yes
       }
@@ -1901,7 +1913,7 @@ module SoExaminerViewer {
     snapCount = 2
     inputDevicesList = ""
     headlight = TRUE
-    decoration = TRUE
+    decoration = FALSE
     popupMenuEnabled = FALSE
     viewing = TRUE
     autoClipping = TRUE
@@ -1922,11 +1934,11 @@ module SoExaminerViewer {
     stereoViewing = FALSE
     stereoOffset = 3
     height = 0.78539819
-    position = "65.2954406738281 525.311645507812 115.845291137695"
-    orientation = "0.0976132601499557 -0.678306877613068 -0.728266000747681 2.84929251670837"
-    nearDistance = 107.82236
-    farDistance = 609.43774
-    focalDistance = 361.78506
+    position = "191.654357910156 -213.173446655273 112.050094604492"
+    orientation = "-0.999433398246765 -0.025518499314785 0.0219503827393055 4.75569486618042"
+    nearDistance = 207.7382
+    farDistance = 599.45343
+    focalDistance = 403.40036
     forceRedrawOnInteraction = FALSE
     button1events = TO_VIEWER
     button2events = TO_VIEWER
@@ -2177,7 +2189,7 @@ module SoRenderArea {
     moduleGroupName = "2D V-Net"
     windows  {
       window _viewer {
-        geometry = "2888 30 944 1042"
+        geometry = "2888 30 944 1002"
         sizeHint = "400 400"
         wasOpen = yes
       }
@@ -2583,7 +2595,7 @@ module SoExaminerViewer {
     moduleGroupName = "2D DV-Net"
     windows  {
       window _viewer {
-        geometry = "1928 30 944 1042"
+        geometry = "1928 30 944 1002"
         sizeHint = "400 400"
         wasOpen = yes
       }
@@ -2627,7 +2639,7 @@ module SoExaminerViewer {
     snapCount = 2
     inputDevicesList = ""
     headlight = TRUE
-    decoration = TRUE
+    decoration = FALSE
     popupMenuEnabled = FALSE
     viewing = TRUE
     autoClipping = TRUE
@@ -2648,11 +2660,11 @@ module SoExaminerViewer {
     stereoViewing = FALSE
     stereoOffset = 3
     height = 0.78539819
-    position = "65.2954406738281 525.311645507812 115.845291137695"
-    orientation = "0.0976132601499557 -0.678306877613068 -0.728266000747681 2.84929251670837"
-    nearDistance = 107.82236
-    farDistance = 609.43774
-    focalDistance = 361.78506
+    position = "191.654357910156 -213.173446655273 112.050094604492"
+    orientation = "-0.999433398246765 -0.025518499314785 0.0219503827393055 4.75569486618042"
+    nearDistance = 207.7382
+    farDistance = 599.45343
+    focalDistance = 403.40036
     forceRedrawOnInteraction = FALSE
     button1events = TO_VIEWER
     button2events = TO_VIEWER
@@ -2903,7 +2915,7 @@ module SoRenderArea {
     moduleGroupName = "2D DV-Net"
     windows  {
       window _viewer {
-        geometry = "2888 30 944 1042"
+        geometry = "2888 30 944 1002"
         sizeHint = "400 400"
         wasOpen = yes
       }
@@ -3309,7 +3321,7 @@ module SoExaminerViewer {
     moduleGroupName = "3D U-Net"
     windows  {
       window _viewer {
-        geometry = "1928 30 944 1042"
+        geometry = "1928 30 944 1002"
         sizeHint = "400 400"
         wasOpen = yes
       }
@@ -3353,7 +3365,7 @@ module SoExaminerViewer {
     snapCount = 7
     inputDevicesList = ""
     headlight = TRUE
-    decoration = TRUE
+    decoration = FALSE
     popupMenuEnabled = FALSE
     viewing = TRUE
     autoClipping = TRUE
@@ -3374,11 +3386,11 @@ module SoExaminerViewer {
     stereoViewing = FALSE
     stereoOffset = 3
     height = 0.78539819
-    position = "65.2954406738281 525.311645507812 115.845291137695"
-    orientation = "0.0976132601499557 -0.678306877613068 -0.728266000747681 2.84929251670837"
-    nearDistance = 107.82236
-    farDistance = 609.43774
-    focalDistance = 361.78506
+    position = "191.654357910156 -213.173446655273 112.050094604492"
+    orientation = "-0.999433398246765 -0.025518499314785 0.0219503827393055 4.75569486618042"
+    nearDistance = 207.7382
+    farDistance = 599.45343
+    focalDistance = 403.40036
     forceRedrawOnInteraction = FALSE
     button1events = TO_VIEWER
     button2events = TO_VIEWER
@@ -3629,7 +3641,7 @@ module SoRenderArea {
     moduleGroupName = "3D U-Net"
     windows  {
       window _viewer {
-        geometry = "2888 30 944 1042"
+        geometry = "2888 30 944 1002"
         sizeHint = "400 400"
         wasOpen = yes
       }
@@ -4030,7 +4042,7 @@ module SoExaminerViewer {
     moduleGroupName = "3D V-Net"
     windows  {
       window _viewer {
-        geometry = "1928 30 944 1042"
+        geometry = "1928 30 944 1002"
         sizeHint = "400 400"
         wasOpen = yes
       }
@@ -4074,7 +4086,7 @@ module SoExaminerViewer {
     snapCount = 2
     inputDevicesList = ""
     headlight = TRUE
-    decoration = TRUE
+    decoration = FALSE
     popupMenuEnabled = FALSE
     viewing = TRUE
     autoClipping = TRUE
@@ -4095,11 +4107,11 @@ module SoExaminerViewer {
     stereoViewing = FALSE
     stereoOffset = 3
     height = 0.78539819
-    position = "65.2954406738281 525.311645507812 115.845291137695"
-    orientation = "0.0976132601499557 -0.678306877613068 -0.728266000747681 2.84929251670837"
-    nearDistance = 107.82236
-    farDistance = 609.43774
-    focalDistance = 361.78506
+    position = "191.654357910156 -213.173446655273 112.050094604492"
+    orientation = "-0.999433398246765 -0.025518499314785 0.0219503827393055 4.75569486618042"
+    nearDistance = 207.7382
+    farDistance = 599.45343
+    focalDistance = 403.40036
     forceRedrawOnInteraction = FALSE
     button1events = TO_VIEWER
     button2events = TO_VIEWER
@@ -4350,7 +4362,7 @@ module SoRenderArea {
     moduleGroupName = "3D V-Net"
     windows  {
       window _viewer {
-        geometry = "2888 30 944 1042"
+        geometry = "2888 30 944 1002"
         sizeHint = "400 400"
         wasOpen = yes
       }
@@ -4756,7 +4768,7 @@ module SoExaminerViewer {
     moduleGroupName = "3D DV-Net"
     windows  {
       window _viewer {
-        geometry = "1928 30 944 1042"
+        geometry = "1928 30 944 1002"
         sizeHint = "400 400"
         wasOpen = yes
       }
@@ -4800,7 +4812,7 @@ module SoExaminerViewer {
     snapCount = 2
     inputDevicesList = ""
     headlight = TRUE
-    decoration = TRUE
+    decoration = FALSE
     popupMenuEnabled = FALSE
     viewing = TRUE
     autoClipping = TRUE
@@ -4821,11 +4833,11 @@ module SoExaminerViewer {
     stereoViewing = FALSE
     stereoOffset = 3
     height = 0.78539819
-    position = "65.2954406738281 525.311645507812 115.845291137695"
-    orientation = "0.0976132601499557 -0.678306877613068 -0.728266000747681 2.84929251670837"
-    nearDistance = 107.82236
-    farDistance = 609.43774
-    focalDistance = 361.78506
+    position = "191.654357910156 -213.173446655273 112.050094604492"
+    orientation = "-0.999433398246765 -0.025518499314785 0.0219503827393055 4.75569486618042"
+    nearDistance = 207.7382
+    farDistance = 599.45343
+    focalDistance = 403.40036
     forceRedrawOnInteraction = FALSE
     button1events = TO_VIEWER
     button2events = TO_VIEWER
@@ -5076,7 +5088,7 @@ module SoRenderArea {
     moduleGroupName = "3D DV-Net"
     windows  {
       window _viewer {
-        geometry = "2888 30 944 1042"
+        geometry = "2888 30 944 1002"
         sizeHint = "400 400"
         wasOpen = yes
       }
@@ -5221,6 +5233,3893 @@ module SoSeparator {
     pickCulling = AUTO
   }
 }
+module SoLUTEditor {
+  internal  {
+    frame = "253 -1155 104 56"
+    moduleGroupName = ""
+    windows  {
+      window _default {
+        geometry = "2145 177 515 450"
+        sizeHint = "515 450"
+        wasOpen = no
+      }
+    }
+  }
+  fields  {
+    instanceName = SoLUTEditor
+    rangeMin = -250
+    rangeMax = 375
+    viewMin = -250
+    viewMax = 375
+    window = 1
+    level = 0.5
+    allowNewPoints = TRUE
+    updateLutWhileDragging = TRUE
+    relativeLut = FALSE
+    colorInterpolation = InterpolateRGB
+    colorPoints = "[ -250 0 0 0, 375 1 1 1 ]"
+    alphaPoints = "[ -250 0, 375 1 ]"
+    alphaFactor = 1
+    newRangeMin = -250
+    newRangeMax = 375
+    newRangeMode = ClipFormerLUT
+    colorEditorHeight = 24
+    showColorEditor = TRUE
+    showAlphaEditor = TRUE
+    markerRadius = 4
+    selectedMarkerRadius = 6
+    snapMarkerRadius = 10
+    alphaLineWidth = 2
+    backgroundColor = "0.800000011920929 0.800000011920929 0.800000011920929"
+    borderColor = "0 0 0"
+    alphaLineColor = "0 0 0"
+    histogramColor = "0.400000005960464 0.400000005960464 0.400000005960464"
+    drawColoredMarkers = TRUE
+    markerColor = "1 1 1"
+    selectedMarkerColor = "1 0.5 0.5"
+    selectedTriangleSize = 8
+    triangleSize = 6
+    useAntiAliasing = TRUE
+  }
+}
+module itkImageFileReader {
+  internal  {
+    frame = "441 597 144 56"
+    moduleGroupName = ""
+    windows  {
+      window _default {
+        geometry = "1145 217 328 395"
+        sizeHint = "328 395"
+        wasOpen = no
+      }
+      window _automatic {
+        geometry = "919 320 500 600"
+        sizeHint = "260 223"
+        wasOpen = no
+      }
+    }
+  }
+  fields  {
+    instanceName = itkImageFileReader8
+    fileDataType = "unsigned int8"
+    autoDetermineDataType = TRUE
+    correctSubVoxelShift = TRUE
+    fileDimension = 3
+    info = "Loading okay."
+    numDims = 3
+    fileType = TypeNotApplicable
+    componentType = "unsigned int8"
+    pixelType = SCALAR
+    loaderType = NiftiImageIO
+    outputMetaDataStr = "ITK_FileNotes : 
+aux_file : 
+bitpix : 8
+cal_max : 0
+cal_min : 0
+datatype : 2
+descrip : 
+dim[0] : 3
+dim[1] : 512
+dim[2] : 512
+dim[3] : 119
+dim[4] : 1
+dim[5] : 1
+dim[6] : 1
+dim[7] : 1
+dim_info : 
+intent_code : 0
+intent_name : 
+intent_p1 : 0
+intent_p2 : 0
+intent_p3 : 0
+pixdim[0] : 1
+pixdim[1] : 0.743
+pixdim[2] : 0.743
+pixdim[3] : 1.6
+pixdim[4] : 1
+pixdim[5] : 1
+pixdim[6] : 1
+pixdim[7] : 1
+qform_code : 0
+qoffset_x : -0
+qoffset_y : -0
+qoffset_z : 0
+quatern_b : 0
+quatern_c : 0
+quatern_d : 1
+scl_inter : 0
+scl_slope : 1
+sform_code : 2
+slice_code : 
+slice_duration : 0
+slice_end : 0
+slice_start : 0
+srow_x : -0.743 -0 0 -0
+srow_y : -0 -0.743 0 -0
+srow_z : 0 0 1.6 0
+toffset : 0
+vox_offset : 352
+xyzt_units : 
+"
+    suppressErrorPosting = FALSE
+    unresolvedFileName = T:/IRCAD/Data/liver-segmentation-17.nii
+  }
+}
+module SoGVRVolumeRenderer {
+  internal  {
+    frame = "-519 -227 176 56"
+    moduleGroupName = Visualization
+    windows  {
+      window _default {
+        geometry = "3064 239 393 596"
+        sizeHint = "393 596"
+        wasOpen = no
+      }
+    }
+  }
+  fields  {
+    instanceName = SoGVRVolumeRenderer14
+    renderCaching = AUTO
+    boundingBoxCaching = AUTO
+    renderCulling = AUTO
+    pickCulling = AUTO
+    on = TRUE
+    autoLoad = TRUE
+    interactiveQuality = 0.1
+    staticQuality = 1
+    interactiveSamplingRate = 1
+    staticSamplingRate = 1
+    blendMode = MIP
+    octreeNodeSize = NODE_SIZE_32
+    octreeParentComputationMethod = Rank
+    octreeParentComputationRank = 4
+    currentTimePoint = 0
+    maxTimePoint = 0
+    force8bit = FALSE
+    filterVolumeData = FilterLinear
+    filterLut = TRUE
+    subVolumeStartX = 0
+    subVolumeStartY = 0
+    subVolumeStartZ = 0
+    subVolumeEndX = 512
+    subVolumeEndY = 512
+    subVolumeEndZ = 119
+    zbuffer = TRUE
+    permitClipping = TRUE
+    drawOnPlanes = TRUE
+    sizeOutputX = 512
+    sizeOutputY = 512
+    sizeOutputZ = 119
+    incrementalUpdate = TRUE
+    highQualityStaticUpdate = FALSE
+    staticRenderingAfterInteractionOnly = FALSE
+    adaptQualityToWindowSize = TRUE
+    rayCastTextureStorage = RayCastTextureStorage_Auto
+    renderMode = Direct
+    useImageCacheFile = FALSE
+    imageCacheFilename = ""
+    greyCenter = 0.5
+    greyWidth = 0.5
+    greyInvert = FALSE
+    alphaCenter = 0.5
+    alphaWidth = 0.5
+    alphaInvert = FALSE
+    colorFactor = "0.580392181873322 0.388235300779343 0"
+    alphaFactor = 0.1
+    enhancementAlphaMix = 0.25
+    boundaryEnhancement = FALSE
+    boundaryEnhancementFactor = 1
+    boundaryEnhancementExponent = 1
+    boundaryEnhancementGradientBias = 0
+    silhouetteEnhancement = FALSE
+    silhouetteEnhancementExponent = 1
+    silhouetteEnhancementFactor = 1
+    toneShading = FALSE
+    toneShadingWarmColor = "0.674509823322296 0.533333361148834 0.141176477074623"
+    toneShadingColdColor = "0 0 0.400000005960464"
+    toneShadingWarmDiffuse = 0.60000002
+    toneShadingColdDiffuse = 0.2
+    toneShadingAngle = 45
+    materialAmbient = 0.60000002
+    materialDiffuse = 1
+    materialSpecular = 1
+    materialSpecularity = 32
+    reduceLightingOnLowGradientMagnitude = FALSE
+    light1Enabled = TRUE
+    light1DiffuseIntensity = 1
+    light1SpecularIntensity = 1
+    light1Color = "1 1 1"
+    light1PolarPhi = 0
+    light1PolarRho = 0
+    light2Enabled = FALSE
+    light2DiffuseIntensity = 1
+    light2SpecularIntensity = 1
+    light2Color = "1 1 1"
+    light2PolarPhi = 45
+    light2PolarRho = 45
+    light3Enabled = FALSE
+    light3DiffuseIntensity = 1
+    light3SpecularIntensity = 1
+    light3Color = "1 1 1"
+    light3PolarPhi = -45
+    light3PolarRho = 0
+    gradientQuality = GradientQualityAutomatic
+    selectionAlphaThreshold = 0.2
+    selectionActive = FALSE
+    useWorldCoords = TRUE
+  }
+}
+module SoGroup {
+  internal  {
+    frame = "4808 -1361 96 56"
+    moduleGroupName = En1
+  }
+  fields  {
+    instanceName = SoGroup8
+  }
+}
+module itkImageFileReader {
+  internal  {
+    frame = "4320 -977 144 56"
+    moduleGroupName = En1
+    windows  {
+      window _default {
+        geometry = "1089 638 570 395"
+        sizeHint = "328 395"
+        wasOpen = no
+      }
+      window _automatic {
+        geometry = "919 320 500 600"
+        sizeHint = "260 223"
+        wasOpen = no
+      }
+    }
+  }
+  fields  {
+    instanceName = itkImageFileReader9
+    fileDataType = "unsigned int8"
+    autoDetermineDataType = TRUE
+    correctSubVoxelShift = TRUE
+    fileDimension = 3
+    info = "Loading okay."
+    numDims = 3
+    fileType = TypeNotApplicable
+    componentType = "unsigned int8"
+    pixelType = SCALAR
+    loaderType = NiftiImageIO
+    outputMetaDataStr = "ITK_FileNotes : 
+aux_file : 
+bitpix : 8
+cal_max : 0
+cal_min : 0
+datatype : 2
+descrip : 
+dim[0] : 3
+dim[1] : 512
+dim[2] : 512
+dim[3] : 119
+dim[4] : 1
+dim[5] : 1
+dim[6] : 1
+dim[7] : 1
+dim_info : 
+intent_code : 0
+intent_name : 
+intent_p1 : 0
+intent_p2 : 0
+intent_p3 : 0
+pixdim[0] : 1
+pixdim[1] : 0.743
+pixdim[2] : 0.743
+pixdim[3] : 1.6
+pixdim[4] : 0
+pixdim[5] : 0
+pixdim[6] : 0
+pixdim[7] : 0
+qform_code : 1
+qoffset_x : -0
+qoffset_y : -0
+qoffset_z : 0
+quatern_b : 0
+quatern_c : 0
+quatern_d : 1
+scl_inter : 0
+scl_slope : 1
+sform_code : 0
+slice_code : 
+slice_duration : 0
+slice_end : 0
+slice_start : 0
+srow_x : 0 0 0 0
+srow_y : 0 0 0 0
+srow_z : 0 0 0 0
+toffset : 0
+vox_offset : 352
+xyzt_units : 
+"
+    suppressErrorPosting = FALSE
+    unresolvedFileName = "//ckm4cad/d/Projects/VesselSegmentation/tmp/vessel_segmentation/apply_ircad_multi/EquallyWeighted/CombinednD-CEL+DICE-DO-nBN-8-1_apply/prediction-80-17.nii"
+  }
+}
+module Threshold {
+  internal  {
+    frame = "4412 -1153 104 72"
+    moduleGroupName = En1
+    showNetworkPanel = true
+    windows  {
+      window _default {
+        geometry = "456 374 279 302"
+        sizeHint = "248 302"
+        wasOpen = no
+      }
+    }
+  }
+  fields  {
+    instanceName = Threshold14
+    threshold = 2
+    relativeThreshold = FALSE
+    comparisonOperator = Equal
+    conditionTrueWriteValue = UserDef
+    userConditionTrueValue = 1
+    conditionFalseWriteValue = UserDef
+    userConditionFalseValue = 0
+  }
+}
+module Threshold {
+  internal  {
+    frame = "4292 -1161 104 72"
+    moduleGroupName = En1
+    showNetworkPanel = true
+    windows  {
+      window _default {
+        geometry = "843 418 279 302"
+        sizeHint = "248 302"
+        wasOpen = no
+      }
+    }
+  }
+  fields  {
+    instanceName = Threshold15
+    threshold = 1
+    relativeThreshold = FALSE
+    comparisonOperator = Equal
+    conditionTrueWriteValue = UserDef
+    userConditionTrueValue = 1
+    conditionFalseWriteValue = UserDef
+    userConditionFalseValue = 0
+  }
+}
+module Bypass {
+  internal  {
+    frame = "4336 -1057 112 56"
+    moduleGroupName = En1
+    showNetworkPanel = true
+  }
+  fields  {
+    instanceName = Bypass8
+    noBypass = FALSE
+  }
+}
+module SoGVRVolumeRenderer {
+  internal  {
+    frame = "4224 -1297 176 56"
+    moduleGroupName = En1
+    windows  {
+      window _default {
+        geometry = "771 271 393 596"
+        sizeHint = "393 596"
+        wasOpen = no
+      }
+    }
+  }
+  fields  {
+    instanceName = SoGVRVolumeRenderer15
+    renderCaching = AUTO
+    boundingBoxCaching = AUTO
+    renderCulling = AUTO
+    pickCulling = AUTO
+    on = TRUE
+    autoLoad = TRUE
+    interactiveQuality = 0.1
+    staticQuality = 1
+    interactiveSamplingRate = 1
+    staticSamplingRate = 1
+    blendMode = Blend
+    octreeNodeSize = NODE_SIZE_32
+    octreeParentComputationMethod = Rank
+    octreeParentComputationRank = 4
+    currentTimePoint = 0
+    maxTimePoint = 0
+    force8bit = FALSE
+    filterVolumeData = FilterLinear
+    filterLut = TRUE
+    subVolumeStartX = 0
+    subVolumeStartY = 0
+    subVolumeStartZ = 0
+    subVolumeEndX = 512
+    subVolumeEndY = 512
+    subVolumeEndZ = 119
+    zbuffer = TRUE
+    permitClipping = TRUE
+    drawOnPlanes = TRUE
+    sizeOutputX = 512
+    sizeOutputY = 512
+    sizeOutputZ = 119
+    incrementalUpdate = TRUE
+    highQualityStaticUpdate = FALSE
+    staticRenderingAfterInteractionOnly = FALSE
+    adaptQualityToWindowSize = TRUE
+    rayCastTextureStorage = RayCastTextureStorage_Auto
+    renderMode = Direct
+    useImageCacheFile = FALSE
+    imageCacheFilename = ""
+    greyCenter = 0.5
+    greyWidth = 0.5
+    greyInvert = FALSE
+    alphaCenter = 0.5
+    alphaWidth = 0.5
+    alphaInvert = FALSE
+    colorFactor = "1 0 1"
+    alphaFactor = 1
+    enhancementAlphaMix = 0.25
+    boundaryEnhancement = FALSE
+    boundaryEnhancementFactor = 1
+    boundaryEnhancementExponent = 1
+    boundaryEnhancementGradientBias = 0
+    silhouetteEnhancement = FALSE
+    silhouetteEnhancementExponent = 1
+    silhouetteEnhancementFactor = 1
+    toneShading = FALSE
+    toneShadingWarmColor = "0.674509823322296 0.533333361148834 0.141176477074623"
+    toneShadingColdColor = "0 0 0.400000005960464"
+    toneShadingWarmDiffuse = 0.60000002
+    toneShadingColdDiffuse = 0.2
+    toneShadingAngle = 45
+    materialAmbient = 0.60000002
+    materialDiffuse = 1
+    materialSpecular = 1
+    materialSpecularity = 32
+    reduceLightingOnLowGradientMagnitude = FALSE
+    light1Enabled = TRUE
+    light1DiffuseIntensity = 1
+    light1SpecularIntensity = 1
+    light1Color = "1 1 1"
+    light1PolarPhi = 0
+    light1PolarRho = 0
+    light2Enabled = FALSE
+    light2DiffuseIntensity = 1
+    light2SpecularIntensity = 1
+    light2Color = "1 1 1"
+    light2PolarPhi = 45
+    light2PolarRho = 45
+    light3Enabled = FALSE
+    light3DiffuseIntensity = 1
+    light3SpecularIntensity = 1
+    light3Color = "1 1 1"
+    light3PolarPhi = -45
+    light3PolarRho = 0
+    gradientQuality = GradientQualityAutomatic
+    selectionAlphaThreshold = 0.2
+    selectionActive = FALSE
+    useWorldCoords = TRUE
+  }
+}
+module SoExaminerViewer {
+  internal  {
+    frame = "4376 -1473 144 56"
+    moduleGroupName = En1
+    windows  {
+      window _viewer {
+        geometry = "1921 260 944 1002"
+        sizeHint = "400 400"
+        wasOpen = yes
+      }
+      window _automatic {
+        geometry = "694 198 730 600"
+        sizeHint = "260 223"
+        wasOpen = no
+      }
+      window _default {
+        geometry = "948 551 574 368"
+        sizeHint = "574 368"
+        wasOpen = no
+      }
+    }
+  }
+  fields  {
+    instanceName = SoExaminerViewer7
+    renderCaching = AUTO
+    boundingBoxCaching = AUTO
+    renderCulling = AUTO
+    pickCulling = AUTO
+    border = FALSE
+    background = "0 0 0"
+    transparency = BLEND
+    antialiasing = FALSE
+    antialiasingNumPasses = 1
+    hiResRendering = TRUE
+    useSampleBuffers = FALSE
+    numSamples = 8
+    grabKeyFocus = TRUE
+    enableKeyCommands = TRUE
+    snapshotFormat = SNAPSHOT_RGB
+    outputAviFile = ""
+    autoRedrawWhenRecording = TRUE
+    frameRate = 7
+    frameRateAvi = 15
+    outputSnapshotFile = C:/Users/as70/Pictures/Vessel-IEEE/Results/En1-Volume.tif
+    outputSnapshotFileWritten = C:/Users/as70/Pictures/Vessel-IEEE/Results/V2D-Volume1.tif
+    autoIncreaseFile = FALSE
+    showSnapshotWithShell = FALSE
+    snapCount = 2
+    inputDevicesList = ""
+    headlight = TRUE
+    decoration = FALSE
+    popupMenuEnabled = FALSE
+    viewing = TRUE
+    autoClipping = TRUE
+    drawStyle = VIEW_AS_IS
+    interactiveDrawStyle = VIEW_LOW_COMPLEXITY
+    viewAllFlag = FALSE
+    initialCameraOrientation = CAMERA_KEEP_AS_IS
+    applyCameraOrientation = CAMERA_KEEP_AS_IS
+    cameraType = CAMERA_PERSPECTIVE
+    autoApplyUserSettingOrientation = FALSE
+    userSettingOrientation = "0 0 1 0"
+    automaticViewAll = FALSE
+    storeCurrentState = TRUE
+    saveCamera = TRUE
+    cursor = TRUE
+    isCameraStored = TRUE
+    perspective = TRUE
+    stereoViewing = FALSE
+    stereoOffset = 3
+    height = 0.78539819
+    position = "191.654357910156 -213.173446655273 112.050094604492"
+    orientation = "-0.999433398246765 -0.025518499314785 0.0219503827393055 4.75569486618042"
+    nearDistance = 207.7382
+    farDistance = 599.45343
+    focalDistance = 403.40036
+    forceRedrawOnInteraction = FALSE
+    button1events = TO_VIEWER
+    button2events = TO_VIEWER
+    button3events = TO_VIEWER
+    keyEvents = TO_VIEWER
+    animationEnabled = FALSE
+    feedback = FALSE
+    feedbackSize = 32
+    mouseInteraction = ""
+    rotationAxis = "0 1 0"
+    rotationAngle = 360
+    rotationSteps = 80
+    recordRotation = TRUE
+    wheelZoomEnabled = TRUE
+    wheelRotationEnabled = TRUE
+  }
+}
+module SoBackground {
+  internal  {
+    frame = "4180 -1377 120 56"
+    moduleGroupName = En1
+  }
+  fields  {
+    instanceName = SoBackground7
+    rotate = TRUE
+    flip = FALSE
+    on = TRUE
+    depthBuffer = TRUE
+  }
+}
+module SoGVRVolumeRenderer {
+  internal  {
+    frame = "4416 -1297 176 56"
+    moduleGroupName = En1
+    windows  {
+      window _default {
+        geometry = "771 271 393 596"
+        sizeHint = "393 596"
+        wasOpen = no
+      }
+    }
+  }
+  fields  {
+    instanceName = SoGVRVolumeRenderer16
+    renderCaching = AUTO
+    boundingBoxCaching = AUTO
+    renderCulling = AUTO
+    pickCulling = AUTO
+    on = TRUE
+    autoLoad = TRUE
+    interactiveQuality = 0.1
+    staticQuality = 1
+    interactiveSamplingRate = 1
+    staticSamplingRate = 1
+    blendMode = Blend
+    octreeNodeSize = NODE_SIZE_32
+    octreeParentComputationMethod = Rank
+    octreeParentComputationRank = 4
+    currentTimePoint = 0
+    maxTimePoint = 0
+    force8bit = FALSE
+    filterVolumeData = FilterLinear
+    filterLut = TRUE
+    subVolumeStartX = 0
+    subVolumeStartY = 0
+    subVolumeStartZ = 0
+    subVolumeEndX = 512
+    subVolumeEndY = 512
+    subVolumeEndZ = 119
+    zbuffer = TRUE
+    permitClipping = TRUE
+    drawOnPlanes = TRUE
+    sizeOutputX = 512
+    sizeOutputY = 512
+    sizeOutputZ = 119
+    incrementalUpdate = TRUE
+    highQualityStaticUpdate = FALSE
+    staticRenderingAfterInteractionOnly = FALSE
+    adaptQualityToWindowSize = TRUE
+    rayCastTextureStorage = RayCastTextureStorage_Auto
+    renderMode = Direct
+    useImageCacheFile = FALSE
+    imageCacheFilename = ""
+    greyCenter = 0.5
+    greyWidth = 0.5
+    greyInvert = FALSE
+    alphaCenter = 0.5
+    alphaWidth = 0.5
+    alphaInvert = FALSE
+    colorFactor = "0 1 1"
+    alphaFactor = 1
+    enhancementAlphaMix = 0.25
+    boundaryEnhancement = FALSE
+    boundaryEnhancementFactor = 1
+    boundaryEnhancementExponent = 1
+    boundaryEnhancementGradientBias = 0
+    silhouetteEnhancement = FALSE
+    silhouetteEnhancementExponent = 1
+    silhouetteEnhancementFactor = 1
+    toneShading = FALSE
+    toneShadingWarmColor = "0.674509823322296 0.533333361148834 0.141176477074623"
+    toneShadingColdColor = "0 0 0.400000005960464"
+    toneShadingWarmDiffuse = 0.60000002
+    toneShadingColdDiffuse = 0.2
+    toneShadingAngle = 45
+    materialAmbient = 0.60000002
+    materialDiffuse = 1
+    materialSpecular = 1
+    materialSpecularity = 32
+    reduceLightingOnLowGradientMagnitude = FALSE
+    light1Enabled = TRUE
+    light1DiffuseIntensity = 1
+    light1SpecularIntensity = 1
+    light1Color = "1 1 1"
+    light1PolarPhi = 0
+    light1PolarRho = 0
+    light2Enabled = FALSE
+    light2DiffuseIntensity = 1
+    light2SpecularIntensity = 1
+    light2Color = "1 1 1"
+    light2PolarPhi = 45
+    light2PolarRho = 45
+    light3Enabled = FALSE
+    light3DiffuseIntensity = 1
+    light3SpecularIntensity = 1
+    light3Color = "1 1 1"
+    light3PolarPhi = -45
+    light3PolarRho = 0
+    gradientQuality = GradientQualityAutomatic
+    selectionAlphaThreshold = 0.2
+    selectionActive = FALSE
+    useWorldCoords = TRUE
+  }
+}
+module SoView2DOverlay {
+  internal  {
+    frame = "4728 -1257 176 56"
+    moduleGroupName = En1
+    showNetworkPanel = true
+    windows  {
+      window _default {
+        geometry = "135 182 436 472"
+        sizeHint = "436 472"
+        wasOpen = no
+      }
+    }
+  }
+  fields  {
+    instanceName = SoView2DOverlay14
+    interactionProviderID = ""
+    drawingOn = TRUE
+    editingOn = TRUE
+    fixZOn = TRUE
+    color = "1 1 1"
+    selectionTolerance = 4
+    needsValidVoxel = TRUE
+    button1 = IGNORED
+    button2 = IGNORED
+    button3 = IGNORED
+    shift = IGNORED
+    control = IGNORED
+    alt = IGNORED
+    wantsAllEvents = TRUE
+    wantsKeyEvents = TRUE
+    wantsMouseWheelEvents = FALSE
+    setEventHandled = FALSE
+    ignoreHandledEvents = FALSE
+    createNewMode = FALSE
+    renderOnSlab = TRUE
+    clipToSlice = TRUE
+    cursorShape = UNDEFINED_CURSOR
+    overlayName = ""
+    cacheTextures = TRUE
+    blendMode = BLEND_BLEND
+    overwriteCurrentTimePoint = FALSE
+    timePoint = 0
+    maxTimePoint = 0
+    filterMode = FILTER_LINEAR
+    inheritFilterMode = TRUE
+    lutPrecision = VIEW2D_LUT_AUTO
+    alphaFactor = 0.5
+    baseColor = "1 0 1"
+    useWorldCoords = TRUE
+    applyLut = TRUE
+    isCheckerTiling = FALSE
+    checkerTileSize = 2
+    areCheckerTilesInverted = FALSE
+  }
+}
+module SoView2DOverlay {
+  internal  {
+    frame = "4936 -1249 176 56"
+    moduleGroupName = En1
+    showNetworkPanel = true
+    windows  {
+      window _default {
+        geometry = "992 544 436 472"
+        sizeHint = "436 472"
+        wasOpen = no
+      }
+    }
+  }
+  fields  {
+    instanceName = SoView2DOverlay15
+    interactionProviderID = ""
+    drawingOn = TRUE
+    editingOn = TRUE
+    fixZOn = TRUE
+    color = "1 1 1"
+    selectionTolerance = 4
+    needsValidVoxel = TRUE
+    button1 = IGNORED
+    button2 = IGNORED
+    button3 = IGNORED
+    shift = IGNORED
+    control = IGNORED
+    alt = IGNORED
+    wantsAllEvents = TRUE
+    wantsKeyEvents = TRUE
+    wantsMouseWheelEvents = FALSE
+    setEventHandled = FALSE
+    ignoreHandledEvents = FALSE
+    createNewMode = FALSE
+    renderOnSlab = TRUE
+    clipToSlice = TRUE
+    cursorShape = UNDEFINED_CURSOR
+    overlayName = ""
+    cacheTextures = TRUE
+    blendMode = BLEND_BLEND
+    overwriteCurrentTimePoint = FALSE
+    timePoint = 0
+    maxTimePoint = 0
+    filterMode = FILTER_LINEAR
+    inheritFilterMode = TRUE
+    lutPrecision = VIEW2D_LUT_AUTO
+    alphaFactor = 0.5
+    baseColor = "0 1 1"
+    useWorldCoords = TRUE
+    applyLut = TRUE
+    isCheckerTiling = FALSE
+    checkerTileSize = 2
+    areCheckerTilesInverted = FALSE
+  }
+}
+module SoRenderArea {
+  internal  {
+    frame = "4956 -1553 120 56"
+    moduleGroupName = En1
+    windows  {
+      window _viewer {
+        geometry = "2888 30 944 1002"
+        sizeHint = "400 400"
+        wasOpen = yes
+      }
+      window _default {
+        geometry = "626 312 331 326"
+        sizeHint = "331 326"
+        wasOpen = no
+      }
+      window _automatic {
+        geometry = "717 269 500 600"
+        sizeHint = "260 223"
+        wasOpen = no
+      }
+    }
+  }
+  fields  {
+    instanceName = SoRenderArea7
+    renderCaching = AUTO
+    boundingBoxCaching = AUTO
+    renderCulling = AUTO
+    pickCulling = AUTO
+    border = FALSE
+    background = "0 0 0"
+    transparency = BLEND
+    antialiasing = FALSE
+    antialiasingNumPasses = 1
+    hiResRendering = TRUE
+    useSampleBuffers = FALSE
+    numSamples = 8
+    grabKeyFocus = TRUE
+    enableKeyCommands = TRUE
+    snapshotFormat = SNAPSHOT_RGB
+    outputAviFile = ""
+    autoRedrawWhenRecording = TRUE
+    frameRate = 7
+    frameRateAvi = 15
+    outputSnapshotFile = C:/Users/as70/Pictures/Vessel-IEEE/Results/En1-Slice
+    outputSnapshotFileWritten = none
+    autoIncreaseFile = FALSE
+    showSnapshotWithShell = FALSE
+    snapCount = 0
+    inputDevicesList = ""
+  }
+}
+module SoView2D {
+  internal  {
+    frame = "5144 -1353 96 56"
+    moduleGroupName = En1
+    windows  {
+      window _default {
+        geometry = "746 509 1052 501"
+        sizeHint = "439 501"
+        wasOpen = no
+      }
+      window _automatic {
+        geometry = "1236 264 500 600"
+        sizeHint = "260 223"
+        wasOpen = no
+      }
+    }
+  }
+  fields  {
+    instanceName = SoView2D7
+    interactionProviderID = ""
+    viewerId = viewer
+    startSlice = 48
+    sliceStep = 1
+    numSlices = 1
+    numXSlices = 1
+    maxSlice = 118
+    keepSlicesInView = FALSE
+    slab = 1
+    lowerLeft = "0 0"
+    upperRight = "1 1"
+    margin = "2 2"
+    spacing = "4 4"
+    sliceZoom = 1
+    sliceZoomSynchronized = 1
+    zoomCenter = "0.5 0.5"
+    minSliceZoomKeyboard = 1
+    sliceOrigin = "0 0"
+    viewingCenter = "0 0 0"
+    enableViewingCenter = FALSE
+    unzoomOnImageChange = FALSE
+    drawImageData = TRUE
+    timePoint = 0
+    maxTimePoint = 0
+    snapToCenter = FALSE
+    standardKeys = TRUE
+    standardKeysNumbers = TRUE
+    standardKeysNeedValidPosition = FALSE
+    passHandledFlagToInventor = FALSE
+    reverseExtensionDrawingOrder = FALSE
+    blendMode = BLEND_REPLACE
+    filterMode = FILTER_LINEAR
+    cacheMode = SLICE_CACHING_OFF
+    sliceAlignX = SLICE_ALIGNX_CENTER
+    sliceAlignY = SLICE_ALIGNY_CENTER
+    useShaders = TRUE
+    applyLut = TRUE
+    lutPrecision = VIEW2D_LUT_AUTO
+    zoomMode = VIEW2D_AUTO_ZOOM
+    zoomModeParameter = 1
+    invertKeyPanningDirections = FALSE
+    invertKeySlicingDirection = FALSE
+    overrideAspectRatio = FALSE
+    overrideAspectRatioValue = 1
+    alphaFactor = 1
+    baseColor = "1 1 1"
+    backgroundAlphaFactor = 0
+    backgroundColor = "0 0 0"
+    cineCenterT = 0
+    cineIntervalT = 0
+    cineCenterZ = 0
+    cineIntervalZ = 0
+    cineMode = CINE_Z
+    cineDirection = CINE_PINGPONG
+    cineRepeat = CINE_ONCE
+    cineSpeed = 0.1
+    cineFullRangeZ = TRUE
+    cineFullRangeT = TRUE
+    cineAlwaysReset = TRUE
+    deletingEnabled = TRUE
+    handle2DEvents = TRUE
+    handle3DEvents = TRUE
+    useManagedInteraction = FALSE
+    devicePixelSize = 1
+    enableZBuffer = TRUE
+    enableZWrite = TRUE
+  }
+}
+module SoSeparator {
+  internal  {
+    frame = "4952 -1457 128 56"
+    moduleGroupName = En1
+  }
+  fields  {
+    instanceName = SoSeparator7
+    renderCaching = AUTO
+    boundingBoxCaching = AUTO
+    renderCulling = AUTO
+    pickCulling = AUTO
+  }
+}
+module SoTriggerAny {
+  internal  {
+    frame = "3057 -2243 112 56"
+    moduleGroupName = ""
+    windows  {
+      window _default {
+        geometry = "161 765 151 368"
+        sizeHint = "151 368"
+        wasOpen = yes
+      }
+      window _automatic {
+        geometry = "33 380 500 600"
+        sizeHint = "256 192"
+        wasOpen = no
+      }
+    }
+  }
+  fields  {
+    instanceName = SoTriggerAny1
+  }
+}
+module SoGroup {
+  internal  {
+    frame = "4794 -494 96 56"
+    moduleGroupName = En2
+  }
+  fields  {
+    instanceName = SoGroup9
+  }
+}
+module itkImageFileReader {
+  internal  {
+    frame = "4302 -110 152 56"
+    moduleGroupName = En2
+    windows  {
+      window _default {
+        geometry = "1089 638 570 395"
+        sizeHint = "328 395"
+        wasOpen = no
+      }
+      window _automatic {
+        geometry = "919 320 500 600"
+        sizeHint = "260 223"
+        wasOpen = no
+      }
+    }
+  }
+  fields  {
+    instanceName = itkImageFileReader10
+    fileDataType = "unsigned int8"
+    autoDetermineDataType = TRUE
+    correctSubVoxelShift = TRUE
+    fileDimension = 3
+    info = "Loading okay."
+    numDims = 3
+    fileType = TypeNotApplicable
+    componentType = "unsigned int8"
+    pixelType = SCALAR
+    loaderType = NiftiImageIO
+    outputMetaDataStr = "ITK_FileNotes : 
+aux_file : 
+bitpix : 8
+cal_max : 0
+cal_min : 0
+datatype : 2
+descrip : 
+dim[0] : 3
+dim[1] : 512
+dim[2] : 512
+dim[3] : 119
+dim[4] : 1
+dim[5] : 1
+dim[6] : 1
+dim[7] : 1
+dim_info : 
+intent_code : 0
+intent_name : 
+intent_p1 : 0
+intent_p2 : 0
+intent_p3 : 0
+pixdim[0] : 1
+pixdim[1] : 0.743
+pixdim[2] : 0.743
+pixdim[3] : 1.6
+pixdim[4] : 0
+pixdim[5] : 0
+pixdim[6] : 0
+pixdim[7] : 0
+qform_code : 1
+qoffset_x : -0
+qoffset_y : -0
+qoffset_z : 0
+quatern_b : 0
+quatern_c : 0
+quatern_d : 1
+scl_inter : 0
+scl_slope : 1
+sform_code : 0
+slice_code : 
+slice_duration : 0
+slice_end : 0
+slice_start : 0
+srow_x : 0 0 0 0
+srow_y : 0 0 0 0
+srow_z : 0 0 0 0
+toffset : 0
+vox_offset : 352
+xyzt_units : 
+"
+    suppressErrorPosting = FALSE
+    unresolvedFileName = "//ckm4cad/d/Projects/VesselSegmentation/tmp/vessel_segmentation/apply_ircad_multi/0.3for2D0.2for3D/CombinednD-CEL+DICE-DO-nBN-8-1_apply/prediction-80-17.nii"
+  }
+}
+module Threshold {
+  internal  {
+    frame = "4398 -286 104 72"
+    moduleGroupName = En2
+    showNetworkPanel = true
+    windows  {
+      window _default {
+        geometry = "456 374 279 302"
+        sizeHint = "248 302"
+        wasOpen = no
+      }
+    }
+  }
+  fields  {
+    instanceName = Threshold16
+    threshold = 2
+    relativeThreshold = FALSE
+    comparisonOperator = Equal
+    conditionTrueWriteValue = UserDef
+    userConditionTrueValue = 1
+    conditionFalseWriteValue = UserDef
+    userConditionFalseValue = 0
+  }
+}
+module Threshold {
+  internal  {
+    frame = "4278 -294 104 72"
+    moduleGroupName = En2
+    showNetworkPanel = true
+    windows  {
+      window _default {
+        geometry = "843 418 279 302"
+        sizeHint = "248 302"
+        wasOpen = no
+      }
+    }
+  }
+  fields  {
+    instanceName = Threshold17
+    threshold = 1
+    relativeThreshold = FALSE
+    comparisonOperator = Equal
+    conditionTrueWriteValue = UserDef
+    userConditionTrueValue = 1
+    conditionFalseWriteValue = UserDef
+    userConditionFalseValue = 0
+  }
+}
+module Bypass {
+  internal  {
+    frame = "4322 -190 112 56"
+    moduleGroupName = En2
+    showNetworkPanel = true
+  }
+  fields  {
+    instanceName = Bypass9
+    noBypass = FALSE
+  }
+}
+module SoGVRVolumeRenderer {
+  internal  {
+    frame = "4210 -430 176 56"
+    moduleGroupName = En2
+    windows  {
+      window _default {
+        geometry = "771 271 393 596"
+        sizeHint = "393 596"
+        wasOpen = no
+      }
+    }
+  }
+  fields  {
+    instanceName = SoGVRVolumeRenderer17
+    renderCaching = AUTO
+    boundingBoxCaching = AUTO
+    renderCulling = AUTO
+    pickCulling = AUTO
+    on = TRUE
+    autoLoad = TRUE
+    interactiveQuality = 0.1
+    staticQuality = 1
+    interactiveSamplingRate = 1
+    staticSamplingRate = 1
+    blendMode = Blend
+    octreeNodeSize = NODE_SIZE_32
+    octreeParentComputationMethod = Rank
+    octreeParentComputationRank = 4
+    currentTimePoint = 0
+    maxTimePoint = 0
+    force8bit = FALSE
+    filterVolumeData = FilterLinear
+    filterLut = TRUE
+    subVolumeStartX = 0
+    subVolumeStartY = 0
+    subVolumeStartZ = 0
+    subVolumeEndX = 512
+    subVolumeEndY = 512
+    subVolumeEndZ = 119
+    zbuffer = TRUE
+    permitClipping = TRUE
+    drawOnPlanes = TRUE
+    sizeOutputX = 512
+    sizeOutputY = 512
+    sizeOutputZ = 119
+    incrementalUpdate = TRUE
+    highQualityStaticUpdate = FALSE
+    staticRenderingAfterInteractionOnly = FALSE
+    adaptQualityToWindowSize = TRUE
+    rayCastTextureStorage = RayCastTextureStorage_Auto
+    renderMode = Direct
+    useImageCacheFile = FALSE
+    imageCacheFilename = ""
+    greyCenter = 0.5
+    greyWidth = 0.5
+    greyInvert = FALSE
+    alphaCenter = 0.5
+    alphaWidth = 0.5
+    alphaInvert = FALSE
+    colorFactor = "1 0 1"
+    alphaFactor = 1
+    enhancementAlphaMix = 0.25
+    boundaryEnhancement = FALSE
+    boundaryEnhancementFactor = 1
+    boundaryEnhancementExponent = 1
+    boundaryEnhancementGradientBias = 0
+    silhouetteEnhancement = FALSE
+    silhouetteEnhancementExponent = 1
+    silhouetteEnhancementFactor = 1
+    toneShading = FALSE
+    toneShadingWarmColor = "0.674509823322296 0.533333361148834 0.141176477074623"
+    toneShadingColdColor = "0 0 0.400000005960464"
+    toneShadingWarmDiffuse = 0.60000002
+    toneShadingColdDiffuse = 0.2
+    toneShadingAngle = 45
+    materialAmbient = 0.60000002
+    materialDiffuse = 1
+    materialSpecular = 1
+    materialSpecularity = 32
+    reduceLightingOnLowGradientMagnitude = FALSE
+    light1Enabled = TRUE
+    light1DiffuseIntensity = 1
+    light1SpecularIntensity = 1
+    light1Color = "1 1 1"
+    light1PolarPhi = 0
+    light1PolarRho = 0
+    light2Enabled = FALSE
+    light2DiffuseIntensity = 1
+    light2SpecularIntensity = 1
+    light2Color = "1 1 1"
+    light2PolarPhi = 45
+    light2PolarRho = 45
+    light3Enabled = FALSE
+    light3DiffuseIntensity = 1
+    light3SpecularIntensity = 1
+    light3Color = "1 1 1"
+    light3PolarPhi = -45
+    light3PolarRho = 0
+    gradientQuality = GradientQualityAutomatic
+    selectionAlphaThreshold = 0.2
+    selectionActive = FALSE
+    useWorldCoords = TRUE
+  }
+}
+module SoExaminerViewer {
+  internal  {
+    frame = "4362 -606 144 56"
+    moduleGroupName = En2
+    windows  {
+      window _viewer {
+        geometry = "1939 260 944 1002"
+        sizeHint = "400 400"
+        wasOpen = yes
+      }
+      window _automatic {
+        geometry = "694 198 730 600"
+        sizeHint = "260 223"
+        wasOpen = no
+      }
+      window _default {
+        geometry = "948 551 574 368"
+        sizeHint = "574 368"
+        wasOpen = no
+      }
+    }
+  }
+  fields  {
+    instanceName = SoExaminerViewer8
+    renderCaching = AUTO
+    boundingBoxCaching = AUTO
+    renderCulling = AUTO
+    pickCulling = AUTO
+    border = FALSE
+    background = "0 0 0"
+    transparency = BLEND
+    antialiasing = FALSE
+    antialiasingNumPasses = 1
+    hiResRendering = TRUE
+    useSampleBuffers = FALSE
+    numSamples = 8
+    grabKeyFocus = TRUE
+    enableKeyCommands = TRUE
+    snapshotFormat = SNAPSHOT_RGB
+    outputAviFile = ""
+    autoRedrawWhenRecording = TRUE
+    frameRate = 7
+    frameRateAvi = 15
+    outputSnapshotFile = C:/Users/as70/Pictures/Vessel-IEEE/Results/En2-Volume.tif
+    outputSnapshotFileWritten = C:/Users/as70/Pictures/Vessel-IEEE/Results/V2D-Volume1.tif
+    autoIncreaseFile = FALSE
+    showSnapshotWithShell = FALSE
+    snapCount = 2
+    inputDevicesList = ""
+    headlight = TRUE
+    decoration = FALSE
+    popupMenuEnabled = FALSE
+    viewing = TRUE
+    autoClipping = TRUE
+    drawStyle = VIEW_AS_IS
+    interactiveDrawStyle = VIEW_LOW_COMPLEXITY
+    viewAllFlag = FALSE
+    initialCameraOrientation = CAMERA_KEEP_AS_IS
+    applyCameraOrientation = CAMERA_KEEP_AS_IS
+    cameraType = CAMERA_PERSPECTIVE
+    autoApplyUserSettingOrientation = FALSE
+    userSettingOrientation = "0 0 1 0"
+    automaticViewAll = FALSE
+    storeCurrentState = TRUE
+    saveCamera = TRUE
+    cursor = TRUE
+    isCameraStored = TRUE
+    perspective = TRUE
+    stereoViewing = FALSE
+    stereoOffset = 3
+    height = 0.78539819
+    position = "191.654357910156 -213.173446655273 112.050094604492"
+    orientation = "-0.999433398246765 -0.025518499314785 0.0219503827393055 4.75569486618042"
+    nearDistance = 207.7382
+    farDistance = 599.45343
+    focalDistance = 403.40036
+    forceRedrawOnInteraction = FALSE
+    button1events = TO_VIEWER
+    button2events = TO_VIEWER
+    button3events = TO_VIEWER
+    keyEvents = TO_VIEWER
+    animationEnabled = FALSE
+    feedback = FALSE
+    feedbackSize = 32
+    mouseInteraction = ""
+    rotationAxis = "0 1 0"
+    rotationAngle = 360
+    rotationSteps = 80
+    recordRotation = TRUE
+    wheelZoomEnabled = TRUE
+    wheelRotationEnabled = TRUE
+  }
+}
+module SoBackground {
+  internal  {
+    frame = "4166 -510 120 56"
+    moduleGroupName = En2
+  }
+  fields  {
+    instanceName = SoBackground8
+    rotate = TRUE
+    flip = FALSE
+    on = TRUE
+    depthBuffer = TRUE
+  }
+}
+module SoGVRVolumeRenderer {
+  internal  {
+    frame = "4402 -430 176 56"
+    moduleGroupName = En2
+    windows  {
+      window _default {
+        geometry = "771 271 393 596"
+        sizeHint = "393 596"
+        wasOpen = no
+      }
+    }
+  }
+  fields  {
+    instanceName = SoGVRVolumeRenderer18
+    renderCaching = AUTO
+    boundingBoxCaching = AUTO
+    renderCulling = AUTO
+    pickCulling = AUTO
+    on = TRUE
+    autoLoad = TRUE
+    interactiveQuality = 0.1
+    staticQuality = 1
+    interactiveSamplingRate = 1
+    staticSamplingRate = 1
+    blendMode = Blend
+    octreeNodeSize = NODE_SIZE_32
+    octreeParentComputationMethod = Rank
+    octreeParentComputationRank = 4
+    currentTimePoint = 0
+    maxTimePoint = 0
+    force8bit = FALSE
+    filterVolumeData = FilterLinear
+    filterLut = TRUE
+    subVolumeStartX = 0
+    subVolumeStartY = 0
+    subVolumeStartZ = 0
+    subVolumeEndX = 512
+    subVolumeEndY = 512
+    subVolumeEndZ = 119
+    zbuffer = TRUE
+    permitClipping = TRUE
+    drawOnPlanes = TRUE
+    sizeOutputX = 512
+    sizeOutputY = 512
+    sizeOutputZ = 119
+    incrementalUpdate = TRUE
+    highQualityStaticUpdate = FALSE
+    staticRenderingAfterInteractionOnly = FALSE
+    adaptQualityToWindowSize = TRUE
+    rayCastTextureStorage = RayCastTextureStorage_Auto
+    renderMode = Direct
+    useImageCacheFile = FALSE
+    imageCacheFilename = ""
+    greyCenter = 0.5
+    greyWidth = 0.5
+    greyInvert = FALSE
+    alphaCenter = 0.5
+    alphaWidth = 0.5
+    alphaInvert = FALSE
+    colorFactor = "0 1 1"
+    alphaFactor = 1
+    enhancementAlphaMix = 0.25
+    boundaryEnhancement = FALSE
+    boundaryEnhancementFactor = 1
+    boundaryEnhancementExponent = 1
+    boundaryEnhancementGradientBias = 0
+    silhouetteEnhancement = FALSE
+    silhouetteEnhancementExponent = 1
+    silhouetteEnhancementFactor = 1
+    toneShading = FALSE
+    toneShadingWarmColor = "0.674509823322296 0.533333361148834 0.141176477074623"
+    toneShadingColdColor = "0 0 0.400000005960464"
+    toneShadingWarmDiffuse = 0.60000002
+    toneShadingColdDiffuse = 0.2
+    toneShadingAngle = 45
+    materialAmbient = 0.60000002
+    materialDiffuse = 1
+    materialSpecular = 1
+    materialSpecularity = 32
+    reduceLightingOnLowGradientMagnitude = FALSE
+    light1Enabled = TRUE
+    light1DiffuseIntensity = 1
+    light1SpecularIntensity = 1
+    light1Color = "1 1 1"
+    light1PolarPhi = 0
+    light1PolarRho = 0
+    light2Enabled = FALSE
+    light2DiffuseIntensity = 1
+    light2SpecularIntensity = 1
+    light2Color = "1 1 1"
+    light2PolarPhi = 45
+    light2PolarRho = 45
+    light3Enabled = FALSE
+    light3DiffuseIntensity = 1
+    light3SpecularIntensity = 1
+    light3Color = "1 1 1"
+    light3PolarPhi = -45
+    light3PolarRho = 0
+    gradientQuality = GradientQualityAutomatic
+    selectionAlphaThreshold = 0.2
+    selectionActive = FALSE
+    useWorldCoords = TRUE
+  }
+}
+module SoView2DOverlay {
+  internal  {
+    frame = "4714 -390 176 56"
+    moduleGroupName = En2
+    showNetworkPanel = true
+    windows  {
+      window _default {
+        geometry = "135 182 436 472"
+        sizeHint = "436 472"
+        wasOpen = no
+      }
+    }
+  }
+  fields  {
+    instanceName = SoView2DOverlay16
+    interactionProviderID = ""
+    drawingOn = TRUE
+    editingOn = TRUE
+    fixZOn = TRUE
+    color = "1 1 1"
+    selectionTolerance = 4
+    needsValidVoxel = TRUE
+    button1 = IGNORED
+    button2 = IGNORED
+    button3 = IGNORED
+    shift = IGNORED
+    control = IGNORED
+    alt = IGNORED
+    wantsAllEvents = TRUE
+    wantsKeyEvents = TRUE
+    wantsMouseWheelEvents = FALSE
+    setEventHandled = FALSE
+    ignoreHandledEvents = FALSE
+    createNewMode = FALSE
+    renderOnSlab = TRUE
+    clipToSlice = TRUE
+    cursorShape = UNDEFINED_CURSOR
+    overlayName = ""
+    cacheTextures = TRUE
+    blendMode = BLEND_BLEND
+    overwriteCurrentTimePoint = FALSE
+    timePoint = 0
+    maxTimePoint = 0
+    filterMode = FILTER_LINEAR
+    inheritFilterMode = TRUE
+    lutPrecision = VIEW2D_LUT_AUTO
+    alphaFactor = 0.5
+    baseColor = "1 0 1"
+    useWorldCoords = TRUE
+    applyLut = TRUE
+    isCheckerTiling = FALSE
+    checkerTileSize = 2
+    areCheckerTilesInverted = FALSE
+  }
+}
+module SoView2DOverlay {
+  internal  {
+    frame = "4922 -382 176 56"
+    moduleGroupName = En2
+    showNetworkPanel = true
+    windows  {
+      window _default {
+        geometry = "992 544 436 472"
+        sizeHint = "436 472"
+        wasOpen = no
+      }
+    }
+  }
+  fields  {
+    instanceName = SoView2DOverlay17
+    interactionProviderID = ""
+    drawingOn = TRUE
+    editingOn = TRUE
+    fixZOn = TRUE
+    color = "1 1 1"
+    selectionTolerance = 4
+    needsValidVoxel = TRUE
+    button1 = IGNORED
+    button2 = IGNORED
+    button3 = IGNORED
+    shift = IGNORED
+    control = IGNORED
+    alt = IGNORED
+    wantsAllEvents = TRUE
+    wantsKeyEvents = TRUE
+    wantsMouseWheelEvents = FALSE
+    setEventHandled = FALSE
+    ignoreHandledEvents = FALSE
+    createNewMode = FALSE
+    renderOnSlab = TRUE
+    clipToSlice = TRUE
+    cursorShape = UNDEFINED_CURSOR
+    overlayName = ""
+    cacheTextures = TRUE
+    blendMode = BLEND_BLEND
+    overwriteCurrentTimePoint = FALSE
+    timePoint = 0
+    maxTimePoint = 0
+    filterMode = FILTER_LINEAR
+    inheritFilterMode = TRUE
+    lutPrecision = VIEW2D_LUT_AUTO
+    alphaFactor = 0.5
+    baseColor = "0 1 1"
+    useWorldCoords = TRUE
+    applyLut = TRUE
+    isCheckerTiling = FALSE
+    checkerTileSize = 2
+    areCheckerTilesInverted = FALSE
+  }
+}
+module SoRenderArea {
+  internal  {
+    frame = "4942 -686 120 56"
+    moduleGroupName = En2
+    windows  {
+      window _viewer {
+        geometry = "2888 30 944 1002"
+        sizeHint = "400 400"
+        wasOpen = yes
+      }
+      window _default {
+        geometry = "1116 362 331 326"
+        sizeHint = "331 326"
+        wasOpen = no
+      }
+      window _automatic {
+        geometry = "717 269 500 600"
+        sizeHint = "260 223"
+        wasOpen = no
+      }
+    }
+  }
+  fields  {
+    instanceName = SoRenderArea8
+    renderCaching = AUTO
+    boundingBoxCaching = AUTO
+    renderCulling = AUTO
+    pickCulling = AUTO
+    border = FALSE
+    background = "0 0 0"
+    transparency = BLEND
+    antialiasing = FALSE
+    antialiasingNumPasses = 1
+    hiResRendering = TRUE
+    useSampleBuffers = FALSE
+    numSamples = 8
+    grabKeyFocus = TRUE
+    enableKeyCommands = TRUE
+    snapshotFormat = SNAPSHOT_RGB
+    outputAviFile = ""
+    autoRedrawWhenRecording = TRUE
+    frameRate = 7
+    frameRateAvi = 15
+    outputSnapshotFile = C:/Users/as70/Pictures/Vessel-IEEE/Results/En2-Slice
+    outputSnapshotFileWritten = none
+    autoIncreaseFile = FALSE
+    showSnapshotWithShell = FALSE
+    snapCount = 0
+    inputDevicesList = ""
+  }
+}
+module SoView2D {
+  internal  {
+    frame = "5130 -486 96 56"
+    moduleGroupName = En2
+    windows  {
+      window _default {
+        geometry = "746 509 1052 501"
+        sizeHint = "439 501"
+        wasOpen = no
+      }
+      window _automatic {
+        geometry = "1236 264 500 600"
+        sizeHint = "260 223"
+        wasOpen = no
+      }
+    }
+  }
+  fields  {
+    instanceName = SoView2D8
+    interactionProviderID = ""
+    viewerId = viewer
+    startSlice = 48
+    sliceStep = 1
+    numSlices = 1
+    numXSlices = 1
+    maxSlice = 118
+    keepSlicesInView = FALSE
+    slab = 1
+    lowerLeft = "0 0"
+    upperRight = "1 1"
+    margin = "2 2"
+    spacing = "4 4"
+    sliceZoom = 1
+    sliceZoomSynchronized = 1
+    zoomCenter = "0.5 0.5"
+    minSliceZoomKeyboard = 1
+    sliceOrigin = "0 0"
+    viewingCenter = "0 0 0"
+    enableViewingCenter = FALSE
+    unzoomOnImageChange = FALSE
+    drawImageData = TRUE
+    timePoint = 0
+    maxTimePoint = 0
+    snapToCenter = FALSE
+    standardKeys = TRUE
+    standardKeysNumbers = TRUE
+    standardKeysNeedValidPosition = FALSE
+    passHandledFlagToInventor = FALSE
+    reverseExtensionDrawingOrder = FALSE
+    blendMode = BLEND_REPLACE
+    filterMode = FILTER_LINEAR
+    cacheMode = SLICE_CACHING_OFF
+    sliceAlignX = SLICE_ALIGNX_CENTER
+    sliceAlignY = SLICE_ALIGNY_CENTER
+    useShaders = TRUE
+    applyLut = TRUE
+    lutPrecision = VIEW2D_LUT_AUTO
+    zoomMode = VIEW2D_AUTO_ZOOM
+    zoomModeParameter = 1
+    invertKeyPanningDirections = FALSE
+    invertKeySlicingDirection = FALSE
+    overrideAspectRatio = FALSE
+    overrideAspectRatioValue = 1
+    alphaFactor = 1
+    baseColor = "1 1 1"
+    backgroundAlphaFactor = 0
+    backgroundColor = "0 0 0"
+    cineCenterT = 0
+    cineIntervalT = 0
+    cineCenterZ = 0
+    cineIntervalZ = 0
+    cineMode = CINE_Z
+    cineDirection = CINE_PINGPONG
+    cineRepeat = CINE_ONCE
+    cineSpeed = 0.1
+    cineFullRangeZ = TRUE
+    cineFullRangeT = TRUE
+    cineAlwaysReset = TRUE
+    deletingEnabled = TRUE
+    handle2DEvents = TRUE
+    handle3DEvents = TRUE
+    useManagedInteraction = FALSE
+    devicePixelSize = 1
+    enableZBuffer = TRUE
+    enableZWrite = TRUE
+  }
+}
+module SoSeparator {
+  internal  {
+    frame = "4938 -590 128 56"
+    moduleGroupName = En2
+  }
+  fields  {
+    instanceName = SoSeparator8
+    renderCaching = AUTO
+    boundingBoxCaching = AUTO
+    renderCulling = AUTO
+    pickCulling = AUTO
+  }
+}
+module SoGroup {
+  internal  {
+    frame = "4786 347 96 56"
+    moduleGroupName = En4
+  }
+  fields  {
+    instanceName = SoGroup10
+  }
+}
+module itkImageFileReader {
+  internal  {
+    frame = "4294 731 152 56"
+    moduleGroupName = En4
+    windows  {
+      window _default {
+        geometry = "1089 638 570 395"
+        sizeHint = "328 395"
+        wasOpen = no
+      }
+      window _automatic {
+        geometry = "919 320 500 600"
+        sizeHint = "260 223"
+        wasOpen = no
+      }
+    }
+  }
+  fields  {
+    instanceName = itkImageFileReader11
+    fileDataType = "unsigned int8"
+    autoDetermineDataType = TRUE
+    correctSubVoxelShift = TRUE
+    fileDimension = 3
+    info = "Loading okay."
+    numDims = 3
+    fileType = TypeNotApplicable
+    componentType = "unsigned int8"
+    pixelType = SCALAR
+    loaderType = NiftiImageIO
+    outputMetaDataStr = "ITK_FileNotes : 
+aux_file : 
+bitpix : 8
+cal_max : 0
+cal_min : 0
+datatype : 2
+descrip : 
+dim[0] : 3
+dim[1] : 512
+dim[2] : 512
+dim[3] : 119
+dim[4] : 1
+dim[5] : 1
+dim[6] : 1
+dim[7] : 1
+dim_info : 
+intent_code : 0
+intent_name : 
+intent_p1 : 0
+intent_p2 : 0
+intent_p3 : 0
+pixdim[0] : 1
+pixdim[1] : 0.743
+pixdim[2] : 0.743
+pixdim[3] : 1.6
+pixdim[4] : 0
+pixdim[5] : 0
+pixdim[6] : 0
+pixdim[7] : 0
+qform_code : 1
+qoffset_x : -0
+qoffset_y : -0
+qoffset_z : 0
+quatern_b : 0
+quatern_c : 0
+quatern_d : 1
+scl_inter : 0
+scl_slope : 1
+sform_code : 0
+slice_code : 
+slice_duration : 0
+slice_end : 0
+slice_start : 0
+srow_x : 0 0 0 0
+srow_y : 0 0 0 0
+srow_z : 0 0 0 0
+toffset : 0
+vox_offset : 352
+xyzt_units : 
+"
+    suppressErrorPosting = FALSE
+    unresolvedFileName = "//ckm4cad/d/Projects/VesselSegmentation/tmp/vessel_segmentation/apply_ircad_multi/0.3forunet0.2forvnet/CombinednD-CEL+DICE-DO-nBN-8-1_apply/prediction-80-17.nii"
+  }
+}
+module Threshold {
+  internal  {
+    frame = "4390 555 104 72"
+    moduleGroupName = En4
+    showNetworkPanel = true
+    windows  {
+      window _default {
+        geometry = "456 374 279 302"
+        sizeHint = "248 302"
+        wasOpen = no
+      }
+    }
+  }
+  fields  {
+    instanceName = Threshold18
+    threshold = 2
+    relativeThreshold = FALSE
+    comparisonOperator = Equal
+    conditionTrueWriteValue = UserDef
+    userConditionTrueValue = 1
+    conditionFalseWriteValue = UserDef
+    userConditionFalseValue = 0
+  }
+}
+module Threshold {
+  internal  {
+    frame = "4270 547 104 72"
+    moduleGroupName = En4
+    showNetworkPanel = true
+    windows  {
+      window _default {
+        geometry = "843 418 279 302"
+        sizeHint = "248 302"
+        wasOpen = no
+      }
+    }
+  }
+  fields  {
+    instanceName = Threshold19
+    threshold = 1
+    relativeThreshold = FALSE
+    comparisonOperator = Equal
+    conditionTrueWriteValue = UserDef
+    userConditionTrueValue = 1
+    conditionFalseWriteValue = UserDef
+    userConditionFalseValue = 0
+  }
+}
+module Bypass {
+  internal  {
+    frame = "4310 651 120 56"
+    moduleGroupName = En4
+    showNetworkPanel = true
+  }
+  fields  {
+    instanceName = Bypass10
+    noBypass = FALSE
+  }
+}
+module SoGVRVolumeRenderer {
+  internal  {
+    frame = "4202 411 176 56"
+    moduleGroupName = En4
+    windows  {
+      window _default {
+        geometry = "771 271 393 596"
+        sizeHint = "393 596"
+        wasOpen = no
+      }
+    }
+  }
+  fields  {
+    instanceName = SoGVRVolumeRenderer19
+    renderCaching = AUTO
+    boundingBoxCaching = AUTO
+    renderCulling = AUTO
+    pickCulling = AUTO
+    on = TRUE
+    autoLoad = TRUE
+    interactiveQuality = 0.1
+    staticQuality = 1
+    interactiveSamplingRate = 1
+    staticSamplingRate = 1
+    blendMode = Blend
+    octreeNodeSize = NODE_SIZE_32
+    octreeParentComputationMethod = Rank
+    octreeParentComputationRank = 4
+    currentTimePoint = 0
+    maxTimePoint = 0
+    force8bit = FALSE
+    filterVolumeData = FilterLinear
+    filterLut = TRUE
+    subVolumeStartX = 0
+    subVolumeStartY = 0
+    subVolumeStartZ = 0
+    subVolumeEndX = 512
+    subVolumeEndY = 512
+    subVolumeEndZ = 119
+    zbuffer = TRUE
+    permitClipping = TRUE
+    drawOnPlanes = TRUE
+    sizeOutputX = 512
+    sizeOutputY = 512
+    sizeOutputZ = 119
+    incrementalUpdate = TRUE
+    highQualityStaticUpdate = FALSE
+    staticRenderingAfterInteractionOnly = FALSE
+    adaptQualityToWindowSize = TRUE
+    rayCastTextureStorage = RayCastTextureStorage_Auto
+    renderMode = Direct
+    useImageCacheFile = FALSE
+    imageCacheFilename = ""
+    greyCenter = 0.5
+    greyWidth = 0.5
+    greyInvert = FALSE
+    alphaCenter = 0.5
+    alphaWidth = 0.5
+    alphaInvert = FALSE
+    colorFactor = "1 0 1"
+    alphaFactor = 1
+    enhancementAlphaMix = 0.25
+    boundaryEnhancement = FALSE
+    boundaryEnhancementFactor = 1
+    boundaryEnhancementExponent = 1
+    boundaryEnhancementGradientBias = 0
+    silhouetteEnhancement = FALSE
+    silhouetteEnhancementExponent = 1
+    silhouetteEnhancementFactor = 1
+    toneShading = FALSE
+    toneShadingWarmColor = "0.674509823322296 0.533333361148834 0.141176477074623"
+    toneShadingColdColor = "0 0 0.400000005960464"
+    toneShadingWarmDiffuse = 0.60000002
+    toneShadingColdDiffuse = 0.2
+    toneShadingAngle = 45
+    materialAmbient = 0.60000002
+    materialDiffuse = 1
+    materialSpecular = 1
+    materialSpecularity = 32
+    reduceLightingOnLowGradientMagnitude = FALSE
+    light1Enabled = TRUE
+    light1DiffuseIntensity = 1
+    light1SpecularIntensity = 1
+    light1Color = "1 1 1"
+    light1PolarPhi = 0
+    light1PolarRho = 0
+    light2Enabled = FALSE
+    light2DiffuseIntensity = 1
+    light2SpecularIntensity = 1
+    light2Color = "1 1 1"
+    light2PolarPhi = 45
+    light2PolarRho = 45
+    light3Enabled = FALSE
+    light3DiffuseIntensity = 1
+    light3SpecularIntensity = 1
+    light3Color = "1 1 1"
+    light3PolarPhi = -45
+    light3PolarRho = 0
+    gradientQuality = GradientQualityAutomatic
+    selectionAlphaThreshold = 0.2
+    selectionActive = FALSE
+    useWorldCoords = TRUE
+  }
+}
+module SoExaminerViewer {
+  internal  {
+    frame = "4354 235 144 56"
+    moduleGroupName = En4
+    windows  {
+      window _viewer {
+        geometry = "1928 30 944 1002"
+        sizeHint = "400 400"
+        wasOpen = yes
+      }
+      window _automatic {
+        geometry = "694 198 730 600"
+        sizeHint = "260 223"
+        wasOpen = no
+      }
+      window _default {
+        geometry = "948 551 574 368"
+        sizeHint = "574 368"
+        wasOpen = no
+      }
+    }
+  }
+  fields  {
+    instanceName = SoExaminerViewer9
+    renderCaching = AUTO
+    boundingBoxCaching = AUTO
+    renderCulling = AUTO
+    pickCulling = AUTO
+    border = FALSE
+    background = "0 0 0"
+    transparency = BLEND
+    antialiasing = FALSE
+    antialiasingNumPasses = 1
+    hiResRendering = TRUE
+    useSampleBuffers = FALSE
+    numSamples = 8
+    grabKeyFocus = TRUE
+    enableKeyCommands = TRUE
+    snapshotFormat = SNAPSHOT_RGB
+    outputAviFile = ""
+    autoRedrawWhenRecording = TRUE
+    frameRate = 7
+    frameRateAvi = 15
+    outputSnapshotFile = C:/Users/as70/Pictures/Vessel-IEEE/Results/En4-Volume.tif
+    outputSnapshotFileWritten = C:/Users/as70/Pictures/Vessel-IEEE/Results/V2D-Volume1.tif
+    autoIncreaseFile = FALSE
+    showSnapshotWithShell = FALSE
+    snapCount = 2
+    inputDevicesList = ""
+    headlight = TRUE
+    decoration = FALSE
+    popupMenuEnabled = FALSE
+    viewing = TRUE
+    autoClipping = TRUE
+    drawStyle = VIEW_AS_IS
+    interactiveDrawStyle = VIEW_LOW_COMPLEXITY
+    viewAllFlag = FALSE
+    initialCameraOrientation = CAMERA_KEEP_AS_IS
+    applyCameraOrientation = CAMERA_KEEP_AS_IS
+    cameraType = CAMERA_PERSPECTIVE
+    autoApplyUserSettingOrientation = FALSE
+    userSettingOrientation = "0 0 1 0"
+    automaticViewAll = FALSE
+    storeCurrentState = TRUE
+    saveCamera = TRUE
+    cursor = TRUE
+    isCameraStored = TRUE
+    perspective = TRUE
+    stereoViewing = FALSE
+    stereoOffset = 3
+    height = 0.78539819
+    position = "191.654357910156 -213.173446655273 112.050094604492"
+    orientation = "-0.999433398246765 -0.025518499314785 0.0219503827393055 4.75569486618042"
+    nearDistance = 207.7382
+    farDistance = 599.45343
+    focalDistance = 403.40036
+    forceRedrawOnInteraction = FALSE
+    button1events = TO_VIEWER
+    button2events = TO_VIEWER
+    button3events = TO_VIEWER
+    keyEvents = TO_VIEWER
+    animationEnabled = FALSE
+    feedback = FALSE
+    feedbackSize = 32
+    mouseInteraction = ""
+    rotationAxis = "0 1 0"
+    rotationAngle = 360
+    rotationSteps = 80
+    recordRotation = TRUE
+    wheelZoomEnabled = TRUE
+    wheelRotationEnabled = TRUE
+  }
+}
+module SoBackground {
+  internal  {
+    frame = "4158 331 120 56"
+    moduleGroupName = En4
+  }
+  fields  {
+    instanceName = SoBackground9
+    rotate = TRUE
+    flip = FALSE
+    on = TRUE
+    depthBuffer = TRUE
+  }
+}
+module SoGVRVolumeRenderer {
+  internal  {
+    frame = "4394 411 176 56"
+    moduleGroupName = En4
+    windows  {
+      window _default {
+        geometry = "771 271 393 596"
+        sizeHint = "393 596"
+        wasOpen = no
+      }
+    }
+  }
+  fields  {
+    instanceName = SoGVRVolumeRenderer20
+    renderCaching = AUTO
+    boundingBoxCaching = AUTO
+    renderCulling = AUTO
+    pickCulling = AUTO
+    on = TRUE
+    autoLoad = TRUE
+    interactiveQuality = 0.1
+    staticQuality = 1
+    interactiveSamplingRate = 1
+    staticSamplingRate = 1
+    blendMode = Blend
+    octreeNodeSize = NODE_SIZE_32
+    octreeParentComputationMethod = Rank
+    octreeParentComputationRank = 4
+    currentTimePoint = 0
+    maxTimePoint = 0
+    force8bit = FALSE
+    filterVolumeData = FilterLinear
+    filterLut = TRUE
+    subVolumeStartX = 0
+    subVolumeStartY = 0
+    subVolumeStartZ = 0
+    subVolumeEndX = 512
+    subVolumeEndY = 512
+    subVolumeEndZ = 119
+    zbuffer = TRUE
+    permitClipping = TRUE
+    drawOnPlanes = TRUE
+    sizeOutputX = 512
+    sizeOutputY = 512
+    sizeOutputZ = 119
+    incrementalUpdate = TRUE
+    highQualityStaticUpdate = FALSE
+    staticRenderingAfterInteractionOnly = FALSE
+    adaptQualityToWindowSize = TRUE
+    rayCastTextureStorage = RayCastTextureStorage_Auto
+    renderMode = Direct
+    useImageCacheFile = FALSE
+    imageCacheFilename = ""
+    greyCenter = 0.5
+    greyWidth = 0.5
+    greyInvert = FALSE
+    alphaCenter = 0.5
+    alphaWidth = 0.5
+    alphaInvert = FALSE
+    colorFactor = "0 1 1"
+    alphaFactor = 1
+    enhancementAlphaMix = 0.25
+    boundaryEnhancement = FALSE
+    boundaryEnhancementFactor = 1
+    boundaryEnhancementExponent = 1
+    boundaryEnhancementGradientBias = 0
+    silhouetteEnhancement = FALSE
+    silhouetteEnhancementExponent = 1
+    silhouetteEnhancementFactor = 1
+    toneShading = FALSE
+    toneShadingWarmColor = "0.674509823322296 0.533333361148834 0.141176477074623"
+    toneShadingColdColor = "0 0 0.400000005960464"
+    toneShadingWarmDiffuse = 0.60000002
+    toneShadingColdDiffuse = 0.2
+    toneShadingAngle = 45
+    materialAmbient = 0.60000002
+    materialDiffuse = 1
+    materialSpecular = 1
+    materialSpecularity = 32
+    reduceLightingOnLowGradientMagnitude = FALSE
+    light1Enabled = TRUE
+    light1DiffuseIntensity = 1
+    light1SpecularIntensity = 1
+    light1Color = "1 1 1"
+    light1PolarPhi = 0
+    light1PolarRho = 0
+    light2Enabled = FALSE
+    light2DiffuseIntensity = 1
+    light2SpecularIntensity = 1
+    light2Color = "1 1 1"
+    light2PolarPhi = 45
+    light2PolarRho = 45
+    light3Enabled = FALSE
+    light3DiffuseIntensity = 1
+    light3SpecularIntensity = 1
+    light3Color = "1 1 1"
+    light3PolarPhi = -45
+    light3PolarRho = 0
+    gradientQuality = GradientQualityAutomatic
+    selectionAlphaThreshold = 0.2
+    selectionActive = FALSE
+    useWorldCoords = TRUE
+  }
+}
+module SoView2DOverlay {
+  internal  {
+    frame = "4706 451 176 56"
+    moduleGroupName = En4
+    showNetworkPanel = true
+    windows  {
+      window _default {
+        geometry = "135 182 436 472"
+        sizeHint = "436 472"
+        wasOpen = no
+      }
+    }
+  }
+  fields  {
+    instanceName = SoView2DOverlay18
+    interactionProviderID = ""
+    drawingOn = TRUE
+    editingOn = TRUE
+    fixZOn = TRUE
+    color = "1 1 1"
+    selectionTolerance = 4
+    needsValidVoxel = TRUE
+    button1 = IGNORED
+    button2 = IGNORED
+    button3 = IGNORED
+    shift = IGNORED
+    control = IGNORED
+    alt = IGNORED
+    wantsAllEvents = TRUE
+    wantsKeyEvents = TRUE
+    wantsMouseWheelEvents = FALSE
+    setEventHandled = FALSE
+    ignoreHandledEvents = FALSE
+    createNewMode = FALSE
+    renderOnSlab = TRUE
+    clipToSlice = TRUE
+    cursorShape = UNDEFINED_CURSOR
+    overlayName = ""
+    cacheTextures = TRUE
+    blendMode = BLEND_BLEND
+    overwriteCurrentTimePoint = FALSE
+    timePoint = 0
+    maxTimePoint = 0
+    filterMode = FILTER_LINEAR
+    inheritFilterMode = TRUE
+    lutPrecision = VIEW2D_LUT_AUTO
+    alphaFactor = 0.5
+    baseColor = "1 0 1"
+    useWorldCoords = TRUE
+    applyLut = TRUE
+    isCheckerTiling = FALSE
+    checkerTileSize = 2
+    areCheckerTilesInverted = FALSE
+  }
+}
+module SoView2DOverlay {
+  internal  {
+    frame = "4914 459 176 56"
+    moduleGroupName = En4
+    showNetworkPanel = true
+    windows  {
+      window _default {
+        geometry = "992 544 436 472"
+        sizeHint = "436 472"
+        wasOpen = no
+      }
+    }
+  }
+  fields  {
+    instanceName = SoView2DOverlay19
+    interactionProviderID = ""
+    drawingOn = TRUE
+    editingOn = TRUE
+    fixZOn = TRUE
+    color = "1 1 1"
+    selectionTolerance = 4
+    needsValidVoxel = TRUE
+    button1 = IGNORED
+    button2 = IGNORED
+    button3 = IGNORED
+    shift = IGNORED
+    control = IGNORED
+    alt = IGNORED
+    wantsAllEvents = TRUE
+    wantsKeyEvents = TRUE
+    wantsMouseWheelEvents = FALSE
+    setEventHandled = FALSE
+    ignoreHandledEvents = FALSE
+    createNewMode = FALSE
+    renderOnSlab = TRUE
+    clipToSlice = TRUE
+    cursorShape = UNDEFINED_CURSOR
+    overlayName = ""
+    cacheTextures = TRUE
+    blendMode = BLEND_BLEND
+    overwriteCurrentTimePoint = FALSE
+    timePoint = 0
+    maxTimePoint = 0
+    filterMode = FILTER_LINEAR
+    inheritFilterMode = TRUE
+    lutPrecision = VIEW2D_LUT_AUTO
+    alphaFactor = 0.5
+    baseColor = "0 1 1"
+    useWorldCoords = TRUE
+    applyLut = TRUE
+    isCheckerTiling = FALSE
+    checkerTileSize = 2
+    areCheckerTilesInverted = FALSE
+  }
+}
+module SoRenderArea {
+  internal  {
+    frame = "4934 155 120 56"
+    moduleGroupName = En4
+    windows  {
+      window _viewer {
+        geometry = "2888 30 944 1002"
+        sizeHint = "400 400"
+        wasOpen = yes
+      }
+      window _default {
+        geometry = "626 312 331 326"
+        sizeHint = "331 326"
+        wasOpen = no
+      }
+      window _automatic {
+        geometry = "717 269 500 600"
+        sizeHint = "260 223"
+        wasOpen = no
+      }
+    }
+  }
+  fields  {
+    instanceName = SoRenderArea9
+    renderCaching = AUTO
+    boundingBoxCaching = AUTO
+    renderCulling = AUTO
+    pickCulling = AUTO
+    border = FALSE
+    background = "0 0 0"
+    transparency = BLEND
+    antialiasing = FALSE
+    antialiasingNumPasses = 1
+    hiResRendering = TRUE
+    useSampleBuffers = FALSE
+    numSamples = 8
+    grabKeyFocus = TRUE
+    enableKeyCommands = TRUE
+    snapshotFormat = SNAPSHOT_RGB
+    outputAviFile = ""
+    autoRedrawWhenRecording = TRUE
+    frameRate = 7
+    frameRateAvi = 15
+    outputSnapshotFile = C:/Users/as70/Pictures/Vessel-IEEE/Results/En4-Slice
+    outputSnapshotFileWritten = none
+    autoIncreaseFile = FALSE
+    showSnapshotWithShell = FALSE
+    snapCount = 0
+    inputDevicesList = ""
+  }
+}
+module SoView2D {
+  internal  {
+    frame = "5122 355 96 56"
+    moduleGroupName = En4
+    windows  {
+      window _default {
+        geometry = "746 509 1052 501"
+        sizeHint = "439 501"
+        wasOpen = no
+      }
+      window _automatic {
+        geometry = "1236 264 500 600"
+        sizeHint = "260 223"
+        wasOpen = no
+      }
+    }
+  }
+  fields  {
+    instanceName = SoView2D9
+    interactionProviderID = ""
+    viewerId = viewer
+    startSlice = 48
+    sliceStep = 1
+    numSlices = 1
+    numXSlices = 1
+    maxSlice = 118
+    keepSlicesInView = FALSE
+    slab = 1
+    lowerLeft = "0 0"
+    upperRight = "1 1"
+    margin = "2 2"
+    spacing = "4 4"
+    sliceZoom = 1
+    sliceZoomSynchronized = 1
+    zoomCenter = "0.5 0.5"
+    minSliceZoomKeyboard = 1
+    sliceOrigin = "0 0"
+    viewingCenter = "0 0 0"
+    enableViewingCenter = FALSE
+    unzoomOnImageChange = FALSE
+    drawImageData = TRUE
+    timePoint = 0
+    maxTimePoint = 0
+    snapToCenter = FALSE
+    standardKeys = TRUE
+    standardKeysNumbers = TRUE
+    standardKeysNeedValidPosition = FALSE
+    passHandledFlagToInventor = FALSE
+    reverseExtensionDrawingOrder = FALSE
+    blendMode = BLEND_REPLACE
+    filterMode = FILTER_LINEAR
+    cacheMode = SLICE_CACHING_OFF
+    sliceAlignX = SLICE_ALIGNX_CENTER
+    sliceAlignY = SLICE_ALIGNY_CENTER
+    useShaders = TRUE
+    applyLut = TRUE
+    lutPrecision = VIEW2D_LUT_AUTO
+    zoomMode = VIEW2D_AUTO_ZOOM
+    zoomModeParameter = 1
+    invertKeyPanningDirections = FALSE
+    invertKeySlicingDirection = FALSE
+    overrideAspectRatio = FALSE
+    overrideAspectRatioValue = 1
+    alphaFactor = 1
+    baseColor = "1 1 1"
+    backgroundAlphaFactor = 0
+    backgroundColor = "0 0 0"
+    cineCenterT = 0
+    cineIntervalT = 0
+    cineCenterZ = 0
+    cineIntervalZ = 0
+    cineMode = CINE_Z
+    cineDirection = CINE_PINGPONG
+    cineRepeat = CINE_ONCE
+    cineSpeed = 0.1
+    cineFullRangeZ = TRUE
+    cineFullRangeT = TRUE
+    cineAlwaysReset = TRUE
+    deletingEnabled = TRUE
+    handle2DEvents = TRUE
+    handle3DEvents = TRUE
+    useManagedInteraction = FALSE
+    devicePixelSize = 1
+    enableZBuffer = TRUE
+    enableZWrite = TRUE
+  }
+}
+module SoSeparator {
+  internal  {
+    frame = "4938 251 112 56"
+    moduleGroupName = En4
+  }
+  fields  {
+    instanceName = SoSeparator9
+    renderCaching = AUTO
+    boundingBoxCaching = AUTO
+    renderCulling = AUTO
+    pickCulling = AUTO
+  }
+}
+module SoGroup {
+  internal  {
+    frame = "5966 -926 96 56"
+    moduleGroupName = En6
+  }
+  fields  {
+    instanceName = SoGroup11
+  }
+}
+module itkImageFileReader {
+  internal  {
+    frame = "5474 -542 152 56"
+    moduleGroupName = En6
+    windows  {
+      window _default {
+        geometry = "1089 638 570 395"
+        sizeHint = "328 395"
+        wasOpen = no
+      }
+      window _automatic {
+        geometry = "919 320 500 600"
+        sizeHint = "260 223"
+        wasOpen = no
+      }
+    }
+  }
+  fields  {
+    instanceName = itkImageFileReader12
+    fileDataType = "unsigned int8"
+    autoDetermineDataType = TRUE
+    correctSubVoxelShift = TRUE
+    fileDimension = 3
+    info = "Loading okay."
+    numDims = 3
+    fileType = TypeNotApplicable
+    componentType = "unsigned int8"
+    pixelType = SCALAR
+    loaderType = NiftiImageIO
+    outputMetaDataStr = "ITK_FileNotes : 
+aux_file : 
+bitpix : 8
+cal_max : 0
+cal_min : 0
+datatype : 2
+descrip : 
+dim[0] : 3
+dim[1] : 512
+dim[2] : 512
+dim[3] : 119
+dim[4] : 1
+dim[5] : 1
+dim[6] : 1
+dim[7] : 1
+dim_info : 
+intent_code : 0
+intent_name : 
+intent_p1 : 0
+intent_p2 : 0
+intent_p3 : 0
+pixdim[0] : 1
+pixdim[1] : 0.743
+pixdim[2] : 0.743
+pixdim[3] : 1.6
+pixdim[4] : 0
+pixdim[5] : 0
+pixdim[6] : 0
+pixdim[7] : 0
+qform_code : 1
+qoffset_x : -0
+qoffset_y : -0
+qoffset_z : 0
+quatern_b : 0
+quatern_c : 0
+quatern_d : 1
+scl_inter : 0
+scl_slope : 1
+sform_code : 0
+slice_code : 
+slice_duration : 0
+slice_end : 0
+slice_start : 0
+srow_x : 0 0 0 0
+srow_y : 0 0 0 0
+srow_z : 0 0 0 0
+toffset : 0
+vox_offset : 352
+xyzt_units : 
+"
+    suppressErrorPosting = FALSE
+    unresolvedFileName = "//ckm4cad/d/Projects/VesselSegmentation/tmp/vessel_segmentation/apply_ircad_multi/0.3forunet0.2forvnet/CombinednD-CEL+DICE-DO-nBN-8-1_apply/prediction-80-17.nii"
+  }
+}
+module Threshold {
+  internal  {
+    frame = "5570 -718 104 72"
+    moduleGroupName = En6
+    showNetworkPanel = true
+    windows  {
+      window _default {
+        geometry = "456 374 279 302"
+        sizeHint = "248 302"
+        wasOpen = no
+      }
+    }
+  }
+  fields  {
+    instanceName = Threshold21
+    threshold = 2
+    relativeThreshold = FALSE
+    comparisonOperator = Equal
+    conditionTrueWriteValue = UserDef
+    userConditionTrueValue = 1
+    conditionFalseWriteValue = UserDef
+    userConditionFalseValue = 0
+  }
+}
+module Threshold {
+  internal  {
+    frame = "5450 -726 104 72"
+    moduleGroupName = En6
+    showNetworkPanel = true
+    windows  {
+      window _default {
+        geometry = "843 418 279 302"
+        sizeHint = "248 302"
+        wasOpen = no
+      }
+    }
+  }
+  fields  {
+    instanceName = Threshold22
+    threshold = 1
+    relativeThreshold = FALSE
+    comparisonOperator = Equal
+    conditionTrueWriteValue = UserDef
+    userConditionTrueValue = 1
+    conditionFalseWriteValue = UserDef
+    userConditionFalseValue = 0
+  }
+}
+module Bypass {
+  internal  {
+    frame = "5490 -622 120 56"
+    moduleGroupName = En6
+    showNetworkPanel = true
+  }
+  fields  {
+    instanceName = Bypass11
+    noBypass = FALSE
+  }
+}
+module SoGVRVolumeRenderer {
+  internal  {
+    frame = "5382 -862 176 56"
+    moduleGroupName = En6
+    windows  {
+      window _default {
+        geometry = "771 271 393 596"
+        sizeHint = "393 596"
+        wasOpen = no
+      }
+    }
+  }
+  fields  {
+    instanceName = SoGVRVolumeRenderer23
+    renderCaching = AUTO
+    boundingBoxCaching = AUTO
+    renderCulling = AUTO
+    pickCulling = AUTO
+    on = TRUE
+    autoLoad = TRUE
+    interactiveQuality = 0.1
+    staticQuality = 1
+    interactiveSamplingRate = 1
+    staticSamplingRate = 1
+    blendMode = Blend
+    octreeNodeSize = NODE_SIZE_32
+    octreeParentComputationMethod = Rank
+    octreeParentComputationRank = 4
+    currentTimePoint = 0
+    maxTimePoint = 0
+    force8bit = FALSE
+    filterVolumeData = FilterLinear
+    filterLut = TRUE
+    subVolumeStartX = 0
+    subVolumeStartY = 0
+    subVolumeStartZ = 0
+    subVolumeEndX = 512
+    subVolumeEndY = 512
+    subVolumeEndZ = 119
+    zbuffer = TRUE
+    permitClipping = TRUE
+    drawOnPlanes = TRUE
+    sizeOutputX = 512
+    sizeOutputY = 512
+    sizeOutputZ = 119
+    incrementalUpdate = TRUE
+    highQualityStaticUpdate = FALSE
+    staticRenderingAfterInteractionOnly = FALSE
+    adaptQualityToWindowSize = TRUE
+    rayCastTextureStorage = RayCastTextureStorage_Auto
+    renderMode = Direct
+    useImageCacheFile = FALSE
+    imageCacheFilename = ""
+    greyCenter = 0.5
+    greyWidth = 0.5
+    greyInvert = FALSE
+    alphaCenter = 0.5
+    alphaWidth = 0.5
+    alphaInvert = FALSE
+    colorFactor = "1 0 1"
+    alphaFactor = 1
+    enhancementAlphaMix = 0.25
+    boundaryEnhancement = FALSE
+    boundaryEnhancementFactor = 1
+    boundaryEnhancementExponent = 1
+    boundaryEnhancementGradientBias = 0
+    silhouetteEnhancement = FALSE
+    silhouetteEnhancementExponent = 1
+    silhouetteEnhancementFactor = 1
+    toneShading = FALSE
+    toneShadingWarmColor = "0.674509823322296 0.533333361148834 0.141176477074623"
+    toneShadingColdColor = "0 0 0.400000005960464"
+    toneShadingWarmDiffuse = 0.60000002
+    toneShadingColdDiffuse = 0.2
+    toneShadingAngle = 45
+    materialAmbient = 0.60000002
+    materialDiffuse = 1
+    materialSpecular = 1
+    materialSpecularity = 32
+    reduceLightingOnLowGradientMagnitude = FALSE
+    light1Enabled = TRUE
+    light1DiffuseIntensity = 1
+    light1SpecularIntensity = 1
+    light1Color = "1 1 1"
+    light1PolarPhi = 0
+    light1PolarRho = 0
+    light2Enabled = FALSE
+    light2DiffuseIntensity = 1
+    light2SpecularIntensity = 1
+    light2Color = "1 1 1"
+    light2PolarPhi = 45
+    light2PolarRho = 45
+    light3Enabled = FALSE
+    light3DiffuseIntensity = 1
+    light3SpecularIntensity = 1
+    light3Color = "1 1 1"
+    light3PolarPhi = -45
+    light3PolarRho = 0
+    gradientQuality = GradientQualityAutomatic
+    selectionAlphaThreshold = 0.2
+    selectionActive = FALSE
+    useWorldCoords = TRUE
+  }
+}
+module SoExaminerViewer {
+  internal  {
+    frame = "5530 -1038 152 56"
+    moduleGroupName = En6
+    windows  {
+      window _viewer {
+        geometry = "1928 30 944 1002"
+        sizeHint = "400 400"
+        wasOpen = yes
+      }
+      window _automatic {
+        geometry = "694 198 730 600"
+        sizeHint = "260 223"
+        wasOpen = no
+      }
+      window _default {
+        geometry = "948 551 574 368"
+        sizeHint = "574 368"
+        wasOpen = no
+      }
+    }
+  }
+  fields  {
+    instanceName = SoExaminerViewer10
+    renderCaching = AUTO
+    boundingBoxCaching = AUTO
+    renderCulling = AUTO
+    pickCulling = AUTO
+    border = FALSE
+    background = "0 0 0"
+    transparency = BLEND
+    antialiasing = FALSE
+    antialiasingNumPasses = 1
+    hiResRendering = TRUE
+    useSampleBuffers = FALSE
+    numSamples = 8
+    grabKeyFocus = TRUE
+    enableKeyCommands = TRUE
+    snapshotFormat = SNAPSHOT_RGB
+    outputAviFile = ""
+    autoRedrawWhenRecording = TRUE
+    frameRate = 7
+    frameRateAvi = 15
+    outputSnapshotFile = C:/Users/as70/Pictures/Vessel-IEEE/Results/En6-Volume.tif
+    outputSnapshotFileWritten = C:/Users/as70/Pictures/Vessel-IEEE/Results/V2D-Volume1.tif
+    autoIncreaseFile = FALSE
+    showSnapshotWithShell = FALSE
+    snapCount = 2
+    inputDevicesList = ""
+    headlight = TRUE
+    decoration = FALSE
+    popupMenuEnabled = FALSE
+    viewing = TRUE
+    autoClipping = TRUE
+    drawStyle = VIEW_AS_IS
+    interactiveDrawStyle = VIEW_LOW_COMPLEXITY
+    viewAllFlag = FALSE
+    initialCameraOrientation = CAMERA_KEEP_AS_IS
+    applyCameraOrientation = CAMERA_KEEP_AS_IS
+    cameraType = CAMERA_PERSPECTIVE
+    autoApplyUserSettingOrientation = FALSE
+    userSettingOrientation = "0 0 1 0"
+    automaticViewAll = FALSE
+    storeCurrentState = TRUE
+    saveCamera = TRUE
+    cursor = TRUE
+    isCameraStored = TRUE
+    perspective = TRUE
+    stereoViewing = FALSE
+    stereoOffset = 3
+    height = 0.78539819
+    position = "191.654357910156 -213.173446655273 112.050094604492"
+    orientation = "-0.999433398246765 -0.025518499314785 0.0219503827393055 4.75569486618042"
+    nearDistance = 207.7382
+    farDistance = 599.45343
+    focalDistance = 403.40036
+    forceRedrawOnInteraction = FALSE
+    button1events = TO_VIEWER
+    button2events = TO_VIEWER
+    button3events = TO_VIEWER
+    keyEvents = TO_VIEWER
+    animationEnabled = FALSE
+    feedback = FALSE
+    feedbackSize = 32
+    mouseInteraction = ""
+    rotationAxis = "0 1 0"
+    rotationAngle = 360
+    rotationSteps = 80
+    recordRotation = TRUE
+    wheelZoomEnabled = TRUE
+    wheelRotationEnabled = TRUE
+  }
+}
+module SoBackground {
+  internal  {
+    frame = "5334 -942 128 56"
+    moduleGroupName = En6
+  }
+  fields  {
+    instanceName = SoBackground10
+    rotate = TRUE
+    flip = FALSE
+    on = TRUE
+    depthBuffer = TRUE
+  }
+}
+module SoGVRVolumeRenderer {
+  internal  {
+    frame = "5574 -862 176 56"
+    moduleGroupName = En6
+    windows  {
+      window _default {
+        geometry = "771 271 393 596"
+        sizeHint = "393 596"
+        wasOpen = no
+      }
+    }
+  }
+  fields  {
+    instanceName = SoGVRVolumeRenderer24
+    renderCaching = AUTO
+    boundingBoxCaching = AUTO
+    renderCulling = AUTO
+    pickCulling = AUTO
+    on = TRUE
+    autoLoad = TRUE
+    interactiveQuality = 0.1
+    staticQuality = 1
+    interactiveSamplingRate = 1
+    staticSamplingRate = 1
+    blendMode = Blend
+    octreeNodeSize = NODE_SIZE_32
+    octreeParentComputationMethod = Rank
+    octreeParentComputationRank = 4
+    currentTimePoint = 0
+    maxTimePoint = 0
+    force8bit = FALSE
+    filterVolumeData = FilterLinear
+    filterLut = TRUE
+    subVolumeStartX = 0
+    subVolumeStartY = 0
+    subVolumeStartZ = 0
+    subVolumeEndX = 512
+    subVolumeEndY = 512
+    subVolumeEndZ = 119
+    zbuffer = TRUE
+    permitClipping = TRUE
+    drawOnPlanes = TRUE
+    sizeOutputX = 512
+    sizeOutputY = 512
+    sizeOutputZ = 119
+    incrementalUpdate = TRUE
+    highQualityStaticUpdate = FALSE
+    staticRenderingAfterInteractionOnly = FALSE
+    adaptQualityToWindowSize = TRUE
+    rayCastTextureStorage = RayCastTextureStorage_Auto
+    renderMode = Direct
+    useImageCacheFile = FALSE
+    imageCacheFilename = ""
+    greyCenter = 0.5
+    greyWidth = 0.5
+    greyInvert = FALSE
+    alphaCenter = 0.5
+    alphaWidth = 0.5
+    alphaInvert = FALSE
+    colorFactor = "0 1 1"
+    alphaFactor = 1
+    enhancementAlphaMix = 0.25
+    boundaryEnhancement = FALSE
+    boundaryEnhancementFactor = 1
+    boundaryEnhancementExponent = 1
+    boundaryEnhancementGradientBias = 0
+    silhouetteEnhancement = FALSE
+    silhouetteEnhancementExponent = 1
+    silhouetteEnhancementFactor = 1
+    toneShading = FALSE
+    toneShadingWarmColor = "0.674509823322296 0.533333361148834 0.141176477074623"
+    toneShadingColdColor = "0 0 0.400000005960464"
+    toneShadingWarmDiffuse = 0.60000002
+    toneShadingColdDiffuse = 0.2
+    toneShadingAngle = 45
+    materialAmbient = 0.60000002
+    materialDiffuse = 1
+    materialSpecular = 1
+    materialSpecularity = 32
+    reduceLightingOnLowGradientMagnitude = FALSE
+    light1Enabled = TRUE
+    light1DiffuseIntensity = 1
+    light1SpecularIntensity = 1
+    light1Color = "1 1 1"
+    light1PolarPhi = 0
+    light1PolarRho = 0
+    light2Enabled = FALSE
+    light2DiffuseIntensity = 1
+    light2SpecularIntensity = 1
+    light2Color = "1 1 1"
+    light2PolarPhi = 45
+    light2PolarRho = 45
+    light3Enabled = FALSE
+    light3DiffuseIntensity = 1
+    light3SpecularIntensity = 1
+    light3Color = "1 1 1"
+    light3PolarPhi = -45
+    light3PolarRho = 0
+    gradientQuality = GradientQualityAutomatic
+    selectionAlphaThreshold = 0.2
+    selectionActive = FALSE
+    useWorldCoords = TRUE
+  }
+}
+module SoView2DOverlay {
+  internal  {
+    frame = "5886 -822 176 56"
+    moduleGroupName = En6
+    showNetworkPanel = true
+    windows  {
+      window _default {
+        geometry = "135 182 436 472"
+        sizeHint = "436 472"
+        wasOpen = no
+      }
+    }
+  }
+  fields  {
+    instanceName = SoView2DOverlay25
+    interactionProviderID = ""
+    drawingOn = TRUE
+    editingOn = TRUE
+    fixZOn = TRUE
+    color = "1 1 1"
+    selectionTolerance = 4
+    needsValidVoxel = TRUE
+    button1 = IGNORED
+    button2 = IGNORED
+    button3 = IGNORED
+    shift = IGNORED
+    control = IGNORED
+    alt = IGNORED
+    wantsAllEvents = TRUE
+    wantsKeyEvents = TRUE
+    wantsMouseWheelEvents = FALSE
+    setEventHandled = FALSE
+    ignoreHandledEvents = FALSE
+    createNewMode = FALSE
+    renderOnSlab = TRUE
+    clipToSlice = TRUE
+    cursorShape = UNDEFINED_CURSOR
+    overlayName = ""
+    cacheTextures = TRUE
+    blendMode = BLEND_BLEND
+    overwriteCurrentTimePoint = FALSE
+    timePoint = 0
+    maxTimePoint = 0
+    filterMode = FILTER_LINEAR
+    inheritFilterMode = TRUE
+    lutPrecision = VIEW2D_LUT_AUTO
+    alphaFactor = 0.5
+    baseColor = "1 0 1"
+    useWorldCoords = TRUE
+    applyLut = TRUE
+    isCheckerTiling = FALSE
+    checkerTileSize = 2
+    areCheckerTilesInverted = FALSE
+  }
+}
+module SoView2DOverlay {
+  internal  {
+    frame = "6094 -814 176 56"
+    moduleGroupName = En6
+    showNetworkPanel = true
+    windows  {
+      window _default {
+        geometry = "992 544 436 472"
+        sizeHint = "436 472"
+        wasOpen = no
+      }
+    }
+  }
+  fields  {
+    instanceName = SoView2DOverlay26
+    interactionProviderID = ""
+    drawingOn = TRUE
+    editingOn = TRUE
+    fixZOn = TRUE
+    color = "1 1 1"
+    selectionTolerance = 4
+    needsValidVoxel = TRUE
+    button1 = IGNORED
+    button2 = IGNORED
+    button3 = IGNORED
+    shift = IGNORED
+    control = IGNORED
+    alt = IGNORED
+    wantsAllEvents = TRUE
+    wantsKeyEvents = TRUE
+    wantsMouseWheelEvents = FALSE
+    setEventHandled = FALSE
+    ignoreHandledEvents = FALSE
+    createNewMode = FALSE
+    renderOnSlab = TRUE
+    clipToSlice = TRUE
+    cursorShape = UNDEFINED_CURSOR
+    overlayName = ""
+    cacheTextures = TRUE
+    blendMode = BLEND_BLEND
+    overwriteCurrentTimePoint = FALSE
+    timePoint = 0
+    maxTimePoint = 0
+    filterMode = FILTER_LINEAR
+    inheritFilterMode = TRUE
+    lutPrecision = VIEW2D_LUT_AUTO
+    alphaFactor = 0.5
+    baseColor = "0 1 1"
+    useWorldCoords = TRUE
+    applyLut = TRUE
+    isCheckerTiling = FALSE
+    checkerTileSize = 2
+    areCheckerTilesInverted = FALSE
+  }
+}
+module SoRenderArea {
+  internal  {
+    frame = "6110 -1118 128 56"
+    moduleGroupName = En6
+    windows  {
+      window _viewer {
+        geometry = "2888 30 944 1002"
+        sizeHint = "400 400"
+        wasOpen = yes
+      }
+      window _default {
+        geometry = "600 437 331 326"
+        sizeHint = "331 326"
+        wasOpen = no
+      }
+      window _automatic {
+        geometry = "717 269 500 600"
+        sizeHint = "260 223"
+        wasOpen = no
+      }
+    }
+  }
+  fields  {
+    instanceName = SoRenderArea10
+    renderCaching = AUTO
+    boundingBoxCaching = AUTO
+    renderCulling = AUTO
+    pickCulling = AUTO
+    border = FALSE
+    background = "0 0 0"
+    transparency = BLEND
+    antialiasing = FALSE
+    antialiasingNumPasses = 1
+    hiResRendering = TRUE
+    useSampleBuffers = FALSE
+    numSamples = 8
+    grabKeyFocus = TRUE
+    enableKeyCommands = TRUE
+    snapshotFormat = SNAPSHOT_RGB
+    outputAviFile = ""
+    autoRedrawWhenRecording = TRUE
+    frameRate = 7
+    frameRateAvi = 15
+    outputSnapshotFile = C:/Users/as70/Pictures/Vessel-IEEE/Results/En6-Slice
+    outputSnapshotFileWritten = none
+    autoIncreaseFile = FALSE
+    showSnapshotWithShell = FALSE
+    snapCount = 0
+    inputDevicesList = ""
+  }
+}
+module SoView2D {
+  internal  {
+    frame = "6298 -918 104 56"
+    moduleGroupName = En6
+    windows  {
+      window _default {
+        geometry = "746 509 1052 501"
+        sizeHint = "439 501"
+        wasOpen = no
+      }
+      window _automatic {
+        geometry = "1236 264 500 600"
+        sizeHint = "260 223"
+        wasOpen = no
+      }
+    }
+  }
+  fields  {
+    instanceName = SoView2D10
+    interactionProviderID = ""
+    viewerId = viewer
+    startSlice = 48
+    sliceStep = 1
+    numSlices = 1
+    numXSlices = 1
+    maxSlice = 118
+    keepSlicesInView = FALSE
+    slab = 1
+    lowerLeft = "0 0"
+    upperRight = "1 1"
+    margin = "2 2"
+    spacing = "4 4"
+    sliceZoom = 1
+    sliceZoomSynchronized = 1
+    zoomCenter = "0.5 0.5"
+    minSliceZoomKeyboard = 1
+    sliceOrigin = "0 0"
+    viewingCenter = "0 0 0"
+    enableViewingCenter = FALSE
+    unzoomOnImageChange = FALSE
+    drawImageData = TRUE
+    timePoint = 0
+    maxTimePoint = 0
+    snapToCenter = FALSE
+    standardKeys = TRUE
+    standardKeysNumbers = TRUE
+    standardKeysNeedValidPosition = FALSE
+    passHandledFlagToInventor = FALSE
+    reverseExtensionDrawingOrder = FALSE
+    blendMode = BLEND_REPLACE
+    filterMode = FILTER_LINEAR
+    cacheMode = SLICE_CACHING_OFF
+    sliceAlignX = SLICE_ALIGNX_CENTER
+    sliceAlignY = SLICE_ALIGNY_CENTER
+    useShaders = TRUE
+    applyLut = TRUE
+    lutPrecision = VIEW2D_LUT_AUTO
+    zoomMode = VIEW2D_AUTO_ZOOM
+    zoomModeParameter = 1
+    invertKeyPanningDirections = FALSE
+    invertKeySlicingDirection = FALSE
+    overrideAspectRatio = FALSE
+    overrideAspectRatioValue = 1
+    alphaFactor = 1
+    baseColor = "1 1 1"
+    backgroundAlphaFactor = 0
+    backgroundColor = "0 0 0"
+    cineCenterT = 0
+    cineIntervalT = 0
+    cineCenterZ = 0
+    cineIntervalZ = 0
+    cineMode = CINE_Z
+    cineDirection = CINE_PINGPONG
+    cineRepeat = CINE_ONCE
+    cineSpeed = 0.1
+    cineFullRangeZ = TRUE
+    cineFullRangeT = TRUE
+    cineAlwaysReset = TRUE
+    deletingEnabled = TRUE
+    handle2DEvents = TRUE
+    handle3DEvents = TRUE
+    useManagedInteraction = FALSE
+    devicePixelSize = 1
+    enableZBuffer = TRUE
+    enableZWrite = TRUE
+  }
+}
+module SoSeparator {
+  internal  {
+    frame = "6118 -1022 112 56"
+    moduleGroupName = En6
+  }
+  fields  {
+    instanceName = SoSeparator10
+    renderCaching = AUTO
+    boundingBoxCaching = AUTO
+    renderCulling = AUTO
+    pickCulling = AUTO
+  }
+}
+module SoGroup {
+  internal  {
+    frame = "5961 -141 96 56"
+    moduleGroupName = En7
+  }
+  fields  {
+    instanceName = SoGroup12
+  }
+}
+module itkImageFileReader {
+  internal  {
+    frame = "5469 243 152 56"
+    moduleGroupName = En7
+    windows  {
+      window _default {
+        geometry = "1089 638 570 395"
+        sizeHint = "328 395"
+        wasOpen = no
+      }
+      window _automatic {
+        geometry = "919 320 500 600"
+        sizeHint = "260 223"
+        wasOpen = no
+      }
+    }
+  }
+  fields  {
+    instanceName = itkImageFileReader13
+    fileDataType = "unsigned int8"
+    autoDetermineDataType = TRUE
+    correctSubVoxelShift = TRUE
+    fileDimension = 3
+    info = "Loading okay."
+    numDims = 3
+    fileType = TypeNotApplicable
+    componentType = "unsigned int8"
+    pixelType = SCALAR
+    loaderType = NiftiImageIO
+    outputMetaDataStr = "ITK_FileNotes : 
+aux_file : 
+bitpix : 8
+cal_max : 0
+cal_min : 0
+datatype : 2
+descrip : 
+dim[0] : 3
+dim[1] : 512
+dim[2] : 512
+dim[3] : 119
+dim[4] : 1
+dim[5] : 1
+dim[6] : 1
+dim[7] : 1
+dim_info : 
+intent_code : 0
+intent_name : 
+intent_p1 : 0
+intent_p2 : 0
+intent_p3 : 0
+pixdim[0] : 1
+pixdim[1] : 0.743
+pixdim[2] : 0.743
+pixdim[3] : 1.6
+pixdim[4] : 0
+pixdim[5] : 0
+pixdim[6] : 0
+pixdim[7] : 0
+qform_code : 1
+qoffset_x : -0
+qoffset_y : -0
+qoffset_z : 0
+quatern_b : 0
+quatern_c : 0
+quatern_d : 1
+scl_inter : 0
+scl_slope : 1
+sform_code : 0
+slice_code : 
+slice_duration : 0
+slice_end : 0
+slice_start : 0
+srow_x : 0 0 0 0
+srow_y : 0 0 0 0
+srow_z : 0 0 0 0
+toffset : 0
+vox_offset : 352
+xyzt_units : 
+"
+    suppressErrorPosting = FALSE
+    unresolvedFileName = "//ckm4cad/d/Projects/VesselSegmentation/tmp/vessel_segmentation/apply_ircad_multi/0.3forunet0.2forvnet/CombinednD-CEL+DICE-DO-nBN-8-1_apply/prediction-80-17.nii"
+  }
+}
+module Threshold {
+  internal  {
+    frame = "5565 67 104 72"
+    moduleGroupName = En7
+    showNetworkPanel = true
+    windows  {
+      window _default {
+        geometry = "456 374 279 302"
+        sizeHint = "248 302"
+        wasOpen = no
+      }
+    }
+  }
+  fields  {
+    instanceName = Threshold27
+    threshold = 2
+    relativeThreshold = FALSE
+    comparisonOperator = Equal
+    conditionTrueWriteValue = UserDef
+    userConditionTrueValue = 1
+    conditionFalseWriteValue = UserDef
+    userConditionFalseValue = 0
+  }
+}
+module Threshold {
+  internal  {
+    frame = "5445 59 104 72"
+    moduleGroupName = En7
+    showNetworkPanel = true
+    windows  {
+      window _default {
+        geometry = "843 418 279 302"
+        sizeHint = "248 302"
+        wasOpen = no
+      }
+    }
+  }
+  fields  {
+    instanceName = Threshold28
+    threshold = 1
+    relativeThreshold = FALSE
+    comparisonOperator = Equal
+    conditionTrueWriteValue = UserDef
+    userConditionTrueValue = 1
+    conditionFalseWriteValue = UserDef
+    userConditionFalseValue = 0
+  }
+}
+module Bypass {
+  internal  {
+    frame = "5485 163 120 56"
+    moduleGroupName = En7
+    showNetworkPanel = true
+  }
+  fields  {
+    instanceName = Bypass12
+    noBypass = FALSE
+  }
+}
+module SoGVRVolumeRenderer {
+  internal  {
+    frame = "5377 -77 176 56"
+    moduleGroupName = En7
+    windows  {
+      window _default {
+        geometry = "771 271 393 596"
+        sizeHint = "393 596"
+        wasOpen = no
+      }
+    }
+  }
+  fields  {
+    instanceName = SoGVRVolumeRenderer29
+    renderCaching = AUTO
+    boundingBoxCaching = AUTO
+    renderCulling = AUTO
+    pickCulling = AUTO
+    on = TRUE
+    autoLoad = TRUE
+    interactiveQuality = 0.1
+    staticQuality = 1
+    interactiveSamplingRate = 1
+    staticSamplingRate = 1
+    blendMode = Blend
+    octreeNodeSize = NODE_SIZE_32
+    octreeParentComputationMethod = Rank
+    octreeParentComputationRank = 4
+    currentTimePoint = 0
+    maxTimePoint = 0
+    force8bit = FALSE
+    filterVolumeData = FilterLinear
+    filterLut = TRUE
+    subVolumeStartX = 0
+    subVolumeStartY = 0
+    subVolumeStartZ = 0
+    subVolumeEndX = 512
+    subVolumeEndY = 512
+    subVolumeEndZ = 119
+    zbuffer = TRUE
+    permitClipping = TRUE
+    drawOnPlanes = TRUE
+    sizeOutputX = 512
+    sizeOutputY = 512
+    sizeOutputZ = 119
+    incrementalUpdate = TRUE
+    highQualityStaticUpdate = FALSE
+    staticRenderingAfterInteractionOnly = FALSE
+    adaptQualityToWindowSize = TRUE
+    rayCastTextureStorage = RayCastTextureStorage_Auto
+    renderMode = Direct
+    useImageCacheFile = FALSE
+    imageCacheFilename = ""
+    greyCenter = 0.5
+    greyWidth = 0.5
+    greyInvert = FALSE
+    alphaCenter = 0.5
+    alphaWidth = 0.5
+    alphaInvert = FALSE
+    colorFactor = "1 0 1"
+    alphaFactor = 1
+    enhancementAlphaMix = 0.25
+    boundaryEnhancement = FALSE
+    boundaryEnhancementFactor = 1
+    boundaryEnhancementExponent = 1
+    boundaryEnhancementGradientBias = 0
+    silhouetteEnhancement = FALSE
+    silhouetteEnhancementExponent = 1
+    silhouetteEnhancementFactor = 1
+    toneShading = FALSE
+    toneShadingWarmColor = "0.674509823322296 0.533333361148834 0.141176477074623"
+    toneShadingColdColor = "0 0 0.400000005960464"
+    toneShadingWarmDiffuse = 0.60000002
+    toneShadingColdDiffuse = 0.2
+    toneShadingAngle = 45
+    materialAmbient = 0.60000002
+    materialDiffuse = 1
+    materialSpecular = 1
+    materialSpecularity = 32
+    reduceLightingOnLowGradientMagnitude = FALSE
+    light1Enabled = TRUE
+    light1DiffuseIntensity = 1
+    light1SpecularIntensity = 1
+    light1Color = "1 1 1"
+    light1PolarPhi = 0
+    light1PolarRho = 0
+    light2Enabled = FALSE
+    light2DiffuseIntensity = 1
+    light2SpecularIntensity = 1
+    light2Color = "1 1 1"
+    light2PolarPhi = 45
+    light2PolarRho = 45
+    light3Enabled = FALSE
+    light3DiffuseIntensity = 1
+    light3SpecularIntensity = 1
+    light3Color = "1 1 1"
+    light3PolarPhi = -45
+    light3PolarRho = 0
+    gradientQuality = GradientQualityAutomatic
+    selectionAlphaThreshold = 0.2
+    selectionActive = FALSE
+    useWorldCoords = TRUE
+  }
+}
+module SoExaminerViewer {
+  internal  {
+    frame = "5525 -253 152 56"
+    moduleGroupName = En7
+    windows  {
+      window _viewer {
+        geometry = "1928 30 944 1002"
+        sizeHint = "400 400"
+        wasOpen = yes
+      }
+      window _automatic {
+        geometry = "694 198 730 600"
+        sizeHint = "260 223"
+        wasOpen = no
+      }
+      window _default {
+        geometry = "948 551 574 368"
+        sizeHint = "574 368"
+        wasOpen = no
+      }
+    }
+  }
+  fields  {
+    instanceName = SoExaminerViewer11
+    renderCaching = AUTO
+    boundingBoxCaching = AUTO
+    renderCulling = AUTO
+    pickCulling = AUTO
+    border = FALSE
+    background = "0 0 0"
+    transparency = BLEND
+    antialiasing = FALSE
+    antialiasingNumPasses = 1
+    hiResRendering = TRUE
+    useSampleBuffers = FALSE
+    numSamples = 8
+    grabKeyFocus = TRUE
+    enableKeyCommands = TRUE
+    snapshotFormat = SNAPSHOT_RGB
+    outputAviFile = ""
+    autoRedrawWhenRecording = TRUE
+    frameRate = 7
+    frameRateAvi = 15
+    outputSnapshotFile = C:/Users/as70/Pictures/Vessel-IEEE/Results/En7-Volume.tif
+    outputSnapshotFileWritten = C:/Users/as70/Pictures/Vessel-IEEE/Results/V2D-Volume1.tif
+    autoIncreaseFile = FALSE
+    showSnapshotWithShell = FALSE
+    snapCount = 2
+    inputDevicesList = ""
+    headlight = TRUE
+    decoration = FALSE
+    popupMenuEnabled = FALSE
+    viewing = TRUE
+    autoClipping = TRUE
+    drawStyle = VIEW_AS_IS
+    interactiveDrawStyle = VIEW_LOW_COMPLEXITY
+    viewAllFlag = FALSE
+    initialCameraOrientation = CAMERA_KEEP_AS_IS
+    applyCameraOrientation = CAMERA_KEEP_AS_IS
+    cameraType = CAMERA_PERSPECTIVE
+    autoApplyUserSettingOrientation = FALSE
+    userSettingOrientation = "0 0 1 0"
+    automaticViewAll = FALSE
+    storeCurrentState = TRUE
+    saveCamera = TRUE
+    cursor = TRUE
+    isCameraStored = TRUE
+    perspective = TRUE
+    stereoViewing = FALSE
+    stereoOffset = 3
+    height = 0.78539819
+    position = "191.654357910156 -213.173446655273 112.050094604492"
+    orientation = "-0.999433398246765 -0.025518499314785 0.0219503827393055 4.75569486618042"
+    nearDistance = 207.7382
+    farDistance = 599.45343
+    focalDistance = 403.40036
+    forceRedrawOnInteraction = FALSE
+    button1events = TO_VIEWER
+    button2events = TO_VIEWER
+    button3events = TO_VIEWER
+    keyEvents = TO_VIEWER
+    animationEnabled = FALSE
+    feedback = FALSE
+    feedbackSize = 32
+    mouseInteraction = ""
+    rotationAxis = "0 1 0"
+    rotationAngle = 360
+    rotationSteps = 80
+    recordRotation = TRUE
+    wheelZoomEnabled = TRUE
+    wheelRotationEnabled = TRUE
+  }
+}
+module SoBackground {
+  internal  {
+    frame = "5329 -157 128 56"
+    moduleGroupName = En7
+  }
+  fields  {
+    instanceName = SoBackground11
+    rotate = TRUE
+    flip = FALSE
+    on = TRUE
+    depthBuffer = TRUE
+  }
+}
+module SoGVRVolumeRenderer {
+  internal  {
+    frame = "5569 -77 176 56"
+    moduleGroupName = En7
+    windows  {
+      window _default {
+        geometry = "771 271 393 596"
+        sizeHint = "393 596"
+        wasOpen = no
+      }
+    }
+  }
+  fields  {
+    instanceName = SoGVRVolumeRenderer30
+    renderCaching = AUTO
+    boundingBoxCaching = AUTO
+    renderCulling = AUTO
+    pickCulling = AUTO
+    on = TRUE
+    autoLoad = TRUE
+    interactiveQuality = 0.1
+    staticQuality = 1
+    interactiveSamplingRate = 1
+    staticSamplingRate = 1
+    blendMode = Blend
+    octreeNodeSize = NODE_SIZE_32
+    octreeParentComputationMethod = Rank
+    octreeParentComputationRank = 4
+    currentTimePoint = 0
+    maxTimePoint = 0
+    force8bit = FALSE
+    filterVolumeData = FilterLinear
+    filterLut = TRUE
+    subVolumeStartX = 0
+    subVolumeStartY = 0
+    subVolumeStartZ = 0
+    subVolumeEndX = 512
+    subVolumeEndY = 512
+    subVolumeEndZ = 119
+    zbuffer = TRUE
+    permitClipping = TRUE
+    drawOnPlanes = TRUE
+    sizeOutputX = 512
+    sizeOutputY = 512
+    sizeOutputZ = 119
+    incrementalUpdate = TRUE
+    highQualityStaticUpdate = FALSE
+    staticRenderingAfterInteractionOnly = FALSE
+    adaptQualityToWindowSize = TRUE
+    rayCastTextureStorage = RayCastTextureStorage_Auto
+    renderMode = Direct
+    useImageCacheFile = FALSE
+    imageCacheFilename = ""
+    greyCenter = 0.5
+    greyWidth = 0.5
+    greyInvert = FALSE
+    alphaCenter = 0.5
+    alphaWidth = 0.5
+    alphaInvert = FALSE
+    colorFactor = "0 1 1"
+    alphaFactor = 1
+    enhancementAlphaMix = 0.25
+    boundaryEnhancement = FALSE
+    boundaryEnhancementFactor = 1
+    boundaryEnhancementExponent = 1
+    boundaryEnhancementGradientBias = 0
+    silhouetteEnhancement = FALSE
+    silhouetteEnhancementExponent = 1
+    silhouetteEnhancementFactor = 1
+    toneShading = FALSE
+    toneShadingWarmColor = "0.674509823322296 0.533333361148834 0.141176477074623"
+    toneShadingColdColor = "0 0 0.400000005960464"
+    toneShadingWarmDiffuse = 0.60000002
+    toneShadingColdDiffuse = 0.2
+    toneShadingAngle = 45
+    materialAmbient = 0.60000002
+    materialDiffuse = 1
+    materialSpecular = 1
+    materialSpecularity = 32
+    reduceLightingOnLowGradientMagnitude = FALSE
+    light1Enabled = TRUE
+    light1DiffuseIntensity = 1
+    light1SpecularIntensity = 1
+    light1Color = "1 1 1"
+    light1PolarPhi = 0
+    light1PolarRho = 0
+    light2Enabled = FALSE
+    light2DiffuseIntensity = 1
+    light2SpecularIntensity = 1
+    light2Color = "1 1 1"
+    light2PolarPhi = 45
+    light2PolarRho = 45
+    light3Enabled = FALSE
+    light3DiffuseIntensity = 1
+    light3SpecularIntensity = 1
+    light3Color = "1 1 1"
+    light3PolarPhi = -45
+    light3PolarRho = 0
+    gradientQuality = GradientQualityAutomatic
+    selectionAlphaThreshold = 0.2
+    selectionActive = FALSE
+    useWorldCoords = TRUE
+  }
+}
+module SoView2DOverlay {
+  internal  {
+    frame = "5881 -37 176 56"
+    moduleGroupName = En7
+    showNetworkPanel = true
+    windows  {
+      window _default {
+        geometry = "135 182 436 472"
+        sizeHint = "436 472"
+        wasOpen = no
+      }
+    }
+  }
+  fields  {
+    instanceName = SoView2DOverlay31
+    interactionProviderID = ""
+    drawingOn = TRUE
+    editingOn = TRUE
+    fixZOn = TRUE
+    color = "1 1 1"
+    selectionTolerance = 4
+    needsValidVoxel = TRUE
+    button1 = IGNORED
+    button2 = IGNORED
+    button3 = IGNORED
+    shift = IGNORED
+    control = IGNORED
+    alt = IGNORED
+    wantsAllEvents = TRUE
+    wantsKeyEvents = TRUE
+    wantsMouseWheelEvents = FALSE
+    setEventHandled = FALSE
+    ignoreHandledEvents = FALSE
+    createNewMode = FALSE
+    renderOnSlab = TRUE
+    clipToSlice = TRUE
+    cursorShape = UNDEFINED_CURSOR
+    overlayName = ""
+    cacheTextures = TRUE
+    blendMode = BLEND_BLEND
+    overwriteCurrentTimePoint = FALSE
+    timePoint = 0
+    maxTimePoint = 0
+    filterMode = FILTER_LINEAR
+    inheritFilterMode = TRUE
+    lutPrecision = VIEW2D_LUT_AUTO
+    alphaFactor = 0.5
+    baseColor = "1 0 1"
+    useWorldCoords = TRUE
+    applyLut = TRUE
+    isCheckerTiling = FALSE
+    checkerTileSize = 2
+    areCheckerTilesInverted = FALSE
+  }
+}
+module SoView2DOverlay {
+  internal  {
+    frame = "6089 -29 176 56"
+    moduleGroupName = En7
+    showNetworkPanel = true
+    windows  {
+      window _default {
+        geometry = "992 544 436 472"
+        sizeHint = "436 472"
+        wasOpen = no
+      }
+    }
+  }
+  fields  {
+    instanceName = SoView2DOverlay32
+    interactionProviderID = ""
+    drawingOn = TRUE
+    editingOn = TRUE
+    fixZOn = TRUE
+    color = "1 1 1"
+    selectionTolerance = 4
+    needsValidVoxel = TRUE
+    button1 = IGNORED
+    button2 = IGNORED
+    button3 = IGNORED
+    shift = IGNORED
+    control = IGNORED
+    alt = IGNORED
+    wantsAllEvents = TRUE
+    wantsKeyEvents = TRUE
+    wantsMouseWheelEvents = FALSE
+    setEventHandled = FALSE
+    ignoreHandledEvents = FALSE
+    createNewMode = FALSE
+    renderOnSlab = TRUE
+    clipToSlice = TRUE
+    cursorShape = UNDEFINED_CURSOR
+    overlayName = ""
+    cacheTextures = TRUE
+    blendMode = BLEND_BLEND
+    overwriteCurrentTimePoint = FALSE
+    timePoint = 0
+    maxTimePoint = 0
+    filterMode = FILTER_LINEAR
+    inheritFilterMode = TRUE
+    lutPrecision = VIEW2D_LUT_AUTO
+    alphaFactor = 0.5
+    baseColor = "0 1 1"
+    useWorldCoords = TRUE
+    applyLut = TRUE
+    isCheckerTiling = FALSE
+    checkerTileSize = 2
+    areCheckerTilesInverted = FALSE
+  }
+}
+module SoRenderArea {
+  internal  {
+    frame = "6105 -333 128 56"
+    moduleGroupName = En7
+    windows  {
+      window _viewer {
+        geometry = "2888 30 944 1002"
+        sizeHint = "400 400"
+        wasOpen = yes
+      }
+      window _default {
+        geometry = "1116 362 331 326"
+        sizeHint = "331 326"
+        wasOpen = no
+      }
+      window _automatic {
+        geometry = "717 269 500 600"
+        sizeHint = "260 223"
+        wasOpen = no
+      }
+    }
+  }
+  fields  {
+    instanceName = SoRenderArea11
+    renderCaching = AUTO
+    boundingBoxCaching = AUTO
+    renderCulling = AUTO
+    pickCulling = AUTO
+    border = FALSE
+    background = "0 0 0"
+    transparency = BLEND
+    antialiasing = FALSE
+    antialiasingNumPasses = 1
+    hiResRendering = TRUE
+    useSampleBuffers = FALSE
+    numSamples = 8
+    grabKeyFocus = TRUE
+    enableKeyCommands = TRUE
+    snapshotFormat = SNAPSHOT_RGB
+    outputAviFile = ""
+    autoRedrawWhenRecording = TRUE
+    frameRate = 7
+    frameRateAvi = 15
+    outputSnapshotFile = C:/Users/as70/Pictures/Vessel-IEEE/Results/En7-Slice
+    outputSnapshotFileWritten = none
+    autoIncreaseFile = FALSE
+    showSnapshotWithShell = FALSE
+    snapCount = 0
+    inputDevicesList = ""
+  }
+}
+module SoView2D {
+  internal  {
+    frame = "6293 -133 104 56"
+    moduleGroupName = En7
+    windows  {
+      window _default {
+        geometry = "746 509 1052 501"
+        sizeHint = "439 501"
+        wasOpen = no
+      }
+      window _automatic {
+        geometry = "1236 264 500 600"
+        sizeHint = "260 223"
+        wasOpen = no
+      }
+    }
+  }
+  fields  {
+    instanceName = SoView2D11
+    interactionProviderID = ""
+    viewerId = viewer
+    startSlice = 48
+    sliceStep = 1
+    numSlices = 1
+    numXSlices = 1
+    maxSlice = 118
+    keepSlicesInView = FALSE
+    slab = 1
+    lowerLeft = "0 0"
+    upperRight = "1 1"
+    margin = "2 2"
+    spacing = "4 4"
+    sliceZoom = 1
+    sliceZoomSynchronized = 1
+    zoomCenter = "0.5 0.5"
+    minSliceZoomKeyboard = 1
+    sliceOrigin = "0 0"
+    viewingCenter = "0 0 0"
+    enableViewingCenter = FALSE
+    unzoomOnImageChange = FALSE
+    drawImageData = TRUE
+    timePoint = 0
+    maxTimePoint = 0
+    snapToCenter = FALSE
+    standardKeys = TRUE
+    standardKeysNumbers = TRUE
+    standardKeysNeedValidPosition = FALSE
+    passHandledFlagToInventor = FALSE
+    reverseExtensionDrawingOrder = FALSE
+    blendMode = BLEND_REPLACE
+    filterMode = FILTER_LINEAR
+    cacheMode = SLICE_CACHING_OFF
+    sliceAlignX = SLICE_ALIGNX_CENTER
+    sliceAlignY = SLICE_ALIGNY_CENTER
+    useShaders = TRUE
+    applyLut = TRUE
+    lutPrecision = VIEW2D_LUT_AUTO
+    zoomMode = VIEW2D_AUTO_ZOOM
+    zoomModeParameter = 1
+    invertKeyPanningDirections = FALSE
+    invertKeySlicingDirection = FALSE
+    overrideAspectRatio = FALSE
+    overrideAspectRatioValue = 1
+    alphaFactor = 1
+    baseColor = "1 1 1"
+    backgroundAlphaFactor = 0
+    backgroundColor = "0 0 0"
+    cineCenterT = 0
+    cineIntervalT = 0
+    cineCenterZ = 0
+    cineIntervalZ = 0
+    cineMode = CINE_Z
+    cineDirection = CINE_PINGPONG
+    cineRepeat = CINE_ONCE
+    cineSpeed = 0.1
+    cineFullRangeZ = TRUE
+    cineFullRangeT = TRUE
+    cineAlwaysReset = TRUE
+    deletingEnabled = TRUE
+    handle2DEvents = TRUE
+    handle3DEvents = TRUE
+    useManagedInteraction = FALSE
+    devicePixelSize = 1
+    enableZBuffer = TRUE
+    enableZWrite = TRUE
+  }
+}
+module SoSeparator {
+  internal  {
+    frame = "6113 -237 112 56"
+    moduleGroupName = En7
+  }
+  fields  {
+    instanceName = SoSeparator11
+    renderCaching = AUTO
+    boundingBoxCaching = AUTO
+    renderCulling = AUTO
+    pickCulling = AUTO
+  }
+}
 connections  {
   Bypass.input0 = itkImageFileReader.output0
   Threshold.input0 = Bypass1.output0
@@ -5254,12 +9153,12 @@ connections  {
   SoView2DOverlay2.image = Threshold3.output0
   SoView2DOverlay3.image = Threshold2.output0
   SoView2D.image = Bypass.output0
-  SoSeparator.children = "SoGroup1.self SoView2D.self"
+  SoSeparator.children = "SoGroup1.self SoLUTEditor.outInventorLUT SoView2D.self"
   SoRenderArea2.doSnapshot = SoTriggerAny.input1
   SoRenderArea2.children = SoSeparator1.self
   SoView2D1.image = Bypass.output0
   SoView2D1.startSlice = SoView2D.startSlice
-  SoSeparator1.children = "SoGroup2.self SoView2D1.self"
+  SoSeparator1.children = "SoGroup2.self SoLUTEditor.outInventorLUT SoView2D1.self"
   SoGroup3.children = "SoView2DOverlay4.self SoView2DOverlay5.self"
   Threshold4.input0 = Bypass3.output0
   Threshold5.input0 = Bypass3.output0
@@ -5280,7 +9179,7 @@ connections  {
   SoRenderArea1.children = SoSeparator2.self
   SoView2D2.image = Bypass.output0
   SoView2D2.startSlice = SoView2D.startSlice
-  SoSeparator2.children = "SoGroup3.self SoView2D2.self"
+  SoSeparator2.children = "SoGroup3.self SoLUTEditor.outInventorLUT SoView2D2.self"
   SoGroup4.children = "SoView2DOverlay6.self SoView2DOverlay7.self"
   Threshold6.input0 = Bypass4.output0
   Threshold7.input0 = Bypass4.output0
@@ -5301,7 +9200,7 @@ connections  {
   SoRenderArea3.children = SoSeparator3.self
   SoView2D3.image = Bypass.output0
   SoView2D3.startSlice = SoView2D.startSlice
-  SoSeparator3.children = "SoGroup4.self SoView2D3.self"
+  SoSeparator3.children = "SoGroup4.self SoLUTEditor.outInventorLUT SoView2D3.self"
   SoGroup5.children = "SoView2DOverlay8.self SoView2DOverlay9.self"
   Threshold8.input0 = Bypass5.output0
   Threshold9.input0 = Bypass5.output0
@@ -5322,7 +9221,7 @@ connections  {
   SoRenderArea4.children = SoSeparator4.self
   SoView2D4.image = Bypass.output0
   SoView2D4.startSlice = SoView2D.startSlice
-  SoSeparator4.children = "SoGroup5.self SoView2D4.self"
+  SoSeparator4.children = "SoGroup5.self SoLUTEditor.outInventorLUT SoView2D4.self"
   SoGroup6.children = "SoView2DOverlay10.self SoView2DOverlay11.self"
   Threshold10.input0 = Bypass6.output0
   Threshold11.input0 = Bypass6.output0
@@ -5343,7 +9242,7 @@ connections  {
   SoRenderArea5.children = SoSeparator5.self
   SoView2D5.image = Bypass.output0
   SoView2D5.startSlice = SoView2D.startSlice
-  SoSeparator5.children = "SoGroup6.self SoView2D5.self"
+  SoSeparator5.children = "SoGroup6.self SoLUTEditor.outInventorLUT SoView2D5.self"
   SoGroup7.children = "SoView2DOverlay12.self SoView2DOverlay13.self"
   Threshold12.input0 = Bypass7.output0
   Threshold13.input0 = Bypass7.output0
@@ -5364,7 +9263,113 @@ connections  {
   SoRenderArea6.children = SoSeparator6.self
   SoView2D6.image = Bypass.output0
   SoView2D6.startSlice = SoView2D.startSlice
-  SoSeparator6.children = "SoGroup7.self SoView2D6.self"
+  SoSeparator6.children = "SoGroup7.self SoLUTEditor.outInventorLUT SoView2D6.self"
+  SoGVRVolumeRenderer14.image = itkImageFileReader8.output0
+  SoGroup8.children = "SoView2DOverlay14.self SoView2DOverlay15.self"
+  Threshold14.input0 = Bypass8.output0
+  Threshold15.input0 = Bypass8.output0
+  Bypass8.input0 = itkImageFileReader9.output0
+  SoGVRVolumeRenderer15.image = Threshold15.output0
+  SoExaminerViewer7.doSnapshot = SoTriggerAny1.input0
+  SoExaminerViewer7.height = SoExaminerViewer.height
+  SoExaminerViewer7.position = SoExaminerViewer.position
+  SoExaminerViewer7.orientation = SoExaminerViewer.orientation
+  SoExaminerViewer7.nearDistance = SoExaminerViewer.nearDistance
+  SoExaminerViewer7.farDistance = SoExaminerViewer.farDistance
+  SoExaminerViewer7.focalDistance = SoExaminerViewer.focalDistance
+  SoExaminerViewer7.children = "SoBackground7.self SoGVRVolumeRenderer15.self SoGVRVolumeRenderer16.self"
+  SoGVRVolumeRenderer16.image = Threshold14.output0
+  SoView2DOverlay14.image = Threshold15.output0
+  SoView2DOverlay15.image = Threshold14.output0
+  SoRenderArea7.doSnapshot = SoTriggerAny1.input0
+  SoRenderArea7.children = SoSeparator7.self
+  SoView2D7.image = Bypass.output0
+  SoView2D7.startSlice = SoView2D.startSlice
+  SoSeparator7.children = "SoGroup8.self SoLUTEditor.outInventorLUT SoView2D7.self"
+  SoGroup9.children = "SoView2DOverlay16.self SoView2DOverlay17.self"
+  Threshold16.input0 = Bypass9.output0
+  Threshold17.input0 = Bypass9.output0
+  Bypass9.input0 = itkImageFileReader10.output0
+  SoGVRVolumeRenderer17.image = Threshold17.output0
+  SoExaminerViewer8.doSnapshot = SoTriggerAny1.input1
+  SoExaminerViewer8.height = SoExaminerViewer.height
+  SoExaminerViewer8.position = SoExaminerViewer.position
+  SoExaminerViewer8.orientation = SoExaminerViewer.orientation
+  SoExaminerViewer8.nearDistance = SoExaminerViewer.nearDistance
+  SoExaminerViewer8.farDistance = SoExaminerViewer.farDistance
+  SoExaminerViewer8.focalDistance = SoExaminerViewer.focalDistance
+  SoExaminerViewer8.children = "SoBackground8.self SoGVRVolumeRenderer17.self SoGVRVolumeRenderer18.self"
+  SoGVRVolumeRenderer18.image = Threshold16.output0
+  SoView2DOverlay16.image = Threshold17.output0
+  SoView2DOverlay17.image = Threshold16.output0
+  SoRenderArea8.doSnapshot = SoTriggerAny1.input1
+  SoRenderArea8.children = SoSeparator8.self
+  SoView2D8.image = Bypass.output0
+  SoView2D8.startSlice = SoView2D.startSlice
+  SoSeparator8.children = "SoGroup9.self SoLUTEditor.outInventorLUT SoView2D8.self"
+  SoGroup10.children = "SoView2DOverlay18.self SoView2DOverlay19.self"
+  Threshold18.input0 = Bypass10.output0
+  Threshold19.input0 = Bypass10.output0
+  Bypass10.input0 = itkImageFileReader11.output0
+  SoGVRVolumeRenderer19.image = Threshold19.output0
+  SoExaminerViewer9.doSnapshot = SoTriggerAny1.input2
+  SoExaminerViewer9.height = SoExaminerViewer.height
+  SoExaminerViewer9.position = SoExaminerViewer.position
+  SoExaminerViewer9.orientation = SoExaminerViewer.orientation
+  SoExaminerViewer9.nearDistance = SoExaminerViewer.nearDistance
+  SoExaminerViewer9.farDistance = SoExaminerViewer.farDistance
+  SoExaminerViewer9.focalDistance = SoExaminerViewer.focalDistance
+  SoExaminerViewer9.children = "SoBackground9.self SoGVRVolumeRenderer19.self SoGVRVolumeRenderer20.self"
+  SoGVRVolumeRenderer20.image = Threshold18.output0
+  SoView2DOverlay18.image = Threshold19.output0
+  SoView2DOverlay19.image = Threshold18.output0
+  SoRenderArea9.doSnapshot = SoTriggerAny1.input2
+  SoRenderArea9.children = SoSeparator9.self
+  SoView2D9.image = Bypass.output0
+  SoView2D9.startSlice = SoView2D.startSlice
+  SoSeparator9.children = "SoGroup10.self SoLUTEditor.outInventorLUT SoView2D9.self"
+  SoGroup11.children = "SoView2DOverlay25.self SoView2DOverlay26.self"
+  Threshold21.input0 = Bypass11.output0
+  Threshold22.input0 = Bypass11.output0
+  Bypass11.input0 = itkImageFileReader12.output0
+  SoGVRVolumeRenderer23.image = Threshold22.output0
+  SoExaminerViewer10.doSnapshot = SoTriggerAny1.input3
+  SoExaminerViewer10.height = SoExaminerViewer.height
+  SoExaminerViewer10.position = SoExaminerViewer.position
+  SoExaminerViewer10.orientation = SoExaminerViewer.orientation
+  SoExaminerViewer10.nearDistance = SoExaminerViewer.nearDistance
+  SoExaminerViewer10.farDistance = SoExaminerViewer.farDistance
+  SoExaminerViewer10.focalDistance = SoExaminerViewer.focalDistance
+  SoExaminerViewer10.children = "SoBackground10.self SoGVRVolumeRenderer23.self SoGVRVolumeRenderer24.self"
+  SoGVRVolumeRenderer24.image = Threshold21.output0
+  SoView2DOverlay25.image = Threshold22.output0
+  SoView2DOverlay26.image = Threshold21.output0
+  SoRenderArea10.doSnapshot = SoTriggerAny1.input3
+  SoRenderArea10.children = SoSeparator10.self
+  SoView2D10.image = Bypass.output0
+  SoView2D10.startSlice = SoView2D.startSlice
+  SoSeparator10.children = "SoGroup11.self SoLUTEditor.outInventorLUT SoView2D10.self"
+  SoGroup12.children = "SoView2DOverlay31.self SoView2DOverlay32.self"
+  Threshold27.input0 = Bypass12.output0
+  Threshold28.input0 = Bypass12.output0
+  Bypass12.input0 = itkImageFileReader13.output0
+  SoGVRVolumeRenderer29.image = Threshold28.output0
+  SoExaminerViewer11.doSnapshot = SoTriggerAny1.input4
+  SoExaminerViewer11.height = SoExaminerViewer.height
+  SoExaminerViewer11.position = SoExaminerViewer.position
+  SoExaminerViewer11.orientation = SoExaminerViewer.orientation
+  SoExaminerViewer11.nearDistance = SoExaminerViewer.nearDistance
+  SoExaminerViewer11.farDistance = SoExaminerViewer.farDistance
+  SoExaminerViewer11.focalDistance = SoExaminerViewer.focalDistance
+  SoExaminerViewer11.children = "SoBackground11.self SoGVRVolumeRenderer29.self SoGVRVolumeRenderer30.self"
+  SoGVRVolumeRenderer30.image = Threshold27.output0
+  SoView2DOverlay31.image = Threshold28.output0
+  SoView2DOverlay32.image = Threshold27.output0
+  SoRenderArea11.doSnapshot = SoTriggerAny1.input4
+  SoRenderArea11.children = SoSeparator11.self
+  SoView2D11.image = Bypass.output0
+  SoView2D11.startSlice = SoView2D.startSlice
+  SoSeparator11.children = "SoGroup12.self SoLUTEditor.outInventorLUT SoView2D11.self"
 }
 networkModel  {
   parentItems  {
@@ -5449,6 +9454,61 @@ networkModel  {
       MLABNetworkModelItem MLABNetworkModelItemGroup {
         uniqueId = 975
         objectName = "3D DV-Net"
+        parentUniqueId = 0
+        color  {
+          r = 45
+          g = 226
+          b = 226
+          a = 40
+        }
+      }
+      MLABNetworkModelItem MLABNetworkModelItemGroup {
+        uniqueId = 328
+        objectName = En1
+        parentUniqueId = 0
+        color  {
+          r = 45
+          g = 226
+          b = 226
+          a = 40
+        }
+      }
+      MLABNetworkModelItem MLABNetworkModelItemGroup {
+        uniqueId = 438
+        objectName = En2
+        parentUniqueId = 0
+        color  {
+          r = 45
+          g = 226
+          b = 226
+          a = 40
+        }
+      }
+      MLABNetworkModelItem MLABNetworkModelItemGroup {
+        uniqueId = 575
+        objectName = En4
+        parentUniqueId = 0
+        color  {
+          r = 45
+          g = 226
+          b = 226
+          a = 40
+        }
+      }
+      MLABNetworkModelItem MLABNetworkModelItemGroup {
+        uniqueId = 674
+        objectName = En6
+        parentUniqueId = 0
+        color  {
+          r = 45
+          g = 226
+          b = 226
+          a = 40
+        }
+      }
+      MLABNetworkModelItem MLABNetworkModelItemGroup {
+        uniqueId = 743
+        objectName = En7
         parentUniqueId = 0
         color  {
           r = 45

@@ -8,9 +8,9 @@ module itkImageFileReader {
     moduleGroupName = ""
     windows  {
       window _default {
-        geometry = "1767 427 328 395"
+        geometry = "1035 669 624 395"
         sizeHint = "328 395"
-        wasOpen = yes
+        wasOpen = no
       }
     }
   }
@@ -36,7 +36,7 @@ descrip :
 dim[0] : 5
 dim[1] : 512
 dim[2] : 512
-dim[3] : 58
+dim[3] : 122
 dim[4] : 1
 dim[5] : 3
 dim[6] : 1
@@ -48,9 +48,9 @@ intent_p1 : 0
 intent_p2 : 0
 intent_p3 : 0
 pixdim[0] : 1
-pixdim[1] : 0.720703
-pixdim[2] : 0.720703
-pixdim[3] : 3
+pixdim[1] : 0.736
+pixdim[2] : 0.736
+pixdim[3] : 1.6
 pixdim[4] : 0
 pixdim[5] : 0
 pixdim[6] : 0
@@ -58,7 +58,7 @@ pixdim[7] : 0
 qform_code : 1
 qoffset_x : -0
 qoffset_y : -0
-qoffset_z : 222
+qoffset_z : 0
 quatern_b : 0
 quatern_c : 0
 quatern_d : 1
@@ -77,7 +77,7 @@ vox_offset : 352
 xyzt_units : 
 "
     suppressErrorPosting = FALSE
-    unresolvedFileName = "//ckm4cad/d/Projects/VesselSegmentation/tmp/vessel_segmentation/apply_ircad_btcv/UNet2D-CEL+DICE-DO-nBN-8-0_apply/prediction-80-2.nii"
+    unresolvedFileName = "//ckm4cad/d/Projects/VesselSegmentation/tmp/vessel_segmentation/apply_ircad_multi/VNet3D-CEL+DICE-DO-nBN-8-0_apply/prediction-80-10.nii"
   }
 }
 module View2D {
@@ -88,7 +88,7 @@ module View2D {
       window _default {
         geometry = "1985 116 630 660"
         sizeHint = "400 400"
-        wasOpen = yes
+        wasOpen = no
       }
       window _automatic {
         geometry = "186 243 500 600"
@@ -102,231 +102,7 @@ module View2D {
     inventorInputOn = TRUE
     inventorOutputOn = FALSE
     view2DExtensionsOn = TRUE
-    startSlice = 34
-    numSlices = 1
-    numXSlices = 1
-    sliceStep = 1
-    slab = 1
-    blendMode = BLEND_REPLACE
-    timePoint = 0
-    maxTimePoint = 0
-    filterMode = FILTER_LINEAR
-    standardKeys = TRUE
-    cineMode = CINE_ZT
-    cineDirection = CINE_FORWARD
-    cineRepeat = CINE_ONCE
-    cineSpeed = 0.1
-    cineAlwaysReset = TRUE
-    snapToCenter = TRUE
-    zoomMode = VIEW2D_AUTO_ZOOM
-    unzoomOnImageChange = FALSE
-    sliceZoom = 1
-    sliceZoomSynced = 1
-    baseColor = "1 1 1"
-    margin = "2 2"
-    sliceOrigin = "0 0"
-    useShaders = TRUE
-    useManagedInteraction = FALSE
-    lutCenter = 0.324595332145691
-    lutWidth = 0.466392606496811
-    annotationOn = TRUE
-    annotationMode = ANNO_MODE_AUTO
-    annotationSizeMode = ANNO_SHOW_DETAILED
-    annotationCol = "0.899999976158142 0.899999976158142 0.899999976158142"
-    annotationFontSize = ANNO_SIZE_AUTO
-    annoCoords = Voxel
-    annoCTValue = AsIs
-    borderOn = FALSE
-    borderColor = "0.899999976158142 0.899999976158142 0.899999976158142"
-    valueHighPrecision = TRUE
-    showColorChannelValues = FALSE
-    colorChannelSeparator = " / "
-    maxPrecision = 4
-    enableSlicing = TRUE
-    useRelativeLUTIfNoInputImage = TRUE
-    hiResRendering = TRUE
-  }
-}
-module itkVectorIndexSelectionCastImageFilter {
-  internal  {
-    frame = "461 293 248 56"
-    moduleGroupName = ""
-    windows  {
-      window _default {
-        geometry = "835 418 264 302"
-        sizeHint = "264 302"
-        wasOpen = no
-      }
-    }
-  }
-  fields  {
-    instanceName = itkVectorIndexSelectionCastImageFilter
-    updateMode = AutoUpdate
-    applyMode = AutoApply
-    minValue = 2.20107906665894e-23
-    maxValue = 1
-    applyMinMax = FALSE
-    autoSetMinMax = TRUE
-    clampOutImageValues = FALSE
-    lowerOutSideMode = MinValue
-    upperOutSideMode = MaxValue
-    lowerOutSideValue = 0
-    upperOutSideValue = 0
-    index = 0
-    coordinateTolerance = 1e-06
-    directionTolerance = 1e-06
-  }
-}
-module itkVectorIndexSelectionCastImageFilter {
-  internal  {
-    frame = "733 285 248 56"
-    moduleGroupName = ""
-    windows  {
-      window _default {
-        geometry = "1116 569 264 302"
-        sizeHint = "264 302"
-        wasOpen = no
-      }
-    }
-  }
-  fields  {
-    instanceName = itkVectorIndexSelectionCastImageFilter1
-    updateMode = AutoUpdate
-    applyMode = AutoApply
-    minValue = 2.20107906665894e-23
-    maxValue = 1
-    applyMinMax = FALSE
-    autoSetMinMax = TRUE
-    clampOutImageValues = FALSE
-    lowerOutSideMode = MinValue
-    upperOutSideMode = MaxValue
-    lowerOutSideValue = 0
-    upperOutSideValue = 0
-    index = 1
-    coordinateTolerance = 1e-06
-    directionTolerance = 1e-06
-  }
-}
-module View2D {
-  internal  {
-    frame = "813 101 120 56"
-    moduleGroupName = ""
-    windows  {
-      window _default {
-        geometry = "2633 113 581 663"
-        sizeHint = "400 400"
-        wasOpen = yes
-      }
-      window _automatic {
-        geometry = "717 269 500 600"
-        sizeHint = "260 223"
-        wasOpen = no
-      }
-    }
-  }
-  fields  {
-    instanceName = View2D1
-    inventorInputOn = TRUE
-    inventorOutputOn = FALSE
-    view2DExtensionsOn = TRUE
-    startSlice = 34
-    numSlices = 1
-    numXSlices = 1
-    sliceStep = 1
-    slab = 1
-    blendMode = BLEND_REPLACE
-    timePoint = 0
-    maxTimePoint = 0
-    filterMode = FILTER_LINEAR
-    standardKeys = TRUE
-    cineMode = CINE_ZT
-    cineDirection = CINE_FORWARD
-    cineRepeat = CINE_ONCE
-    cineSpeed = 0.1
-    cineAlwaysReset = TRUE
-    snapToCenter = TRUE
-    zoomMode = VIEW2D_AUTO_ZOOM
-    unzoomOnImageChange = FALSE
-    sliceZoom = 1
-    sliceZoomSynced = 1
-    baseColor = "1 1 1"
-    margin = "2 2"
-    sliceOrigin = "0 0"
-    useShaders = TRUE
-    useManagedInteraction = FALSE
-    lutCenter = 0.393750011920929
-    lutWidth = 0.64330005645752
-    annotationOn = TRUE
-    annotationMode = ANNO_MODE_AUTO
-    annotationSizeMode = ANNO_SHOW_DETAILED
-    annotationCol = "0.899999976158142 0.899999976158142 0.899999976158142"
-    annotationFontSize = ANNO_SIZE_AUTO
-    annoCoords = Voxel
-    annoCTValue = AsIs
-    borderOn = FALSE
-    borderColor = "0.899999976158142 0.899999976158142 0.899999976158142"
-    valueHighPrecision = TRUE
-    showColorChannelValues = FALSE
-    colorChannelSeparator = " / "
-    maxPrecision = 4
-    enableSlicing = TRUE
-    useRelativeLUTIfNoInputImage = TRUE
-    hiResRendering = TRUE
-  }
-}
-module itkVectorIndexSelectionCastImageFilter {
-  internal  {
-    frame = "1021 277 248 56"
-    moduleGroupName = ""
-    windows  {
-      window _default {
-        geometry = "1417 632 264 302"
-        sizeHint = "264 302"
-        wasOpen = no
-      }
-    }
-  }
-  fields  {
-    instanceName = itkVectorIndexSelectionCastImageFilter2
-    updateMode = AutoUpdate
-    applyMode = AutoApply
-    minValue = 2.20107906665894e-23
-    maxValue = 1
-    applyMinMax = FALSE
-    autoSetMinMax = TRUE
-    clampOutImageValues = FALSE
-    lowerOutSideMode = MinValue
-    upperOutSideMode = MaxValue
-    lowerOutSideValue = 0
-    upperOutSideValue = 0
-    index = 2
-    coordinateTolerance = 1e-06
-    directionTolerance = 1e-06
-  }
-}
-module View2D {
-  internal  {
-    frame = "1021 61 120 56"
-    moduleGroupName = ""
-    windows  {
-      window _default {
-        geometry = "3222 115 608 662"
-        sizeHint = "400 400"
-        wasOpen = yes
-      }
-      window _automatic {
-        geometry = "1225 266 500 600"
-        sizeHint = "260 223"
-        wasOpen = no
-      }
-    }
-  }
-  fields  {
-    instanceName = View2D2
-    inventorInputOn = TRUE
-    inventorOutputOn = FALSE
-    view2DExtensionsOn = TRUE
-    startSlice = 34
+    startSlice = 61
     numSlices = 1
     numXSlices = 1
     sliceStep = 1
@@ -371,6 +147,682 @@ module View2D {
     hiResRendering = TRUE
   }
 }
+module itkVectorIndexSelectionCastImageFilter {
+  internal  {
+    frame = "461 293 248 56"
+    moduleGroupName = ""
+    windows  {
+      window _default {
+        geometry = "835 418 264 302"
+        sizeHint = "264 302"
+        wasOpen = no
+      }
+    }
+  }
+  fields  {
+    instanceName = itkVectorIndexSelectionCastImageFilter
+    updateMode = AutoUpdate
+    applyMode = AutoApply
+    minValue = 1.3285665104858e-29
+    maxValue = 1
+    applyMinMax = FALSE
+    autoSetMinMax = TRUE
+    clampOutImageValues = FALSE
+    lowerOutSideMode = MinValue
+    upperOutSideMode = MaxValue
+    lowerOutSideValue = 0
+    upperOutSideValue = 0
+    index = 0
+    coordinateTolerance = 1e-06
+    directionTolerance = 1e-06
+  }
+}
+module itkVectorIndexSelectionCastImageFilter {
+  internal  {
+    frame = "733 285 248 56"
+    moduleGroupName = ""
+    windows  {
+      window _default {
+        geometry = "1116 569 264 302"
+        sizeHint = "264 302"
+        wasOpen = no
+      }
+    }
+  }
+  fields  {
+    instanceName = itkVectorIndexSelectionCastImageFilter1
+    updateMode = AutoUpdate
+    applyMode = AutoApply
+    minValue = 1.3285665104858e-29
+    maxValue = 1
+    applyMinMax = FALSE
+    autoSetMinMax = TRUE
+    clampOutImageValues = FALSE
+    lowerOutSideMode = MinValue
+    upperOutSideMode = MaxValue
+    lowerOutSideValue = 0
+    upperOutSideValue = 0
+    index = 1
+    coordinateTolerance = 1e-06
+    directionTolerance = 1e-06
+  }
+}
+module View2D {
+  internal  {
+    frame = "813 101 120 56"
+    moduleGroupName = ""
+    windows  {
+      window _default {
+        geometry = "2633 113 581 663"
+        sizeHint = "400 400"
+        wasOpen = no
+      }
+      window _automatic {
+        geometry = "717 269 500 600"
+        sizeHint = "260 223"
+        wasOpen = no
+      }
+    }
+  }
+  fields  {
+    instanceName = View2D1
+    inventorInputOn = TRUE
+    inventorOutputOn = FALSE
+    view2DExtensionsOn = TRUE
+    startSlice = 61
+    numSlices = 1
+    numXSlices = 1
+    sliceStep = 1
+    slab = 1
+    blendMode = BLEND_REPLACE
+    timePoint = 0
+    maxTimePoint = 0
+    filterMode = FILTER_LINEAR
+    standardKeys = TRUE
+    cineMode = CINE_ZT
+    cineDirection = CINE_FORWARD
+    cineRepeat = CINE_ONCE
+    cineSpeed = 0.1
+    cineAlwaysReset = TRUE
+    snapToCenter = TRUE
+    zoomMode = VIEW2D_AUTO_ZOOM
+    unzoomOnImageChange = FALSE
+    sliceZoom = 1
+    sliceZoomSynced = 1
+    baseColor = "1 1 1"
+    margin = "2 2"
+    sliceOrigin = "0 0"
+    useShaders = TRUE
+    useManagedInteraction = FALSE
+    lutCenter = 0.162500128149986
+    lutWidth = 0.49750030040741
+    annotationOn = TRUE
+    annotationMode = ANNO_MODE_AUTO
+    annotationSizeMode = ANNO_SHOW_DETAILED
+    annotationCol = "0.899999976158142 0.899999976158142 0.899999976158142"
+    annotationFontSize = ANNO_SIZE_AUTO
+    annoCoords = Voxel
+    annoCTValue = AsIs
+    borderOn = FALSE
+    borderColor = "0.899999976158142 0.899999976158142 0.899999976158142"
+    valueHighPrecision = TRUE
+    showColorChannelValues = FALSE
+    colorChannelSeparator = " / "
+    maxPrecision = 4
+    enableSlicing = TRUE
+    useRelativeLUTIfNoInputImage = TRUE
+    hiResRendering = TRUE
+  }
+}
+module itkVectorIndexSelectionCastImageFilter {
+  internal  {
+    frame = "1021 277 248 56"
+    moduleGroupName = ""
+    windows  {
+      window _default {
+        geometry = "1417 632 264 302"
+        sizeHint = "264 302"
+        wasOpen = no
+      }
+    }
+  }
+  fields  {
+    instanceName = itkVectorIndexSelectionCastImageFilter2
+    updateMode = AutoUpdate
+    applyMode = AutoApply
+    minValue = 1.3285665104858e-29
+    maxValue = 1
+    applyMinMax = FALSE
+    autoSetMinMax = TRUE
+    clampOutImageValues = FALSE
+    lowerOutSideMode = MinValue
+    upperOutSideMode = MaxValue
+    lowerOutSideValue = 0
+    upperOutSideValue = 0
+    index = 2
+    coordinateTolerance = 1e-06
+    directionTolerance = 1e-06
+  }
+}
+module View2D {
+  internal  {
+    frame = "1021 61 120 56"
+    moduleGroupName = ""
+    windows  {
+      window _default {
+        geometry = "3222 115 608 662"
+        sizeHint = "400 400"
+        wasOpen = no
+      }
+      window _automatic {
+        geometry = "1225 266 500 600"
+        sizeHint = "260 223"
+        wasOpen = no
+      }
+    }
+  }
+  fields  {
+    instanceName = View2D2
+    inventorInputOn = TRUE
+    inventorOutputOn = FALSE
+    view2DExtensionsOn = TRUE
+    startSlice = 61
+    numSlices = 1
+    numXSlices = 1
+    sliceStep = 1
+    slab = 1
+    blendMode = BLEND_REPLACE
+    timePoint = 0
+    maxTimePoint = 0
+    filterMode = FILTER_LINEAR
+    standardKeys = TRUE
+    cineMode = CINE_ZT
+    cineDirection = CINE_FORWARD
+    cineRepeat = CINE_ONCE
+    cineSpeed = 0.1
+    cineAlwaysReset = TRUE
+    snapToCenter = TRUE
+    zoomMode = VIEW2D_AUTO_ZOOM
+    unzoomOnImageChange = FALSE
+    sliceZoom = 1
+    sliceZoomSynced = 1
+    baseColor = "1 1 1"
+    margin = "2 2"
+    sliceOrigin = "0 0"
+    useShaders = TRUE
+    useManagedInteraction = FALSE
+    lutCenter = 0.5
+    lutWidth = 1
+    annotationOn = TRUE
+    annotationMode = ANNO_MODE_AUTO
+    annotationSizeMode = ANNO_SHOW_DETAILED
+    annotationCol = "0.899999976158142 0.899999976158142 0.899999976158142"
+    annotationFontSize = ANNO_SIZE_AUTO
+    annoCoords = Voxel
+    annoCTValue = AsIs
+    borderOn = FALSE
+    borderColor = "0.899999976158142 0.899999976158142 0.899999976158142"
+    valueHighPrecision = TRUE
+    showColorChannelValues = FALSE
+    colorChannelSeparator = " / "
+    maxPrecision = 4
+    enableSlicing = TRUE
+    useRelativeLUTIfNoInputImage = TRUE
+    hiResRendering = TRUE
+  }
+}
+module Threshold {
+  internal  {
+    frame = "709 -131 88 72"
+    moduleGroupName = ""
+    showNetworkPanel = true
+    windows  {
+      window _default {
+        geometry = "1327 41 279 302"
+        sizeHint = "248 302"
+        wasOpen = no
+      }
+    }
+  }
+  fields  {
+    instanceName = Threshold
+    threshold = 0.3
+    relativeThreshold = FALSE
+    comparisonOperator = Greater
+    conditionTrueWriteValue = UserDef
+    userConditionTrueValue = 1
+    conditionFalseWriteValue = UserDef
+    userConditionFalseValue = 0
+  }
+}
+module View3D {
+  internal  {
+    frame = "465 -219 144 56"
+    moduleGroupName = ""
+    windows  {
+      window _automatic {
+        geometry = "717 269 500 600"
+        sizeHint = "260 223"
+        wasOpen = no
+      }
+      window _default {
+        geometry = "659 217 1005 645"
+        sizeHint = "1005 645"
+        wasOpen = no
+      }
+    }
+  }
+  fields  {
+    instanceName = View3D
+    autoViewAll = TRUE
+    inventorInputOn = TRUE
+    inventorOutputOn = FALSE
+    lutType = Ramp
+    currentTimePoint = 0
+    staticSamplingRate = 1
+    quality = 1
+    filterVolumeData = FilterLinear
+    lutEditorColorPoints = "[ 0 0 0 0, 4095 1 1 1 ]"
+    lutEditorAlphaPoints = "[ 0 0, 4095 1 ]"
+    lutEditorRelativeLut = FALSE
+    lutEditorColorInterpolation = InterpolateRGB
+    lutEditorAlphaFactor = 1
+    orientationProjectionType = PERSPECTIVE
+    orientationLocation = LOWER_RIGHT
+    orientationOn = TRUE
+    orientationModel = CUBE
+    greyCenter = 0.5
+    greyWidth = 0.5
+    alphaFactor = 1
+    colorFactor = "1 1 1"
+    camType = TRUE
+    camPosition = "619.677978515625 -401.940734863281 232.993072509766"
+    camOrientation = "-0.88700807094574 -0.244389072060585 -0.391778945922852 4.74618530273438"
+    initialCameraOrientation = CAMERA_KEEP_AS_IS
+    camFar = 1021.8613
+    camNear = 465.75653
+    camFocal = 743.53137
+    camHeight = 0.78539801
+    decoration = FALSE
+    hiResRendering = TRUE
+    annotations = TRUE
+    background = TRUE
+    mode = VolumeRendering
+    interactiveQuality = Medium
+  }
+  internalFields  {
+    renderer.gradientQuality = GradientQualityAutomatic
+    renderer.enhancementAlphaMix = 0.25
+    renderer.boundaryEnhancement = FALSE
+    renderer.boundaryEnhancementFactor = 1
+    renderer.boundaryEnhancementExponent = 1
+    renderer.boundaryEnhancementGradientBias = 0
+    renderer.silhouetteEnhancement = FALSE
+    renderer.silhouetteEnhancementExponent = 1
+    renderer.silhouetteEnhancementFactor = 1
+    renderer.toneShading = FALSE
+    renderer.toneShadingWarmColor = "0.67451000213623 0.533333003520966 0.141176000237465"
+    renderer.toneShadingColdColor = "0 0 0.400000005960464"
+    renderer.toneShadingWarmDiffuse = 0.60000002
+    renderer.toneShadingColdDiffuse = 0.2
+    renderer.toneShadingAngle = 45
+    renderer.materialAmbient = 0.60000002
+    renderer.materialDiffuse = 1
+    renderer.materialSpecular = 1
+    renderer.materialSpecularity = 32
+    renderer.light1Enabled = TRUE
+    renderer.light1DiffuseIntensity = 1
+    renderer.light1SpecularIntensity = 1
+    renderer.light1Color = "1 1 1"
+    renderer.light1PolarPhi = 45
+    renderer.light1PolarRho = 0
+    renderer.light2Enabled = FALSE
+    renderer.light2DiffuseIntensity = 1
+    renderer.light2SpecularIntensity = 1
+    renderer.light2Color = "1 1 1"
+    renderer.light2PolarPhi = 0
+    renderer.light2PolarRho = 0
+    renderer.light3Enabled = FALSE
+    renderer.light3DiffuseIntensity = 1
+    renderer.light3SpecularIntensity = 1
+    renderer.light3Color = "1 1 1"
+    renderer.light3PolarPhi = -45
+    renderer.light3PolarRho = 0
+    renderer.sizeOutputX = 512
+    renderer.sizeOutputY = 512
+    renderer.sizeOutputZ = 122
+    renderer.subVolumeStartX = 0
+    renderer.subVolumeStartY = 0
+    renderer.subVolumeStartZ = 0
+    renderer.subVolumeEndX = 512
+    renderer.subVolumeEndY = 512
+    renderer.subVolumeEndZ = 122
+    clip.hideGeometry = FALSE
+    clip.on = FALSE
+    clip.left = FALSE
+    clip.right = FALSE
+    clip.top = FALSE
+    clip.bottom = FALSE
+    clip.rear = FALSE
+    clip.front = FALSE
+    clip.translation0 = "1 0 0"
+    clip.translation1 = "-1 0 0"
+    clip.translation2 = "0 1 0"
+    clip.translation3 = "0 -1 0"
+    clip.translation4 = "0 0 1"
+    clip.translation5 = "0 0 -1"
+    clip.rotation0 = "0 0 0.999999940395355 1.57079994678497"
+    clip.rotation1 = "0 0 -0.999999940395355 1.57079994678497"
+    clip.rotation2 = "0 0 -1 3.1415901184082"
+    clip.rotation3 = "0 0 1 0"
+    clip.rotation4 = "-0.999999940395355 0 0 1.57079994678497"
+    clip.rotation5 = "0.999999940395355 0 0 1.57079994678497"
+  }
+}
+module itkImageFileReader {
+  internal  {
+    frame = "257 373 144 56"
+    moduleGroupName = ""
+    windows  {
+      window _default {
+        geometry = "1060 597 624 395"
+        sizeHint = "328 395"
+        wasOpen = no
+      }
+    }
+  }
+  fields  {
+    instanceName = itkImageFileReader1
+    fileDataType = "unsigned int8"
+    autoDetermineDataType = TRUE
+    correctSubVoxelShift = FALSE
+    fileDimension = 4
+    info = "Loading okay."
+    numDims = 3
+    fileType = TypeNotApplicable
+    componentType = "unsigned int8"
+    pixelType = SCALAR
+    loaderType = NiftiImageIO
+    outputMetaDataStr = "ITK_FileNotes : 
+aux_file : 
+bitpix : 8
+cal_max : 0
+cal_min : 0
+datatype : 2
+descrip : 
+dim[0] : 3
+dim[1] : 512
+dim[2] : 512
+dim[3] : 122
+dim[4] : 1
+dim[5] : 1
+dim[6] : 1
+dim[7] : 1
+dim_info : 
+intent_code : 0
+intent_name : 
+intent_p1 : 0
+intent_p2 : 0
+intent_p3 : 0
+pixdim[0] : 1
+pixdim[1] : 0.736
+pixdim[2] : 0.736
+pixdim[3] : 1.6
+pixdim[4] : 0
+pixdim[5] : 0
+pixdim[6] : 0
+pixdim[7] : 0
+qform_code : 2
+qoffset_x : -0
+qoffset_y : -0
+qoffset_z : 0
+quatern_b : 0
+quatern_c : 0
+quatern_d : 1
+scl_inter : 0
+scl_slope : 1
+sform_code : 1
+slice_code : 
+slice_duration : 0
+slice_end : 0
+slice_start : 0
+srow_x : -0.736 0 0 -0
+srow_y : 0 -0.736 0 -0
+srow_z : 0 0 1.6 0
+toffset : 0
+vox_offset : 352
+xyzt_units : 
+"
+    suppressErrorPosting = FALSE
+    unresolvedFileName = "//ckm4cad/d/Image_Data/Patient_Data/IRCAD_new/Data/vessel-segmentation_revised-10.nii"
+  }
+}
+module View3D {
+  internal  {
+    frame = "265 -211 144 56"
+    moduleGroupName = ""
+    windows  {
+      window _automatic {
+        geometry = "76 290 500 600"
+        sizeHint = "260 223"
+        wasOpen = no
+      }
+      window _default {
+        geometry = "86 223 1005 645"
+        sizeHint = "1005 645"
+        wasOpen = no
+      }
+    }
+  }
+  fields  {
+    instanceName = View3D1
+    autoViewAll = TRUE
+    inventorInputOn = TRUE
+    inventorOutputOn = FALSE
+    lutType = Ramp
+    currentTimePoint = 0
+    staticSamplingRate = 1
+    quality = 1
+    filterVolumeData = FilterLinear
+    lutEditorColorPoints = "[ 0 0 0 0, 4095 1 1 1 ]"
+    lutEditorAlphaPoints = "[ 0 0, 4095 1 ]"
+    lutEditorRelativeLut = FALSE
+    lutEditorColorInterpolation = InterpolateRGB
+    lutEditorAlphaFactor = 1
+    orientationProjectionType = PERSPECTIVE
+    orientationLocation = LOWER_RIGHT
+    orientationOn = TRUE
+    orientationModel = CUBE
+    greyCenter = 0.925000011920929
+    greyWidth = 0.987500011920929
+    alphaFactor = 1
+    colorFactor = "1 1 1"
+    camType = TRUE
+    camPosition = "619.677978515625 -401.940734863281 232.993072509766"
+    camOrientation = "-0.88700807094574 -0.244389072060585 -0.391778916120529 4.74618530273438"
+    initialCameraOrientation = CAMERA_KEEP_AS_IS
+    camFar = 1021.8611
+    camNear = 465.75644
+    camFocal = 743.53137
+    camHeight = 0.78539801
+    decoration = FALSE
+    hiResRendering = TRUE
+    annotations = TRUE
+    background = TRUE
+    mode = VolumeRendering
+    interactiveQuality = Medium
+  }
+  internalFields  {
+    renderer.gradientQuality = GradientQualityAutomatic
+    renderer.enhancementAlphaMix = 0.25
+    renderer.boundaryEnhancement = FALSE
+    renderer.boundaryEnhancementFactor = 1
+    renderer.boundaryEnhancementExponent = 1
+    renderer.boundaryEnhancementGradientBias = 0
+    renderer.silhouetteEnhancement = FALSE
+    renderer.silhouetteEnhancementExponent = 1
+    renderer.silhouetteEnhancementFactor = 1
+    renderer.toneShading = FALSE
+    renderer.toneShadingWarmColor = "0.67451000213623 0.533333003520966 0.141176000237465"
+    renderer.toneShadingColdColor = "0 0 0.400000005960464"
+    renderer.toneShadingWarmDiffuse = 0.60000002
+    renderer.toneShadingColdDiffuse = 0.2
+    renderer.toneShadingAngle = 45
+    renderer.materialAmbient = 0.60000002
+    renderer.materialDiffuse = 1
+    renderer.materialSpecular = 1
+    renderer.materialSpecularity = 32
+    renderer.light1Enabled = TRUE
+    renderer.light1DiffuseIntensity = 1
+    renderer.light1SpecularIntensity = 1
+    renderer.light1Color = "1 1 1"
+    renderer.light1PolarPhi = 45
+    renderer.light1PolarRho = 0
+    renderer.light2Enabled = FALSE
+    renderer.light2DiffuseIntensity = 1
+    renderer.light2SpecularIntensity = 1
+    renderer.light2Color = "1 1 1"
+    renderer.light2PolarPhi = 0
+    renderer.light2PolarRho = 0
+    renderer.light3Enabled = FALSE
+    renderer.light3DiffuseIntensity = 1
+    renderer.light3SpecularIntensity = 1
+    renderer.light3Color = "1 1 1"
+    renderer.light3PolarPhi = -45
+    renderer.light3PolarRho = 0
+    renderer.sizeOutputX = 512
+    renderer.sizeOutputY = 512
+    renderer.sizeOutputZ = 122
+    renderer.subVolumeStartX = 0
+    renderer.subVolumeStartY = 0
+    renderer.subVolumeStartZ = 0
+    renderer.subVolumeEndX = 512
+    renderer.subVolumeEndY = 512
+    renderer.subVolumeEndZ = 122
+    clip.hideGeometry = FALSE
+    clip.on = FALSE
+    clip.left = FALSE
+    clip.right = FALSE
+    clip.top = FALSE
+    clip.bottom = FALSE
+    clip.rear = FALSE
+    clip.front = FALSE
+    clip.translation0 = "1 0 0"
+    clip.translation1 = "-1 0 0"
+    clip.translation2 = "0 1 0"
+    clip.translation3 = "0 -1 0"
+    clip.translation4 = "0 0 1"
+    clip.translation5 = "0 0 -1"
+    clip.rotation0 = "0 0 0.999999940395355 1.57079994678497"
+    clip.rotation1 = "0 0 -0.999999940395355 1.57079994678497"
+    clip.rotation2 = "0 0 -1 3.1415901184082"
+    clip.rotation3 = "0 0 1 0"
+    clip.rotation4 = "-0.999999940395355 0 0 1.57079994678497"
+    clip.rotation5 = "0.999999940395355 0 0 1.57079994678497"
+  }
+}
+module Threshold {
+  internal  {
+    frame = "249 93 160 72"
+    moduleGroupName = ""
+    showNetworkPanel = true
+    windows  {
+      window _default {
+        geometry = "940 775 279 302"
+        sizeHint = "248 302"
+        wasOpen = no
+      }
+    }
+  }
+  fields  {
+    instanceName = Threshold1
+    threshold = 1
+    relativeThreshold = FALSE
+    comparisonOperator = Equal
+    conditionTrueWriteValue = UserDef
+    userConditionTrueValue = 1
+    conditionFalseWriteValue = UserDef
+    userConditionFalseValue = 0
+  }
+}
+module itkImageFileReader {
+  internal  {
+    frame = "57 365 144 56"
+    moduleGroupName = ""
+    windows  {
+      window _default {
+        geometry = "123 837 624 395"
+        sizeHint = "328 395"
+        wasOpen = no
+      }
+    }
+  }
+  fields  {
+    instanceName = itkImageFileReader2
+    fileDataType = "unsigned int8"
+    autoDetermineDataType = TRUE
+    correctSubVoxelShift = FALSE
+    fileDimension = 4
+    info = "Loading okay."
+    numDims = 3
+    fileType = TypeNotApplicable
+    componentType = "unsigned int8"
+    pixelType = SCALAR
+    loaderType = NiftiImageIO
+    outputMetaDataStr = "ITK_FileNotes : 
+aux_file : 
+bitpix : 8
+cal_max : 0
+cal_min : 0
+datatype : 2
+descrip : 
+dim[0] : 3
+dim[1] : 512
+dim[2] : 512
+dim[3] : 122
+dim[4] : 1
+dim[5] : 1
+dim[6] : 1
+dim[7] : 1
+dim_info : 
+intent_code : 0
+intent_name : 
+intent_p1 : 0
+intent_p2 : 0
+intent_p3 : 0
+pixdim[0] : 1
+pixdim[1] : 0.736
+pixdim[2] : 0.736
+pixdim[3] : 1.6
+pixdim[4] : 0
+pixdim[5] : 0
+pixdim[6] : 0
+pixdim[7] : 0
+qform_code : 1
+qoffset_x : -0
+qoffset_y : -0
+qoffset_z : 0
+quatern_b : 0
+quatern_c : 0
+quatern_d : 1
+scl_inter : 0
+scl_slope : 1
+sform_code : 0
+slice_code : 
+slice_duration : 0
+slice_end : 0
+slice_start : 0
+srow_x : 0 0 0 0
+srow_y : 0 0 0 0
+srow_z : 0 0 0 0
+toffset : 0
+vox_offset : 352
+xyzt_units : 
+"
+    suppressErrorPosting = FALSE
+    unresolvedFileName = "//ckm4cad/d/Projects/VesselSegmentation/tmp/vessel_segmentation/apply_ircad_multi/EquallyUnets/CombinednD-CEL+DICE-DO-nBN-8-0_apply/prediction-80-10.nii"
+  }
+}
 connections  {
   View2D.inImage = itkVectorIndexSelectionCastImageFilter.output0
   itkVectorIndexSelectionCastImageFilter.input0 = itkImageFileReader.output0
@@ -380,5 +832,16 @@ connections  {
   itkVectorIndexSelectionCastImageFilter2.input0 = itkImageFileReader.output0
   View2D2.inImage = itkVectorIndexSelectionCastImageFilter2.output0
   View2D2.startSlice = View2D1.startSlice
+  Threshold.input0 = itkVectorIndexSelectionCastImageFilter1.output0
+  View3D.inImage = Threshold.output0
+  View3D.camPosition = View3D1.camPosition
+  View3D.camOrientation = View3D1.camOrientation
+  View3D.initialCameraOrientation = View3D1.initialCameraOrientation
+  View3D.camFar = View3D1.camFar
+  View3D.camNear = View3D1.camNear
+  View3D.camFocal = View3D1.camFocal
+  View3D.camHeight = View3D1.camHeight
+  View3D1.inImage = Threshold1.output0
+  Threshold1.input0 = itkImageFileReader1.output0
 }
 networkModel = ""
