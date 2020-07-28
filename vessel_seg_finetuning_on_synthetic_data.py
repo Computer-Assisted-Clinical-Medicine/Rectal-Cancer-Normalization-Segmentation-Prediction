@@ -1,18 +1,19 @@
 import os
 import time
-import SimpleITK as sitk
 
 import numpy as np
 import pandas as pd
+import SimpleITK as sitk
 import tensorflow as tf
 
-from SegmentationNetworkBasis import config as cfg
-from SegmentationNetworkBasis.NetworkBasis.util import write_configurations, write_metrics_to_csv, make_csv_file
-from SegmentationNetworkBasis.architecture import UNet, VNet, DVN, CombiNet
-import SegmentationNetworkBasis.NetworkBasis.image as image
-from vesselsegloader import VesselSegRatioLoader
-from vesselsegloader import VesselSegLoader
 import evaluation
+import SegmentationNetworkBasis.NetworkBasis.image as image
+from SegmentationNetworkBasis import config as cfg
+from SegmentationNetworkBasis.architecture import DVN, CombiNet, UNet, VNet
+from SegmentationNetworkBasis.NetworkBasis.util import (make_csv_file,
+                                                        write_configurations,
+                                                        write_metrics_to_csv)
+from vesselsegloader import VesselSegLoader, VesselSegRatioLoader
 
 experiment_name = "vessel_segmentation"
 if cfg.ONSERVER:

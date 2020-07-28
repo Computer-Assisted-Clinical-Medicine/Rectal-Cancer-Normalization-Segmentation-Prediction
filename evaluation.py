@@ -1,16 +1,18 @@
-import math
-import SegmentationNetworkBasis.NetworkBasis.metric as Metric
-import SegmentationNetworkBasis.NetworkBasis.image as Image
-import tensorflow as tf
-import numpy as np
-import SimpleITK as sitk
-import os
 import csv
 import glob
-import pandas as pd
+import math
+import os
+
 import matplotlib.pyplot as plt
-from SegmentationNetworkBasis.NetworkBasis.util import make_csv_file
+import numpy as np
+import pandas as pd
+import SimpleITK as sitk
+import tensorflow as tf
+
+import SegmentationNetworkBasis.NetworkBasis.image as Image
+import SegmentationNetworkBasis.NetworkBasis.metric as Metric
 from SegmentationNetworkBasis import config as cfg
+from SegmentationNetworkBasis.NetworkBasis.util import make_csv_file
 
 
 def make_csv_header():
@@ -64,7 +66,7 @@ def evaluate_segmentation_prediction(result_metrics, prediction_path, label_path
         # result_metrics['Volume Similarity - ' + organ] = orig_vs/
         result_metrics['False Negative - ' + organ] = orig_fn
         result_metrics['False Positive - ' + organ] = orig_fp
-        print('  Original Overlap Meassures ' + organ + ':', orig_dice, orig_vs, orig_fn, orig_fp)
+        print('  Original Overlap Measures ' + organ + ':', orig_dice, orig_vs, orig_fn, orig_fp)
 
         if organ == 'Artery':
             non_target_class = 2

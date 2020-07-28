@@ -1,8 +1,9 @@
 import numpy as np
+import SimpleITK as sitk
+
+from SegmentationNetworkBasis import config as cfg
 from SegmentationNetworkBasis.segbasisloader import SegBasisLoader
 from SegmentationNetworkBasis.segratiobasisloader import SegRatioBasisLoader
-from SegmentationNetworkBasis import config as cfg
-import SimpleITK as sitk
 
 
 class VesselSegLoader(SegBasisLoader):
@@ -25,8 +26,3 @@ class VesselSegLoader(SegBasisLoader):
 
 class VesselSegRatioLoader(VesselSegLoader, SegRatioBasisLoader):
     pass
-
-
-
-
-
