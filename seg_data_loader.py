@@ -6,7 +6,7 @@ from SegmentationNetworkBasis.segbasisloader import SegBasisLoader
 from SegmentationNetworkBasis.segratiobasisloader import SegRatioBasisLoader
 
 
-class VesselSegLoader(SegBasisLoader):
+class SegLoader(SegBasisLoader):
 
     def adapt_to_task(self, data_img, label_img):
         # threshold_filter = sitk.ThresholdImageFilter()
@@ -24,5 +24,5 @@ class VesselSegLoader(SegBasisLoader):
         pass
 
 
-class VesselSegRatioLoader(VesselSegLoader, SegRatioBasisLoader):
+class SegRatioLoader(SegLoader, SegRatioBasisLoader):
     pass

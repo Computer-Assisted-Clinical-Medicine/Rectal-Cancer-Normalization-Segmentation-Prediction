@@ -13,26 +13,26 @@ from SegmentationNetworkBasis.architecture import DVN, CombiNet, UNet, VNet
 from SegmentationNetworkBasis.NetworkBasis.util import (make_csv_file,
                                                         write_configurations,
                                                         write_metrics_to_csv)
-from vesselsegloader import VesselSegRatioLoader
+from seg_data_loader import SegLoader, SegRatioLoader
 
 
 class Experiment():
 
-    def __init__(self, name, hyper_parameters, seed=42, experiment_main_path=None):
+    def __init__(self, name, hyper_parameters, seed=42, output_path=None):
         self.hyper_parameters = hyper_parameters
         self.seed = seed
         self.name = name
         #set path different on the Server
         if cfg.ONSERVER:
-            self.experiment_main_path = os.path.join("tmp", self.name)
+            self.output_path = os.path.join("tmp", self.name)
             os.environ["CUDA_VISIBLE_DEVICES"] = "0"
             physical_devices = tf.config.experimental.list_physical_devices('GPU')
             tf.config.experimental.set_memory_growth(physical_devices[0], True)
         else:
-            if experiment_main_path == None:
-                self.experiment_main_path = os.path.join('Experiments', self.name)
+            if output_path == None:
+                self.output_path = os.path.join('Experiments', self.name)
             else:
-                self.experiment_main_path = experiment_main_path
+                self.output_path = output_path
 
 
     def set_seed(self):
@@ -106,10 +106,10 @@ class Experiment():
         train_files = pd.read_csv(cfg.train_csv, dtype=object).values
         vald_files = pd.read_csv(cfg.vald_csv, dtype=object).values
 
-        training_dataset = VesselSegRatioLoader(name='training_loader') \
+        training_dataset = SegRatioLoader(name='training_loader') \
             (train_files, batch_size=cfg.batch_size_train, n_epochs=cfg.training_epochs,
             read_threads=cfg.train_reader_instances)
-        validation_dataset = VesselSegRatioLoader(mode=VesselSegRatioLoader.MODES.VALIDATE, name='validation_loader') \
+        validation_dataset = SegRatioLoader(mode=SegRatioLoader.MODES.VALIDATE, name='validation_loader') \
             (vald_files, batch_size=cfg.batch_size_train,
             read_threads=cfg.vald_reader_instances)
 
@@ -118,7 +118,7 @@ class Experiment():
             **(self.hyper_parameters["init_parameters"])
         )
         folder_name = self._generate_folder_name()
-        write_configurations(hyper_parameters['experiment_path'], folder_name, net, cfg)
+        write_configurations(self.hyper_parameters['experiment_path'], folder_name, net, cfg)
         # Train the network with the dataset iterators
         net.train(
             self.hyper_parameters['experiment_path'],
@@ -130,6 +130,33 @@ class Experiment():
         )
 
 
+    def applying(self):
+        '''!
+        do testing
+
+        '''
+        tf.keras.backend.clear_session()
+
+        # inits
+        self.set_seed()
+        test_files = pd.read_csv(cfg.test_csv, dtype=object).values
+        testloader = SegLoader(mode=SegLoader.MODES.APPLY, name='test_loader')
+
+        if self.hyper_parameters["evaluate_on_finetuned"]:
+            cfg.training_epochs = cfg.epochs_for_finetuning
+            original_folder = "-".join(os.path.basename(model_path).split('-')[0:2])
+            folder_name = original_folder + '-' + self._make_folder_name() + '-f'
+        else:
+            cfg.training_epochs = cfg.epochs_for_training
+            folder_name = self._make_folder_name()
+        net = self.hyper_parameters['architecture'](self.hyper_parameters['loss'], is_training=False, model_path=os.path.join(self.hyper_parameters['experiment_path'], folder_name), **(self.hyper_parameters["init_parameters"]))
+
+        for f in test_files:
+            test_dataset = testloader(f, batch_size=cfg.batch_size_test, read_threads=cfg.vald_reader_instances)
+            net.apply(test_dataset, f)
+
+        tf.keras.backend.clear_session()
+
     def evaluate(self, model_path=''):
         '''!
         do testing
@@ -137,7 +164,7 @@ class Experiment():
         '''
 
         self.set_seed()
-        test_files = pd.read_csv(cfg.test_csv, dtype=object).as_matrix()
+        test_files = pd.read_csv(cfg.test_csv, dtype=object).values
         if self.hyper_parameters["evaluate_on_finetuned"]:
             cfg.training_epochs = cfg.epochs_for_finetuning
             original_folder = "-".join(os.path.basename(model_path).split('-')[0:2])
@@ -229,13 +256,13 @@ class Experiment():
             print('        Fused predictions for ', file_number)
 
 
-    def run(self, data, hyper_parameters, k_fold, dimensions_and_architectures, losses):
-        hyper_parameters["evaluate_on_finetuned"] = False
+    def run(self, data, k_fold, dimensions_and_architectures, losses):
+        self.hyper_parameters["evaluate_on_finetuned"] = False
         # Experiment 1: Train on individual Data sets
         for (data_name, data_set) in data:
             self.set_seed()
 
-            hyper_parameters['experiment_path'] = os.path.join(logs_path, 'individual_final5f-fin_' + data_name)
+            self.hyper_parameters['experiment_path'] = os.path.join(self.output_path, 'individual_final5f-fin_' + data_name)
             all_indices = np.random.permutation(range(0, data_set.size))
             test_folds = np.array_split(all_indices, k_fold)
 
@@ -262,48 +289,46 @@ class Experiment():
                 cfg.training_epochs = cfg.epochs_for_training
 
                 for d, a in dimensions_and_architectures:
-                    hyper_parameters["dimensions"] = d
-                    _set_parameters_according_to_dimension(hyper_parameters)
-                    hyper_parameters['architecture'] = a
+                    self.hyper_parameters["dimensions"] = d
+                    self._set_parameters_according_to_dimension()
+                    self.hyper_parameters['architecture'] = a
                     for l in losses:
-                        hyper_parameters["loss"] = l
+                        self.hyper_parameters["loss"] = l
 
                         try:
                             cfg.random_sampling_mode = cfg.SAMPLINGMODES.CONSTRAINED_LABEL
                             cfg.percent_of_object_samples = 50
-                            training(**hyper_parameters, seed=f)
+                            self.training()
                             pass
                         except Exception as err:
                             print('Training ' + data_name,
-                                  hyper_parameters['architecture'].get_name() + hyper_parameters['loss'] + 'failed!')
+                                  self.hyper_parameters['architecture'].get_name() + self.hyper_parameters['loss'] + 'failed!')
                             print(err)
                         
-                        time.sleep(20)
-
                         try:
                             cfg.random_sampling_mode = cfg.SAMPLINGMODES.UNIFORM
-                            applying(**hyper_parameters, seed=f)
+                            self.applying()
                         except Exception as err:
                             print('Applying ' + data_name,
-                                  hyper_parameters['architecture'].get_name() + hyper_parameters['loss'] + 'failed!')
+                                  self.hyper_parameters['architecture'].get_name() + self.hyper_parameters['loss'] + 'failed!')
                             print(err)
                         
                         try:
-                            evaluate(**hyper_parameters, seed=f)
+                            self.evaluate()
                         except Exception as err:
                             print('Evaluating ' + data_name,
-                                hyper_parameters['architecture'].get_name() + hyper_parameters['loss'] + 'failed!')
+                                self.hyper_parameters['architecture'].get_name() + self.hyper_parameters['loss'] + 'failed!')
                             print(err)
 
-            evaluation.combine_evaluation_results_from_folds(hyper_parameters['experiment_path'],
+            evaluation.combine_evaluation_results_from_folds(self.hyper_parameters['experiment_path'],
                                                             losses, dimensions_and_architectures)
-            evaluation.make_boxplot_graphic(hyper_parameters['experiment_path'], dimensions_and_architectures, losses)
+            evaluation.make_boxplot_graphic(self.hyper_parameters['experiment_path'], dimensions_and_architectures, losses)
 
 
 if __name__ == '__main__':
 
-    ircad_csv = 'ircad.csv'
-    all_ircad_files = pd.read_csv(ircad_csv, dtype=object, header=None).values
+    data_file = 'data.csv'
+    data_list = pd.read_csv(data_file, dtype=object, header=None).values
 
     k_fold = 5
     losses = ['CEL+DICE']
@@ -335,4 +360,4 @@ if __name__ == '__main__':
         name='testExperiment'
     )
 
-    experiment.run([('ircad', all_ircad_files)], k_fold, dimensions_and_architectures, losses)
+    experiment.run([('ircad', data_list)], k_fold, dimensions_and_architectures, losses)

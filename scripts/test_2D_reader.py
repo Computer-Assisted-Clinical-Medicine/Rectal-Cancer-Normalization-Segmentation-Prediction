@@ -1,5 +1,5 @@
-from vesselsegloader import VesselSegLoader
-from vesselsegloader import VesselSegRatioLoader
+from SegLoader import SegLoader
+from SegLoader import SegRatioLoader
 import tensorflow as tf
 import pandas as pd
 import numpy as np
@@ -24,7 +24,7 @@ def _reader_test(training_dataset, mode):
     valid_writer = tf.summary.create_file_writer(logs_path)
     with valid_writer.as_default():
         with tf.name_scope('01_Input_and_Predictions'):
-            if mode == VesselSegLoader.MODES.APPLY:
+            if mode == SegLoader.MODES.APPLY:
                 for x_train in training_dataset:
                     try:
                         print('Finished Batch: ', x_train.shape)
@@ -93,13 +93,13 @@ def _reader_test(training_dataset, mode):
 def run_vessel_test(train_csv, mode):
     np.random.seed(42)
     train_files = pd.read_csv(train_csv, dtype=object).as_matrix()
-    if mode == VesselSegLoader.MODES.APPLY:
+    if mode == SegLoader.MODES.APPLY:
         train_files = train_files[0]
     else:
         train_files = train_files[0:2]
     loader_name = 'vessel_loader'
 
-    training_dataset = VesselSegLoader(name=loader_name, mode=mode)\
+    training_dataset = SegLoader(name=loader_name, mode=mode)\
             (train_files, batch_size=cfg.batch_size_train, n_epochs=cfg.training_epochs, read_threads=cfg.vald_reader_instances)
 
     print('Testing: ' + loader_name + ' ' + str(cfg.random_sampling_mode))
@@ -109,13 +109,13 @@ def run_vessel_test(train_csv, mode):
 def run_vessel_ratio_test(train_csv, mode):
     np.random.seed(42)
     train_files = pd.read_csv(train_csv, dtype=object).as_matrix()
-    if mode == VesselSegLoader.MODES.APPLY:
+    if mode == SegLoader.MODES.APPLY:
         train_files = train_files[0]
     else:
         train_files = train_files[0:2]
     loader_name = 'vessel_ratio_loader'
 
-    training_dataset = VesselSegRatioLoader(name=loader_name, mode=mode)\
+    training_dataset = SegRatioLoader(name=loader_name, mode=mode)\
             (train_files, batch_size=cfg.batch_size_train, n_epochs=cfg.training_epochs, read_threads=cfg.vald_reader_instances)
 
     print('Testing: ' + loader_name + ' ' + str(cfg.random_sampling_mode))
@@ -130,23 +130,23 @@ if __name__ == '__main__':
     cfg.random_sampling_mode = cfg.SAMPLINGMODES.CONSTRAINED_LABEL
     cfg.normalizing_method = cfg.NORMALIZING.WINDOW
 
-    run_vessel_ratio_test(train_csv, VesselSegLoader.MODES.TRAIN)
-    run_vessel_ratio_test(train_csv, VesselSegLoader.MODES.VALIDATE)
+    run_vessel_ratio_test(train_csv, SegLoader.MODES.TRAIN)
+    run_vessel_ratio_test(train_csv, SegLoader.MODES.VALIDATE)
 
-    run_vessel_test(train_csv, VesselSegLoader.MODES.VALIDATE)
-    run_vessel_test(train_csv, VesselSegLoader.MODES.TRAIN)
+    run_vessel_test(train_csv, SegLoader.MODES.VALIDATE)
+    run_vessel_test(train_csv, SegLoader.MODES.TRAIN)
 
     cfg.random_sampling_mode = cfg.SAMPLINGMODES.UNIFORM
-    run_vessel_test(train_csv, VesselSegLoader.MODES.APPLY)
+    run_vessel_test(train_csv, SegLoader.MODES.APPLY)
 
     cfg.random_sampling_mode = cfg.SAMPLINGMODES.CONSTRAINED_MUSTD
     cfg.normalizing_method = cfg.NORMALIZING.MEAN_STD
 
-    run_vessel_ratio_test(train_csv, VesselSegLoader.MODES.VALIDATE)
-    run_vessel_ratio_test(train_csv, VesselSegLoader.MODES.TRAIN)
+    run_vessel_ratio_test(train_csv, SegLoader.MODES.VALIDATE)
+    run_vessel_ratio_test(train_csv, SegLoader.MODES.TRAIN)
 
-    run_vessel_test(train_csv, VesselSegLoader.MODES.VALIDATE)
-    run_vessel_test(train_csv, VesselSegLoader.MODES.TRAIN)
+    run_vessel_test(train_csv, SegLoader.MODES.VALIDATE)
+    run_vessel_test(train_csv, SegLoader.MODES.TRAIN)
 
     cfg.random_sampling_mode = cfg.SAMPLINGMODES.UNIFORM
-    run_vessel_test(train_csv, VesselSegLoader.MODES.APPLY)
+    run_vessel_test(train_csv, SegLoader.MODES.APPLY)

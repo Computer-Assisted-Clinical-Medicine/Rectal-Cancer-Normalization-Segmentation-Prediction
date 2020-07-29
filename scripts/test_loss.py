@@ -1,5 +1,5 @@
 from SegmentationNetworkBasis.NetworkBasis import loss
-from vesselsegloader import VesselSegLoader
+from SegLoader import SegLoader
 import tensorflow as tf
 import pandas as pd
 import numpy as np
@@ -11,7 +11,7 @@ def loss_test(train_csv):
     np.random.seed(42)
     train_files = pd.read_csv(train_csv, dtype=object).as_matrix()
 
-    training_dataset = VesselSegLoader(name='training_loader') \
+    training_dataset = SegLoader(name='training_loader') \
         (train_files, batch_size=cfg.batch_size_train, n_epochs=1,
          read_threads=cfg.train_reader_instances)
 
