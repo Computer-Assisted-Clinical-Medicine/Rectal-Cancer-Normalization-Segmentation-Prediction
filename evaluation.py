@@ -17,21 +17,20 @@ from SegmentationNetworkBasis.NetworkBasis.util import make_csv_file
 
 def make_csv_header():
     header_row = ['File Number', 'Slices']
-    for organ in ['Vein', 'Artery']:
-        header_row += [organ + ' Volume (L)', organ + ' Volume (P)',
-                   'Dice - ' + organ,
-                   'Confusion Rate - ' + organ,
-                   'Connectivity - ' + organ,
-                   'Fragmentation - ' + organ,
-                   # 'Volume Similarity - ' + organ,
-                   'False Negative - ' + organ,
-                   'False Positive - ' + organ,
-                   'Hausdorff - ' + organ,
-                   'Mean Symmetric Surface Distance - ' + organ,
-                   # 'Median Symmetric Surface Distance - ' + organ,
-                   # 'STD Symmetric Surface Distance - ' + organ,
-                   # 'Max Symmetric Surface Distance - ' + organ
-                   ]
+    header_row += ['Volume (L)', 'Volume (P)',
+                'Dice',
+                'Confusion Rate',
+                'Connectivity',
+                'Fragmentation',
+                # 'Volume Similarity',
+                'False Negative',
+                'False Positive',
+                'Hausdorff',
+                'Mean Symmetric Surface Distance',
+                # 'Median Symmetric Surface Distance',
+                # 'STD Symmetric Surface Distance',
+                # 'Max Symmetric Surface Distance'
+                ]
 
     return header_row
 
@@ -49,68 +48,61 @@ def evaluate_segmentation_prediction(result_metrics, prediction_path, label_path
     label_img.SetOrigin(data_info['orig_origin'])
     label_img.SetSpacing(data_info['orig_spacing'])
 
-    for organ, value in zip(['Artery', 'Vein'], [1, 2, 0]):
+    #check types and if not equal, convert output to target
+    if pred_img.GetPixelID() != label_img.GetPixelID():
+        cast = sitk.CastImageFilter()
+        cast.SetOutputPixelType(label_img.GetPixelID())
+        pred_img = cast.Execute(pred_img)
 
-        if organ == 'Combined':
-            selected_label_img = label_img > value
-            selected_pred_img = pred_img > value
-        else:
-            selected_label_img = label_img == value
-            selected_pred_img = pred_img == value
+    result_metrics['Volume (L)'] = Metric.get_ml_sitk(label_img)
+    result_metrics['Volume (P)'] = Metric.get_ml_sitk(pred_img)
 
-        result_metrics[organ + ' Volume (L)'] = Metric.get_ml_sitk(selected_label_img)
-        result_metrics[organ + ' Volume (P)'] = Metric.get_ml_sitk(selected_pred_img)
+    orig_dice, orig_vs, orig_fn, orig_fp = Metric.overlap_measures_sitk(pred_img, label_img)
+    result_metrics['Dice' ] = orig_dice
+    # result_metrics['Volume Similarity'] = orig_vs/
+    result_metrics['False Negative'] = orig_fn
+    result_metrics['False Positive'] = orig_fp
+    print('  Original Overlap Measures:', orig_dice, orig_vs, orig_fn, orig_fp)
 
-        orig_dice, orig_vs, orig_fn, orig_fp = Metric.overlap_measures_sitk(selected_pred_img, selected_label_img)
-        result_metrics['Dice - ' + organ] = orig_dice
-        # result_metrics['Volume Similarity - ' + organ] = orig_vs/
-        result_metrics['False Negative - ' + organ] = orig_fn
-        result_metrics['False Positive - ' + organ] = orig_fp
-        print('  Original Overlap Measures ' + organ + ':', orig_dice, orig_vs, orig_fn, orig_fp)
+    cr = Metric.confusion_rate_sitk(pred_img, label_img, 1, 0)
+    result_metrics['Confusion Rate'] = cr
+    print('  Confusion Rate:', cr)
 
-        if organ == 'Artery':
-            non_target_class = 2
-        else:
-            non_target_class = 1
-        cr = Metric.confusion_rate_sitk(pred_img, label_img, value, non_target_class)
-        result_metrics['Confusion Rate - ' + organ] = cr
-        print('  Confusion Rate ' + organ + ':', cr)
+    connect = Metric.get_connectivity_sitk(pred_img)
+    result_metrics['Connectivity'] = connect
+    print('  Connectivity:', connect)
 
-        connect = Metric.get_connectivity_sitk(selected_pred_img)
-        result_metrics['Connectivity - ' + organ] = connect
-        print('  Connectivity ' + organ + ':', connect)
+    frag = Metric.get_fragmentation_sitk(pred_img)
+    result_metrics['Fragmentation'] = frag
+    print('  Fragmentation:', frag)
 
-        frag = Metric.get_fragmentation_sitk(selected_pred_img)
-        result_metrics['Fragmentation - ' + organ] = frag
-        print('  Fragmentation ' + organ + ':', frag)
+    try:
+        orig_hdd = Metric.hausdorff_metric_sitk(pred_img, label_img)
+    except RuntimeError as err:
+        print('Surface evaluation failed! Using infinity: ', err)
+        orig_hdd = math.inf
+    result_metrics['Hausdorff'] = orig_hdd
+    print('  Original Hausdorff Distance:', orig_hdd)
 
-        try:
-            orig_hdd = Metric.hausdorff_metric_sitk(selected_pred_img, selected_label_img)
-        except RuntimeError as err:
-            print('Surface evaluation failed! Using infinity: ', err)
-            orig_hdd = math.inf
-        result_metrics['Hausdorff - ' + organ] = orig_hdd
-        print('  Original Hausdorff Distance ' + organ + ':', orig_hdd)
+    try:
+        orig_mnssd, orig_mdssd, orig_stdssd, orig_maxssd = Metric.symmetric_surface_measures_sitk(pred_img, label_img)
+    except RuntimeError as err:
+        print('Surface evaluation failed! Using infinity: ', err)
+        orig_mnssd = math.inf
+        orig_mdssd = math.inf
+        orig_stdssd = math.inf
+        orig_maxssd = math.inf
 
-        try:
-            orig_mnssd, orig_mdssd, orig_stdssd, orig_maxssd = Metric.symmetric_surface_measures_sitk(selected_pred_img, selected_label_img)
-        except RuntimeError as err:
-            print('Surface evaluation failed! Using infinity: ', err)
-            orig_mnssd = math.inf
-            orig_mdssd = math.inf
-            orig_stdssd = math.inf
-            orig_maxssd = math.inf
-
-        result_metrics['Mean Symmetric Surface Distance - ' + organ] = orig_mnssd
-        # result_metrics['Median Symmetric Surface Distance - ' + organ] = orig_mdssd
-        # result_metrics['STD Symmetric Surface Distance - ' + organ] = orig_stdssd
-        # result_metrics['Max Symmetric Surface Distance - ' + organ] = orig_maxssd
-        print('  Original Symmetric Surface Meassures ' + organ + ':', orig_mnssd, orig_mdssd, orig_stdssd, orig_maxssd)
+    result_metrics['Mean Symmetric Surface Distance'] = orig_mnssd
+    # result_metrics['Median Symmetric Surface Distance'] = orig_mdssd
+    # result_metrics['STD Symmetric Surface Distance'] = orig_stdssd
+    # result_metrics['Max Symmetric Surface Distance'] = orig_maxssd
+    print('  Original Symmetric Surface Meassures:', orig_mnssd, orig_mdssd, orig_stdssd, orig_maxssd)
 
     return result_metrics
 
 
-def combine_evaluation_results_from_folds(experiment_path, losses, dimensions_and_architectures, evaluate_on_finetuned=False):
+def combine_evaluation_results_from_folds(experiment_path, eval_files):
     path, experiment = os.path.split(experiment_path)
     eval_mean_file_path = os.path.join(experiment_path, 'evaluation-mean-' + experiment + '.csv')
     eval_std_file_path = os.path.join(experiment_path, 'evaluation-std-' + experiment + '.csv')
@@ -120,29 +112,9 @@ def combine_evaluation_results_from_folds(experiment_path, losses, dimensions_an
     mean_statistics = []
     std_statistics = []
 
-    if evaluate_on_finetuned:
-        for d, a in dimensions_and_architectures:
-            for l1 in losses:
-                for l2 in losses:
-                    for do in ['DO']:  # , 'nDO']:
-                        for bn in ['nBN']:  # 'BN', ]:
-                            combination_name = "-".join([a.get_name() + str(d) + 'D', l1, a.get_name() + str(d) + 'D', l2, do, bn])
-                            indiv_eval_file_path = os.path.join(experiment_path,
-                                                    "-".join(['evaluation', combination_name]) + '.csv')
-                            search_path = os.path.join(experiment_path, combination_name + '*_test', '*.csv')
-                            _gather_individual_results(combination_name, search_path, indiv_eval_file_path,
-                                                       header_row, mean_statistics, std_statistics)
-    else:
-        for d, a in dimensions_and_architectures:
-            for l in losses:
-                for do in ['DO']:  # , 'nDO']:
-                    for bn in ['nBN']:  # 'BN', ]:
-                        combination_name = "-".join([a.get_name() + str(d) + 'D', l, do, bn])
-                        indiv_eval_file_path = os.path.join(experiment_path,
-                                                "-".join(['evaluation', combination_name]) + '.csv')
-                        search_path = os.path.join(experiment_path, combination_name + '*_test', '*.csv')
-                        _gather_individual_results(combination_name, search_path, indiv_eval_file_path, header_row,
-                                                   mean_statistics, std_statistics)
+    for indiv_eval_file_path in eval_files:
+        _gather_individual_results(indiv_eval_file_path, header_row,
+                                    mean_statistics, std_statistics)
 
     for row in mean_statistics:
         with open(eval_mean_file_path, 'a', newline='') as evaluation_file:
@@ -157,92 +129,50 @@ def combine_evaluation_results_from_folds(experiment_path, losses, dimensions_an
             eval_csv_writer.writerow(row)
 
 
-def _gather_individual_results(combination_name, search_path, indiv_eval_file_path, header_row, mean_statistics, std_statistics):
-    results = []
+def _gather_individual_results(indiv_eval_file_path, header_row, mean_statistics, std_statistics):
 
-    for rf in glob.glob(search_path):
-        try:
-            print(rf)
-            individual_results = pd.read_csv(rf, dtype=object).as_matrix()
-            results.append(np.float32(individual_results))
-        except:
-            print('Could not find', search_path)
+    try:
+        results = pd.read_csv(indiv_eval_file_path, dtype=object)
+        #set index, the rest are numbers
+        results.set_index('File Number', inplace=True)
+    except:
+        print('Could not find', search_path)
 
-    if len(results) > 0:
-        print('Writing', indiv_eval_file_path)
-        make_csv_file(indiv_eval_file_path, header_row)
-        results = np.concatenate(results)
-        for row in results:
-            with open(indiv_eval_file_path, 'a', newline='') as evaluation_file:
-                eval_csv_writer = csv.writer(evaluation_file, delimiter=',', quotechar='"',
-                                             quoting=csv.QUOTE_MINIMAL)
-                eval_csv_writer.writerow(row)
+    if results.size > 0:
 
-        average_results = np.mean(results, axis=0).tolist()
-        average_results[0] = combination_name
+        values = results.astype(float).values
+
+        average_results = np.mean(values, axis=0).tolist()
+        average_results = [indiv_eval_file_path.stem] + average_results
         mean_statistics.append(average_results)
 
-        std_results = np.std(results, axis=0).tolist()
-        std_results[0] = combination_name
+        std_results = np.std(values, axis=0).tolist()
+        std_results = [indiv_eval_file_path.stem] + std_results
         std_statistics.append(std_results)
 
 
-def make_boxplot_graphic(experiment_path, dimensions_and_architectures, losses, evaluate_on_finetuned=False):
+def make_boxplot_graphic(experiment_path, eval_files):
     if not os.path.exists(os.path.join(experiment_path, 'plots')):
         os.makedirs(os.path.join(experiment_path, 'plots'))
 
     linewidth = 2
     metrics = []
-    for organ in ['Vein', 'Artery', 'Combined']:
-        metrics += ['Dice - ' + organ, 'Connectivity - ' + organ,
-                   'Fragmentation - ' + organ,
-                   'Mean Symmetric Surface Distance - ' + organ]
+    metrics += ['Dice', 'Connectivity',
+                'Fragmentation',
+                'Mean Symmetric Surface Distance']
 
     for title in metrics:
         data = []
         labels = []
         path, experiment = os.path.split(experiment_path)
-        if evaluate_on_finetuned:
-            for d, a in dimensions_and_architectures:
-                for l1 in losses:
-                    for l2 in losses:
-                            for do in ['DO']:  # , 'nDO']:
-                                for bn in ['nBN']:  # 'BN', ]:
-                                    combination_name = "-".join(
-                                        [a.get_name() + str(d) + 'D', l1, a.get_name() + str(d) + 'D', l2, do, bn])
-                                    indiv_eval_file_path = os.path.join(experiment_path, "-".join(
-                                        ['evaluation', combination_name]) + '.csv')
-                                    individual_results = pd.read_csv(indiv_eval_file_path, dtype=object,
-                                                                     usecols=[title]).as_matrix()
-                                    data.append(np.squeeze(np.float32(individual_results)))
-                                    labels.append(combination_name)
-        else:
-            for d, a in dimensions_and_architectures:
-                for l in losses:
-                    for do in ['DO']:  # , 'nDO']:
-                        for bn in ['nBN']:  # 'BN', ]:
-                            combination_name = "-".join([a.get_name() + str(d) + 'D', l, do, bn])
-                            indiv_eval_file_path = os.path.join(experiment_path, "-".join(
-                                ['evaluation', combination_name]) + '.csv')
-                            individual_results = pd.read_csv(indiv_eval_file_path, dtype=object,
-                                                             usecols=[title]).as_matrix()
-                            data.append(np.squeeze(np.float32(individual_results)))
 
-                            new_name = '-'.join([a.get_name().split('N')[0], 'Net'])
-                            labels.append(str(d)+ 'D' + ' ' + new_name)
+        for indiv_eval_file_path in eval_files:
 
-        # for d, a in dimensions_and_architectures:
-        #     for l in losses:
-        #         for do in ['DO']:  # , 'nDO']:
-        #             for bn in ['nBN']:  # 'BN', ]:
-        #                 indiv_eval_file_path = os.path.join(experiment_path, "-".join(
-        #                     ['evaluation', a.get_name() + str(d) + 'D', l, do, bn, experiment]) + '.csv')
-        #                 individual_results = pd.read_csv(indiv_eval_file_path, dtype=object, usecols=[title]).as_matrix()
-        #                 data.append(np.squeeze(np.float32(individual_results)))
-        #                 labels.append("-".join([a.get_name() + str(d) + 'D', l]))
+            individual_results = pd.read_csv(indiv_eval_file_path, dtype=object,
+                                                usecols=[title]).values
+            data.append(np.squeeze(np.float32(individual_results)))
 
-        # data.append([])
-        # labels.append('')
+            labels.append(indiv_eval_file_path.stem)
 
         f = plt.figure(figsize=(2 * len(data) + 5, 10))
         ax = plt.subplot(111)
@@ -252,14 +182,14 @@ def make_boxplot_graphic(experiment_path, dimensions_and_architectures, losses, 
         for item in ([ax.title, ax.xaxis.label, ax.yaxis.label] +
                      ax.get_xticklabels() + ax.get_yticklabels()):
             item.set_fontsize(20)
-        if any(x in title for x in ['Dice', 'Fragmentation', 'Connectivity']):
+        '''if any(x in title for x in ['Dice', 'Fragmentation', 'Connectivity']):
             ax.set_ylim([0, 1])
         else:
             ax.set_ylabel('mm')
             if 'Hausdorff' in title:
                 ax.set_ylim([0, 140])
             elif 'Mean' in title:
-                ax.set_ylim([0, 40])
+                ax.set_ylim([0, 40])'''
 
         p = plt.boxplot(data, notch=False, whis=[0, 100], showmeans=True, showfliers=True, vert=True, widths=0.9,
                         patch_artist=True, labels=labels)
