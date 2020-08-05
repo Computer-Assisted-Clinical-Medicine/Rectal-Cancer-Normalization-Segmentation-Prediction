@@ -1,3 +1,5 @@
+import logging
+
 import numpy as np
 import SimpleITK as sitk
 
@@ -5,6 +7,8 @@ from SegmentationNetworkBasis import config as cfg
 from SegmentationNetworkBasis.segbasisloader import SegBasisLoader
 from SegmentationNetworkBasis.segratiobasisloader import SegRatioBasisLoader
 
+#configure logger
+logger = logging.getLogger(__name__)
 
 class SegLoader(SegBasisLoader):
 
@@ -18,10 +22,9 @@ class SegLoader(SegBasisLoader):
         return data_img, label_img
 
     def _check_images(self, data, lbl):
-        # print('To Do: think of check')
-        print('          Checking Labels (min, max):', np.min(lbl), np.max(lbl))
-        print('          Shapes (Data, Label): ', data.shape, lbl.shape)
-        pass
+        # print('ToDo: think of check')
+        logger.debug('          Checking Labels (min, max) %s %s:', np.min(lbl), np.max(lbl))
+        logger.debug('          Shapes (Data, Label): %s %s', data.shape, lbl.shape)
 
 
 class SegRatioLoader(SegLoader, SegRatioBasisLoader):

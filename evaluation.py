@@ -1,5 +1,6 @@
 import csv
 import glob
+import logging
 import math
 import os
 
@@ -14,6 +15,10 @@ import SegmentationNetworkBasis.NetworkBasis.metric as Metric
 from SegmentationNetworkBasis import config as cfg
 from SegmentationNetworkBasis.NetworkBasis.util import make_csv_file
 
+#configure logger
+logger = logging.getLogger(__name__)
+#disable the font manager logger
+logging.getLogger('matplotlib.font_manager').disabled = True
 
 def make_csv_header():
     header_row = ['File Number', 'Slices']
@@ -62,32 +67,32 @@ def evaluate_segmentation_prediction(result_metrics, prediction_path, label_path
     # result_metrics['Volume Similarity'] = orig_vs/
     result_metrics['False Negative'] = orig_fn
     result_metrics['False Positive'] = orig_fp
-    print('  Original Overlap Measures:', orig_dice, orig_vs, orig_fn, orig_fp)
+    logger.info('  Original Overlap Measures: %s %s %s %s', orig_dice, orig_vs, orig_fn, orig_fp)
 
     cr = Metric.confusion_rate_sitk(pred_img, label_img, 1, 0)
     result_metrics['Confusion Rate'] = cr
-    print('  Confusion Rate:', cr)
+    logger.info('  Confusion Rate: %s', cr)
 
     connect = Metric.get_connectivity_sitk(pred_img)
     result_metrics['Connectivity'] = connect
-    print('  Connectivity:', connect)
+    logger.info('  Connectivity: %s', connect)
 
     frag = Metric.get_fragmentation_sitk(pred_img)
     result_metrics['Fragmentation'] = frag
-    print('  Fragmentation:', frag)
+    logger.info('  Fragmentation: %s', frag)
 
     try:
         orig_hdd = Metric.hausdorff_metric_sitk(pred_img, label_img)
     except RuntimeError as err:
-        print('Surface evaluation failed! Using infinity: ', err)
+        logger.error('Surface evaluation failed! Using infinity: %s', err)
         orig_hdd = math.inf
     result_metrics['Hausdorff'] = orig_hdd
-    print('  Original Hausdorff Distance:', orig_hdd)
+    logger.info('  Original Hausdorff Distance: %s', orig_hdd)
 
     try:
         orig_mnssd, orig_mdssd, orig_stdssd, orig_maxssd = Metric.symmetric_surface_measures_sitk(pred_img, label_img)
     except RuntimeError as err:
-        print('Surface evaluation failed! Using infinity: ', err)
+        logger.error('Surface evaluation failed! Using infinity: %s', err)
         orig_mnssd = math.inf
         orig_mdssd = math.inf
         orig_stdssd = math.inf
@@ -97,12 +102,16 @@ def evaluate_segmentation_prediction(result_metrics, prediction_path, label_path
     # result_metrics['Median Symmetric Surface Distance'] = orig_mdssd
     # result_metrics['STD Symmetric Surface Distance'] = orig_stdssd
     # result_metrics['Max Symmetric Surface Distance'] = orig_maxssd
-    print('  Original Symmetric Surface Meassures:', orig_mnssd, orig_mdssd, orig_stdssd, orig_maxssd)
+    logger.info('  Original Symmetric Surface Distance: %s (mean) %s (median) %s (STD) %s (max)', orig_mnssd, orig_mdssd, orig_stdssd, orig_maxssd)
 
     return result_metrics
 
 
 def combine_evaluation_results_from_folds(experiment_path, eval_files):
+    if len(eval_files) == 0:
+        logger.info('Eval files empty, nothing to combine')
+        return
+
     path, experiment = os.path.split(experiment_path)
     eval_mean_file_path = os.path.join(experiment_path, 'evaluation-mean-' + experiment + '.csv')
     eval_std_file_path = os.path.join(experiment_path, 'evaluation-std-' + experiment + '.csv')
@@ -136,7 +145,7 @@ def _gather_individual_results(indiv_eval_file_path, header_row, mean_statistics
         #set index, the rest are numbers
         results.set_index('File Number', inplace=True)
     except:
-        print('Could not find', search_path)
+        logger.error('Could not find %s', search_path)
 
     if results.size > 0:
 
@@ -154,6 +163,10 @@ def _gather_individual_results(indiv_eval_file_path, header_row, mean_statistics
 def make_boxplot_graphic(experiment_path, eval_files):
     if not os.path.exists(os.path.join(experiment_path, 'plots')):
         os.makedirs(os.path.join(experiment_path, 'plots'))
+
+    if len(eval_files) == 0:
+        logger.info('Eval files empty, no plots are being made')
+        return
 
     linewidth = 2
     metrics = []
