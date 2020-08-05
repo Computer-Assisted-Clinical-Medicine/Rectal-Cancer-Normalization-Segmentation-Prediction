@@ -263,7 +263,7 @@ class Experiment():
 
         all_indices = np.random.permutation(range(0, data_set.size))
         #split the data into k_fold sections
-        if k_fold > 0:
+        if k_fold > 1:
             test_folds = np.array_split(all_indices, k_fold)
         else:
             #otherwise, us cfg.data_train_split
@@ -342,7 +342,7 @@ class Experiment():
                     self.hyper_parameters['architecture'].get_name(), self.hyper_parameters['loss'])
                 logger.error(err)
 
-            tqdm.write('Finished with {folder_name} (Fold {f} of {k_fold}')
+            tqdm.write(f'Finished with {folder_name} (Fold {f} of {k_fold}')
 
 
 
@@ -391,7 +391,7 @@ if __name__ == '__main__':
 
     data_list = np.array([str(d) for d in data_dir.iterdir() if d.is_dir()])
 
-    k_fold = 5
+    k_fold = 1 #TODO: increase
     dimensions_and_architectures = ([2, UNet], [2, VNet], [3, UNet], [3, VNet])
 
     #define the parameters that are constant
@@ -409,7 +409,7 @@ if __name__ == '__main__':
     train_parameters = {
         "l_r": 0.001,
         "optimizer": "Adam",
-        "epochs" : 10
+        "epochs" : 1 #TODO: increase
     }
 
     constant_parameters = {
