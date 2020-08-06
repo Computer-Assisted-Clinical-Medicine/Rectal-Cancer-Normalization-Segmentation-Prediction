@@ -1,12 +1,8 @@
+import json
 import logging
 import os
 import time
 from pathlib import Path
-
-#logger has to be set before tensorflow is imported
-tf_logger = logging.getLogger('tensorflow')
-tf_logger.setLevel(logging.DEBUG)
-os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3' 
 
 import numpy as np
 import pandas as pd
@@ -18,10 +14,15 @@ import evaluation
 import SegmentationNetworkBasis.NetworkBasis.image as image
 from seg_data_loader import SegLoader, SegRatioLoader
 from SegmentationNetworkBasis import config as cfg
-from SegmentationNetworkBasis.architecture import DVN, CombiNet, UNet, VNet
 from SegmentationNetworkBasis.NetworkBasis.util import (make_csv_file,
                                                         write_configurations,
                                                         write_metrics_to_csv)
+
+#logger has to be set before tensorflow is imported
+tf_logger = logging.getLogger('tensorflow')
+tf_logger.setLevel(logging.DEBUG)
+os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3' 
+
 
 #configure logger
 logger = logging.getLogger()
@@ -64,40 +65,18 @@ class Experiment():
 
         if not self.output_path.exists():
             self.output_path.mkdir()
-        logger.info('Set %s as project folder, all output will be there', self.output_path)
+        logger.info('Set %s as output folder, all output will be there', self.output_path)
 
         #check for finetuning
         if not hasattr(self.hyper_parameters, 'evaluate_on_finetuned'):
             self.hyper_parameters["evaluate_on_finetuned"]=False
 
+        #set hyperparameterfile to store all hyperparameters
+        self.hyperparameter_file = self.output_path / 'hyperparameters.json'
+
     def set_seed(self):
         np.random.seed(self.seed)
         tf.random.set_seed(self.seed)
-
-    def _generate_folder_name(self):
-        epochs = self.hyper_parameters['train_parameters']['epochs']
-
-        if self.hyper_parameters['init_parameters']['drop_out'][0]:
-            do = 'DO'
-        else:
-            do = 'nDO'
-
-        if self.hyper_parameters['init_parameters']['do_batch_normalization']:
-            bn = 'BN'
-        else:
-            bn = 'nBN'
-
-        folder_name = "-".join([
-            self.hyper_parameters['architecture'].get_name() + str(self.hyper_parameters['dimensions']) + 'D',
-            self.hyper_parameters['loss'],
-            do,
-            bn,
-            str(epochs),
-            str(self.seed),
-            f'fold{self.fold}'
-        ])
-
-        return folder_name
 
 
     def _set_parameters_according_to_dimension(self):
@@ -135,7 +114,7 @@ class Experiment():
             cfg.batch_size_test = 1
 
 
-    def training(self):
+    def training(self, folder_name):
         tf.keras.backend.clear_session()
         # inits
         self.set_seed()
@@ -161,7 +140,6 @@ class Experiment():
             #add initialization parameters
             **self.hyper_parameters["init_parameters"]
         )
-        folder_name = self._generate_folder_name()
         write_configurations(self.output_path, folder_name, net, cfg)
         # Train the network with the dataset iterators
         logger.info('Started training of %s', folder_name)
@@ -176,7 +154,7 @@ class Experiment():
         )
 
 
-    def applying(self, model_path=None):
+    def applying(self, folder_name, model_path=None):
         '''!
         do testing
 
@@ -190,11 +168,6 @@ class Experiment():
             name='test_loader'
         )
 
-        if self.hyper_parameters["evaluate_on_finetuned"]:
-            original_folder = "-".join(model_path.name.split('-')[0:2])
-            folder_name = original_folder + '-' + self._make_folder_name() + '-f'
-        else:
-            folder_name = self._generate_folder_name()
         net = self.hyper_parameters['architecture'](
             self.hyper_parameters['loss'],
             is_training=False,
@@ -209,18 +182,13 @@ class Experiment():
 
         tf.keras.backend.clear_session()
 
-    def evaluate_fold(self, model_path=None):
+    def evaluate_fold(self, folder_name, model_path=None):
         '''!
         do testing
 
         '''
 
         self.set_seed()
-        if self.hyper_parameters["evaluate_on_finetuned"]:
-            original_folder = "-".join(model_path.name.split('-')[0:2])
-            folder_name = original_folder + '-' + self._generate_folder_name() + '-f'
-        else:
-            folder_name = self._generate_folder_name()
 
         logger.info('Start evaluation of %s.', folder_name)
 
@@ -258,7 +226,6 @@ class Experiment():
 
     def run(self, data_set, k_fold=1):
         self.hyper_parameters["evaluate_on_finetuned"] = False
-        # Experiment 1: Train on individual Data sets
         self.set_seed()
 
         all_indices = np.random.permutation(range(0, data_set.size))
@@ -271,6 +238,9 @@ class Experiment():
 
         #remember eval files for later use
         self.eval_files = []
+
+        #export parameters
+        self.export_hyperparameters()
 
         for f in range(0, k_fold):
             self.fold = f
@@ -287,7 +257,7 @@ class Experiment():
             self.vald_files = data_set[vald_indices]
             self.test_files = data_set[test_indices]
 
-            folder_name = self._generate_folder_name()
+            folder_name = f'fold-{f}'
             self.workingdir = self.output_path/folder_name
             logger.info('workingdir is %s', self.workingdir)
 
@@ -307,11 +277,13 @@ class Experiment():
 
             self._set_parameters_according_to_dimension()
 
+            tqdm.write(f'Starting with {self.name} {folder_name} (Fold {f} of {k_fold})')
+
             #try the actual training
             try:
                 cfg.random_sampling_mode = cfg.SAMPLINGMODES.CONSTRAINED_LABEL
                 cfg.percent_of_object_samples = 50
-                self.training()
+                self.training(folder_name=folder_name)
             except tf.errors.ResourceExhaustedError as err:
                 logger.error(
                     'The model did not fit in memory, Training %s %s failed!',
@@ -329,20 +301,20 @@ class Experiment():
             
             try:
                 cfg.random_sampling_mode = cfg.SAMPLINGMODES.UNIFORM
-                self.applying()
+                self.applying(folder_name=folder_name)
             except Exception as err:
                 logger.error('Applying %s %s failed!',
                         self.hyper_parameters['architecture'].get_name(), self.hyper_parameters['loss'])
                 logger.error(err)
             
             try:
-                self.evaluate_fold()
+                self.evaluate_fold(folder_name=folder_name)
             except Exception as err:
                 logger.error('Evaluating %s %s failed!',
                     self.hyper_parameters['architecture'].get_name(), self.hyper_parameters['loss'])
                 logger.error(err)
 
-            tqdm.write(f'Finished with {folder_name} (Fold {f} of {k_fold}')
+            tqdm.write(f'Finished with {self.name} {folder_name} (Fold {f} of {k_fold})')
 
 
 
@@ -358,103 +330,10 @@ class Experiment():
             self.eval_files
         )
 
+    def export_hyperparameters(self):
+        params = self.hyper_parameters.copy()
+        if 'architecture' in params:
+            params['architecture'] = params['architecture'].get_name()
 
-if __name__ == '__main__':
-
-    data_dir = Path('TestData')
-    experiment_dir = Path('Experiments', 'testExperiment')
-    if not experiment_dir.exists():
-        experiment_dir.mkdir()
-
-    #configure logging to only log errors
-    #create file handler
-    fh = logging.FileHandler(experiment_dir/'log_errors.txt')
-    fh.setLevel(logging.ERROR)
-    # create formatter
-    formatter = logging.Formatter('%(levelname)s: %(name)s - %(funcName)s (l.%(lineno)d): %(message)s')
-    # add formatter to fh
-    fh.setFormatter(formatter)
-    logger.addHandler(fh)
-
-    #also log for tensorflow
-    fh_tf = logging.FileHandler(experiment_dir/'log_errors_tensorflow.txt')
-    fh_tf.setLevel(logging.ERROR)
-    fh_tf.setFormatter(formatter)
-    tf_logger.addHandler(fh_tf)
-
-    #print errors
-    ch = logging.StreamHandler()
-    ch.setLevel(level=logging.ERROR)
-    ch.setFormatter(formatter)
-    logger.addHandler(ch)
-    tf_logger.addHandler(ch)
-
-    data_list = np.array([str(d) for d in data_dir.iterdir() if d.is_dir()])
-
-    k_fold = 1 #TODO: increase
-    dimensions_and_architectures = ([2, UNet], [2, VNet], [3, UNet], [3, VNet])
-
-    #define the parameters that are constant
-    init_parameters = {
-        "regularize": [True, 'L2', 0.0000001],
-        "drop_out": [True, 0.01],
-        "activation": "elu",
-        "do_batch_normalization": False,
-        "do_bias": True,
-        "cross_hair": False,
-        "do_gradient_clipping" : False,
-        "clipping_value" : 50
-    }
-
-    train_parameters = {
-        "l_r": 0.001,
-        "optimizer": "Adam",
-        "epochs" : 1 #TODO: increase
-    }
-
-    constant_parameters = {
-        "init_parameters": init_parameters,
-        "train_parameters": train_parameters,
-        "loss" : 'DICE'
-    }
-
-    #generate a set of hyperparameters for each dimension and architecture
-    for d, a in dimensions_and_architectures:
-        hyper_parameters = {
-            **constant_parameters,
-            'dimensions' : d,
-            'architecture' : a
-        }
-
-        #define experiment
-        experiment_name = f'{a.get_name()}{d}D'
-        current_experiemnt_path = Path(experiment_dir, experiment_name)
-        if not current_experiemnt_path.exists():
-            current_experiemnt_path.mkdir()
-
-        #add more detailed logger for each network, when problems arise, use debug
-        #create file handlers
-        fh_info = logging.FileHandler(current_experiemnt_path/'log_info.txt')
-        fh_info.setLevel(logging.INFO)
-        fh_info.setFormatter(formatter)
-        #add to loggers
-        logger.addHandler(fh_info)
-
-        experiment = Experiment(
-            hyper_parameters=hyper_parameters,
-            name=experiment_name,
-            output_path=current_experiemnt_path
-        )
-
-        experiment.run(data_list, k_fold)
-        experiment.evaluate()
-
-        #remove logger
-        logger.removeHandler(fh_info)
-
-#TODO: check input (size, orientation, label classes correct)
-#TODO: Write hyperparameters in one file, which is saved in each folder
-#TODO: Make it more clear where the logs are saved
-#TODO: update config or get rid of it completely
-#TODO: Make hyperparameters work with tensorbaord
-#TODO: Make plots nicer
+        with open(self.hyperparameter_file, 'w') as f:
+            json.dump(params, f, indent=4, sort_keys=True)
