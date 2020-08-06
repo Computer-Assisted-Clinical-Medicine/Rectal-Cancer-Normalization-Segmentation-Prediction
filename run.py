@@ -46,8 +46,7 @@ tf_logger.addHandler(ch)
 
 data_list = np.array([str(d) for d in data_dir.iterdir() if d.is_dir()])
 
-k_fold = 1 #TODO: increase
-dimensions_and_architectures = ([2, UNet], [2, VNet], [3, UNet], [3, VNet])
+k_fold = 5
 
 #define the parameters that are constant
 init_parameters = {
@@ -64,7 +63,7 @@ init_parameters = {
 train_parameters = {
     "l_r": 0.001,
     "optimizer": "Adam",
-    "epochs" : 1 #TODO: increase
+    "epochs" : 5 #TODO: increase
 }
 
 constant_parameters = {
@@ -72,6 +71,10 @@ constant_parameters = {
     "train_parameters": train_parameters,
     "loss" : 'DICE'
 }
+
+#define the parameters that are being tuned
+dimensions = [2, 3]
+architectures = [UNet, VNet]
 
 def generate_folder_name(hyper_parameters):
     epochs = hyper_parameters['train_parameters']['epochs']
@@ -101,39 +104,40 @@ tensorboard_command = f'tensorboard --logdir={experiment_dir}'
 print(f'To see the progress in tensorboard, run:\n{tensorboard_command}')
 
 #generate a set of hyperparameters for each dimension and architecture and run
-for d, a in dimensions_and_architectures:
-    hyper_parameters = {
-        **constant_parameters,
-        'dimensions' : d,
-        'architecture' : a
-    }
+for d in dimensions:
+    for a in architectures:
+        hyper_parameters = {
+            **constant_parameters,
+            'dimensions' : d,
+            'architecture' : a
+        }
 
-    #define experiment
-    experiment_name = generate_folder_name(hyper_parameters)
-    
-    current_experiment_path = Path(experiment_dir, experiment_name)
-    if not current_experiment_path.exists():
-        current_experiment_path.mkdir()
+        #define experiment
+        experiment_name = generate_folder_name(hyper_parameters)
+        
+        current_experiment_path = Path(experiment_dir, experiment_name)
+        if not current_experiment_path.exists():
+            current_experiment_path.mkdir()
 
-    #add more detailed logger for each network, when problems arise, use debug
-    #create file handlers
-    fh_info = logging.FileHandler(current_experiment_path/'log_info.txt')
-    fh_info.setLevel(logging.INFO)
-    fh_info.setFormatter(formatter)
-    #add to loggers
-    logger.addHandler(fh_info)
+        #add more detailed logger for each network, when problems arise, use debug
+        #create file handlers
+        fh_info = logging.FileHandler(current_experiment_path/'log_info.txt')
+        fh_info.setLevel(logging.INFO)
+        fh_info.setFormatter(formatter)
+        #add to loggers
+        logger.addHandler(fh_info)
 
-    experiment = Experiment(
-        hyper_parameters=hyper_parameters,
-        name=experiment_name,
-        output_path=current_experiment_path
-    )
+        experiment = Experiment(
+            hyper_parameters=hyper_parameters,
+            name=experiment_name,
+            output_path=current_experiment_path
+        )
 
-    experiment.run(data_list, k_fold)
-    experiment.evaluate()
+        experiment.run(data_list, k_fold)
+        experiment.evaluate()
 
-    #remove logger
-    logger.removeHandler(fh_info)
+        #remove logger
+        logger.removeHandler(fh_info)
 
 #TODO: check input (size, orientation, label classes correct)
 #TODO: Make it more clear where the logs are saved

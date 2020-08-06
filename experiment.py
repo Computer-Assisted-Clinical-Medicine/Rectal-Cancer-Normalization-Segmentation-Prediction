@@ -270,7 +270,7 @@ class Experiment():
 
             self._set_parameters_according_to_dimension()
 
-            tqdm.write(f'Starting with {self.name} {folder_name} (Fold {f} of {k_fold})')
+            tqdm.write(f'Starting with {self.name} {folder_name} (Fold {f+1} of {k_fold})')
 
             #try the actual training
             try:
@@ -307,7 +307,7 @@ class Experiment():
                     self.hyper_parameters['architecture'].get_name(), self.hyper_parameters['loss'])
                 logger.error(err)
 
-            tqdm.write(f'Finished with {self.name} {folder_name} (Fold {f} of {k_fold})')
+            tqdm.write(f'Finished with {self.name} {folder_name} (Fold {f+1} of {k_fold})')
 
 
 
