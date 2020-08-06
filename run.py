@@ -3,7 +3,7 @@ from pathlib import Path
 
 import numpy as np
 
-import experiment
+from experiment import Experiment
 from SegmentationNetworkBasis.architecture import DVN, CombiNet, UNet, VNet
 
 
@@ -115,7 +115,7 @@ for params, experiment_name in zip(hyper_parameters, names):
     #add to loggers
     logger.addHandler(fh_info)
 
-    experiment = experiment.Experiment(
+    experiment = Experiment(
         hyper_parameters=params,
         name=experiment_name,
         output_path=current_experiment_path
