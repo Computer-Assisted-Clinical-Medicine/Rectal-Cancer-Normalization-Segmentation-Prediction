@@ -1,15 +1,25 @@
 import logging
+import os
 from pathlib import Path
 
 import numpy as np
+
+#logger has to be set before tensorflow is imported
+tf_logger = logging.getLogger('tensorflow')
+os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 
 from experiment import Experiment
 from SegmentationNetworkBasis.architecture import DVN, CombiNet, UNet, VNet
 
 
-#configure logger
+#configure loggers
 logger = logging.getLogger()
 logger.setLevel(logging.DEBUG)
+
+tf_logger.setLevel(logging.DEBUG)
+#there is too much output otherwise
+for h in tf_logger.handlers:
+    tf_logger.removeHandler(h)
 
 
 data_dir = Path('TestData')
@@ -27,11 +37,12 @@ formatter = logging.Formatter('%(levelname)s: %(name)s - %(funcName)s (l.%(linen
 fh.setFormatter(formatter)
 logger.addHandler(fh)
 
-#print errors
+#print errors (also for tensorflow)
 ch = logging.StreamHandler()
 ch.setLevel(level=logging.ERROR)
 ch.setFormatter(formatter)
 logger.addHandler(ch)
+tf_logger.addHandler(ch)
 
 data_list = np.array([str(d) for d in data_dir.iterdir() if d.is_dir()])
 
@@ -85,23 +96,20 @@ def generate_folder_name(hyper_parameters):
 
     return folder_name
 
-hyper_parameters = []
-names = []
+#generate tensorflow command
+tensorboard_command = f'tensorboard --logdir={experiment_dir}'
+print(f'To see the progress in tensorboard, run:\n{tensorboard_command}')
 
-#generate a set of hyperparameters for each dimension and architecture
+#generate a set of hyperparameters for each dimension and architecture and run
 for d, a in dimensions_and_architectures:
-    params = {
+    hyper_parameters = {
         **constant_parameters,
         'dimensions' : d,
         'architecture' : a
     }
-    hyper_parameters.append(params)
 
     #define experiment
-    names.append(generate_folder_name(params))
-
-#run the experiments
-for params, experiment_name in zip(hyper_parameters, names):
+    experiment_name = generate_folder_name(hyper_parameters)
     
     current_experiment_path = Path(experiment_dir, experiment_name)
     if not current_experiment_path.exists():
@@ -116,7 +124,7 @@ for params, experiment_name in zip(hyper_parameters, names):
     logger.addHandler(fh_info)
 
     experiment = Experiment(
-        hyper_parameters=params,
+        hyper_parameters=hyper_parameters,
         name=experiment_name,
         output_path=current_experiment_path
     )

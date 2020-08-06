@@ -18,17 +18,10 @@ from SegmentationNetworkBasis.NetworkBasis.util import (make_csv_file,
                                                         write_configurations,
                                                         write_metrics_to_csv)
 
-#logger has to be set before tensorflow is imported
-tf_logger = logging.getLogger('tensorflow')
-tf_logger.setLevel(logging.DEBUG)
-os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3' 
-
-
 #configure logger
-logger = logging.getLogger()
+logger = logging.getLogger(__name__)
 logger.setLevel(logging.DEBUG)
-#remove tensorflow handler (otherwise there are a lot of messages)
-tf_logger.removeHandler(tf_logger.handlers[0])
+
 
 class Experiment():
 
