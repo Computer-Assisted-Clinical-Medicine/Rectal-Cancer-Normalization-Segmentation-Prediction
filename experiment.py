@@ -1,4 +1,3 @@
-import json
 import logging
 import os
 import time
@@ -8,6 +7,7 @@ import numpy as np
 import pandas as pd
 import SimpleITK as sitk
 import tensorflow as tf
+import yaml
 from tqdm import tqdm
 
 import evaluation
@@ -25,7 +25,7 @@ logger.setLevel(logging.DEBUG)
 
 class Experiment():
 
-    def __init__(self, name, hyper_parameters, seed=42, output_path=None):
+    def __init__(self, name, hyper_parameters, folds=5, seed=42, output_path=None):
         """Run experiments using a fixed set of hyperparameters
 
         Parameters
@@ -33,7 +33,9 @@ class Experiment():
             name : str
                 Name of the experiment, is used for the folder name
             hyper_parameters : dict
-                the hyperparameters that should be used
+                the hyperparameters that should be used (as soon as something is changed in between experiments, it is a hyperparameter)
+            folds : int
+                The number of folds to use for validation, by default 5
             seed : int, optional
                 the global seed, by default 42
             output_path : str, optional
@@ -42,6 +44,9 @@ class Experiment():
         self.hyper_parameters = hyper_parameters
         self.seed = seed
         self.name = name
+        self.folds = folds
+        #set fold directory names
+        self.fold_dir_names = [f'fold-{f}' for f in range(self.folds)]
         #start with fold 0
         self.fold = 0
         #set path different on the Server
@@ -103,7 +108,7 @@ class Experiment():
             cfg.test_data_shape = [cfg.num_slices_test, cfg.test_dim, cfg.test_dim, cfg.num_channels]
             cfg.test_label_shape = [cfg.num_slices_test, cfg.test_dim, cfg.test_dim, cfg.num_classes_seg]
             logger.debug('   Test Shapes: %s (input) %s (labels)', cfg.test_data_shape, cfg.test_label_shape)
-            cfg.batch_size_train = 8
+            cfg.batch_size_train = 4 #Otherwise, VNet 3D fails
             cfg.batch_size_test = 1
 
 
@@ -198,9 +203,9 @@ class Experiment():
         for f in self.test_files:
             f = Path(f)
             folder, file_number = f.parts
-            prediction_path = Path(apply_path) / f'prediction-{f.name}-{version}.nii.gz'
+            prediction_path = Path(apply_path) / f'prediction-{f.name}-{version}.nii'
 
-            label_path = f/cfg.label_file_name
+            label_path = os.path.join(folder, (cfg.label_file_name_prefix + file_number + '.nii'))
             try:
                 result_metrics = {}
                 result_metrics['File Number'] = file_number
@@ -217,14 +222,14 @@ class Experiment():
         self.eval_files.append(eval_file_path)
 
 
-    def run(self, data_set, k_fold=1):
+    def run(self, data_set):
         self.hyper_parameters["evaluate_on_finetuned"] = False
         self.set_seed()
 
         all_indices = np.random.permutation(range(0, data_set.size))
-        #split the data into k_fold sections
-        if k_fold > 1:
-            test_folds = np.array_split(all_indices, k_fold)
+        #split the data into self.folds sections
+        if self.folds > 1:
+            test_folds = np.array_split(all_indices, self.folds)
         else:
             #otherwise, us cfg.data_train_split
             test_folds = all_indices[int(all_indices.size*cfg.data_train_split):].reshape(1,-1)
@@ -235,7 +240,7 @@ class Experiment():
         #export parameters
         self.export_hyperparameters()
 
-        for f in range(0, k_fold):
+        for f, folder_name in zip(range(0, self.folds), self.fold_dir_names):
             self.fold = f
 
             #test is the section
@@ -250,7 +255,6 @@ class Experiment():
             self.vald_files = data_set[vald_indices]
             self.test_files = data_set[test_indices]
 
-            folder_name = f'fold-{f}'
             self.workingdir = self.output_path/folder_name
             logger.info('workingdir is %s', self.workingdir)
 
@@ -270,7 +274,7 @@ class Experiment():
 
             self._set_parameters_according_to_dimension()
 
-            tqdm.write(f'Starting with {self.name} {folder_name} (Fold {f+1} of {k_fold})')
+            tqdm.write(f'Starting with {self.name} {folder_name} (Fold {f+1} of {self.folds})')
 
             #try the actual training
             try:
@@ -307,11 +311,22 @@ class Experiment():
                     self.hyper_parameters['architecture'].get_name(), self.hyper_parameters['loss'])
                 logger.error(err)
 
-            tqdm.write(f'Finished with {self.name} {folder_name} (Fold {f+1} of {k_fold})')
+            tqdm.write(f'Finished with {self.name} {folder_name} (Fold {f+1} of {self.folds})')
 
 
 
     def evaluate(self):
+        #set eval files if they do not exist
+        if not hasattr(self, 'eval_files'):
+            self.eval_files = []
+            version = str(self.hyper_parameters['train_parameters']['epochs'])
+            for f_name in self.fold_dir_names:
+                self.eval_files.append(
+                    self.output_path / f_name / f'evaluation-{f_name}-{version}_test.csv'
+                )
+        if not np.all([f.exists() for f in self.eval_files]):
+            print(self.eval_files)
+            raise Exception('Eval file not found')
         #combine previous evaluations
         evaluation.combine_evaluation_results_from_folds(
             self.output_path,
@@ -324,9 +339,5 @@ class Experiment():
         )
 
     def export_hyperparameters(self):
-        params = self.hyper_parameters.copy()
-        if 'architecture' in params:
-            params['architecture'] = params['architecture'].get_name()
-
         with open(self.hyperparameter_file, 'w') as f:
-            json.dump(params, f, indent=4, sort_keys=True)
+            yaml.dump(self.hyper_parameters, f)

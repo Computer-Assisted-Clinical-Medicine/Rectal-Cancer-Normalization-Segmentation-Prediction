@@ -10,6 +10,7 @@ os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 
 from experiment import Experiment
 from SegmentationNetworkBasis.architecture import DVN, CombiNet, UNet, VNet
+from tests.create_test_files import create_test_files
 
 
 #configure loggers
@@ -44,7 +45,15 @@ ch.setFormatter(formatter)
 logger.addHandler(ch)
 tf_logger.addHandler(ch)
 
-data_list = np.array([str(d) for d in data_dir.iterdir() if d.is_dir()])
+data_list = np.array([
+    str(data_dir/d.stem.split('-')[1]) for d in data_dir.iterdir() if 'label' in d.name
+])
+#when no files are there, create them
+if data_list.size == 0:
+    create_test_files(data_dir)
+    data_list = np.array([
+        str(data_dir/d.stem.split('-')[1]) for d in data_dir.iterdir() if 'label' in d.name
+    ])
 
 k_fold = 5
 
@@ -63,7 +72,7 @@ init_parameters = {
 train_parameters = {
     "l_r": 0.001,
     "optimizer": "Adam",
-    "epochs" : 5 #TODO: increase
+    "epochs" : 10
 }
 
 constant_parameters = {
@@ -100,7 +109,7 @@ def generate_folder_name(hyper_parameters):
     return folder_name
 
 #generate tensorflow command
-tensorboard_command = f'tensorboard --logdir={experiment_dir}'
+tensorboard_command = f'tensorboard --logdir={experiment_dir.absolute()}'
 print(f'To see the progress in tensorboard, run:\n{tensorboard_command}')
 
 #generate a set of hyperparameters for each dimension and architecture and run
@@ -130,18 +139,12 @@ for d in dimensions:
         experiment = Experiment(
             hyper_parameters=hyper_parameters,
             name=experiment_name,
-            output_path=current_experiment_path
+            output_path=current_experiment_path,
+            folds=k_fold
         )
 
-        experiment.run(data_list, k_fold)
+        experiment.run(data_list)
         experiment.evaluate()
 
         #remove logger
         logger.removeHandler(fh_info)
-
-#TODO: check input (size, orientation, label classes correct)
-#TODO: Make it more clear where the logs are saved
-#TODO: update config or get rid of it completely
-#TODO: Make hyperparameters work with tensorbaord
-#TODO: Make plots nicer
-#TODO: take project-specific filenames out of the submodule

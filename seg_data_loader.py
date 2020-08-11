@@ -13,11 +13,6 @@ logger = logging.getLogger(__name__)
 
 class SegLoader(SegBasisLoader):
 
-    def _get_filenames(self, file_id):
-        data_file = os.path.join(file_id, (cfg.sample_file_name))
-        label_file = os.path.join(file_id, (cfg.label_file_name))
-        return data_file, label_file
-
     def adapt_to_task(self, data_img, label_img):
         # threshold_filter = sitk.ThresholdImageFilter()
         # threshold_filter.SetUpper(cfg.num_classes_seg)

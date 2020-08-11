@@ -185,13 +185,13 @@ def make_boxplot_graphic(experiment_path, eval_files):
                                                 usecols=[title]).values
             data.append(np.squeeze(np.float32(individual_results)))
 
-            labels.append(indiv_eval_file_path.stem)
+            labels.append(indiv_eval_file_path.parent.name)
 
         f = plt.figure(figsize=(2 * len(data) + 5, 10))
         ax = plt.subplot(111)
         [i.set_linewidth(1) for i in ax.spines.values()]
 
-        # ax.set_title(title, pad=20)
+        ax.set_title(f'{experiment_path.name} {title}', pad=20)
         for item in ([ax.title, ax.xaxis.label, ax.yaxis.label] +
                      ax.get_xticklabels() + ax.get_yticklabels()):
             item.set_fontsize(20)
@@ -204,47 +204,8 @@ def make_boxplot_graphic(experiment_path, eval_files):
             elif 'Mean' in title:
                 ax.set_ylim([0, 40])'''
 
-        p = plt.boxplot(data, notch=False, whis=[0, 100], showmeans=True, showfliers=True, vert=True, widths=0.9,
+        p = plt.boxplot(data, notch=False, showmeans=True, showfliers=True, vert=True, widths=0.9,
                         patch_artist=True, labels=labels)
-
-        if "boxes" in p:
-            [box.set_color(_get_color("")) for label, box in zip(labels, p["boxes"])]
-            [box.set_facecolor(_get_color(label)) for label, box in zip(labels, p["boxes"])]
-            [box.set_linewidth(linewidth) for box in p["boxes"]]
-        if "whiskers" in p:
-            for label, whisker in zip(np.repeat(labels, 2), p["whiskers"]):
-                if str(2) in label:
-                    whisker.set_linestyle('dashed')
-                else:
-                    whisker.set_linestyle('dotted')
-                whisker.set_color(_get_color(label))
-                whisker.set_linewidth(linewidth)
-        if "medians" in p:
-            for label, median in zip(labels, p["medians"]):
-                # if str(dimensions[0]) in label:
-                #     median.set_linestyle('dashed')
-                # else:
-                #     median.set_linestyle('dotted')
-                median.set_color(_get_color(""))
-                median.set_linewidth(linewidth)
-        if "means" in p:
-            for label, mean in zip(labels, p["means"]):
-                if str(2) in label:
-                    mean.set_marker('x')
-                else:
-                    mean.set_marker('+')
-                mean.set_markeredgecolor(_get_color(""))
-                mean.set_markerfacecolor(_get_color(""))
-                mean.set_linewidth(linewidth)
-        if "caps" in p:
-            [cap.set_color(_get_color(label)) for label, cap in zip(np.repeat(labels, 2), p["caps"])]
-            [cap.set_linewidth(linewidth) for cap in p["caps"]]
-        if "fliers" in p:
-            [flier.set_color(_get_color(label)) for label, flier in zip(labels, p["fliers"])]
-            [flier.set_markeredgecolor(_get_color(label)) for label, flier in zip(labels, p["fliers"])]
-            [flier.set_markerfacecolor(_get_color(label)) for label, flier in zip(labels, p["fliers"])]
-
-            [flier.set_fillstyle("full") for label, flier in zip(labels, p["fliers"])]
 
         # with warnings.catch_warnings():
         #     try:
@@ -253,13 +214,3 @@ def make_boxplot_graphic(experiment_path, eval_files):
         #         print(title, y_label, file_path)
 
         plt.savefig(os.path.join(experiment_path, 'plots', title.replace(' ', '') + '.png'), transparent=True)
-
-
-def _get_color(label):
-    colors = {"2D U-Net": "#fd192b", "2D V-Net": "#f15d5b", "2D DV-Net": "#d75fd7",
-              "3D U-Net": "#fd192b", "3D V-Net": "#f15d5b", "3D DV-Net": "#d75fd7"}
-
-    if label in colors:
-        return colors[label]
-    else:
-        return "#000000"
