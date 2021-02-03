@@ -1,4 +1,4 @@
-# Abdominal Segmentation of Veins and Arteries
+# Segmentation of rectal cancer tumors
 
 One Paragraph of project description goes here
 
