@@ -18,6 +18,7 @@ tmp/
 *.nrrd
 *.png
 *.jpg
+*.nrrd
 
 
 ### Standard Python GITIGNORE ###

@@ -1,3 +1,4 @@
+import json
 import logging
 import os
 from pathlib import Path
@@ -9,9 +10,7 @@ tf_logger = logging.getLogger('tensorflow')
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 
 from experiment import Experiment
-from SegmentationNetworkBasis.architecture import DVN, CombiNet, UNet, VNet
-from tests.create_test_files import create_test_files
-
+from SegmentationNetworkBasis.architecture import DVN, ResNet, UNet, VNet
 
 #configure loggers
 logger = logging.getLogger()
@@ -23,8 +22,8 @@ for h in tf_logger.handlers:
     tf_logger.removeHandler(h)
 
 
-data_dir = Path('TestData')
-experiment_dir = Path('Experiments', 'testExperiment')
+data_dir = Path(os.environ['data_dir'])
+experiment_dir = Path(os.environ['experiment_dir'])
 if not experiment_dir.exists():
     experiment_dir.mkdir()
 
@@ -45,17 +44,19 @@ ch.setFormatter(formatter)
 logger.addHandler(ch)
 tf_logger.addHandler(ch)
 
-data_list = np.array([
-    str(data_dir/d.stem.split('-')[1]) for d in data_dir.iterdir() if 'label' in d.name
-])
-#when no files are there, create them
-if data_list.size == 0:
-    create_test_files(data_dir)
-    data_list = np.array([
-        str(data_dir/d.stem.split('-')[1]) for d in data_dir.iterdir() if 'label' in d.name
-    ])
+train_list = np.loadtxt(data_dir / 'train_IDs.csv', dtype='str')
 
-k_fold = 5
+data_list = np.array([str(data_dir / t) for t in train_list])
+
+k_fold = 3
+
+# get number of channels from database file
+data_dict_file = data_dir / 'dataset.json'
+if not data_dict_file.exists():
+    raise FileNotFoundError(f'Dataset dict file {data_dict_file} not found.')
+with open(data_dict_file) as f:
+    data_dict = json.load(f)
+n_channels = len(data_dict['modality'])
 
 #define the parameters that are constant
 init_parameters = {
@@ -66,14 +67,16 @@ init_parameters = {
     "do_bias": True,
     "cross_hair": False,
     "do_gradient_clipping" : False,
-    "clipping_value" : 50
+    "clipping_value" : 50,
 }
 
 train_parameters = {
     "l_r": 0.001,
     "optimizer": "Adam",
-    "epochs" : 10
+    "epochs" : 1
 }
+
+#TODO: fix naming of apply files
 
 constant_parameters = {
     "init_parameters": init_parameters,
@@ -83,7 +86,8 @@ constant_parameters = {
 
 #define the parameters that are being tuned
 dimensions = [2, 3]
-architectures = [UNet, VNet]
+architectures = [UNet, VNet, DVN, ResNet]
+# architectures = [ResNet]
 
 def generate_folder_name(hyper_parameters):
     epochs = hyper_parameters['train_parameters']['epochs']
@@ -109,7 +113,7 @@ def generate_folder_name(hyper_parameters):
     return folder_name
 
 #generate tensorflow command
-tensorboard_command = f'tensorboard --logdir={experiment_dir.absolute()}'
+tensorboard_command = f'tensorboard --logdir="{experiment_dir.absolute()}"'
 print(f'To see the progress in tensorboard, run:\n{tensorboard_command}')
 
 #generate a set of hyperparameters for each dimension and architecture and run
@@ -140,10 +144,11 @@ for d in dimensions:
             hyper_parameters=hyper_parameters,
             name=experiment_name,
             output_path=current_experiment_path,
-            folds=k_fold
+            data_set=data_list,
+            folds=k_fold,
+            num_channels=n_channels
         )
-
-        experiment.run(data_list)
+        experiment.run_all_folds()
         experiment.evaluate()
 
         #remove logger

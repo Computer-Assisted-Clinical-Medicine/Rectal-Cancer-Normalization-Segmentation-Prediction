@@ -53,13 +53,31 @@ def evaluate_segmentation_prediction(result_metrics, prediction_path, label_path
     label_img.SetOrigin(data_info['orig_origin'])
     label_img.SetSpacing(data_info['orig_spacing'])
 
-    #check types and if not equal, convert output to target
+    # check types and if not equal, convert output to target
     if pred_img.GetPixelID() != label_img.GetPixelID():
         cast = sitk.CastImageFilter()
         cast.SetOutputPixelType(label_img.GetPixelID())
         pred_img = cast.Execute(pred_img)
 
     result_metrics['Volume (L)'] = Metric.get_ml_sitk(label_img)
+
+    # check if all labels are background
+    if np.all(sitk.GetArrayFromImage(pred_img) == 0):
+        # if that is not the case, create warning and return metrics
+        if not np.all(sitk.GetArrayFromImage(label_img) == 0):
+            logger.warning('Only background labels found')
+            # set values for results
+            result_metrics['Volume (P)'] = 0
+            result_metrics['Dice' ] = 0
+            result_metrics['False Negative'] = 0
+            result_metrics['False Positive'] = 1
+            result_metrics['Confusion Rate'] = 1
+            result_metrics['Connectivity'] = 0
+            result_metrics['Fragmentation'] = 1
+            result_metrics['Hausdorff'] = np.NAN
+            result_metrics['Mean Symmetric Surface Distance'] = np.NAN
+            return result_metrics
+
     result_metrics['Volume (P)'] = Metric.get_ml_sitk(pred_img)
 
     orig_dice, orig_vs, orig_fn, orig_fp = Metric.overlap_measures_sitk(pred_img, label_img)
@@ -85,7 +103,7 @@ def evaluate_segmentation_prediction(result_metrics, prediction_path, label_path
         orig_hdd = Metric.hausdorff_metric_sitk(pred_img, label_img)
     except RuntimeError as err:
         logger.error('Surface evaluation failed! Using infinity: %s', err)
-        orig_hdd = math.inf
+        orig_hdd = np.NAN
     result_metrics['Hausdorff'] = orig_hdd
     logger.info('  Original Hausdorff Distance: %s', orig_hdd)
 
@@ -93,10 +111,10 @@ def evaluate_segmentation_prediction(result_metrics, prediction_path, label_path
         orig_mnssd, orig_mdssd, orig_stdssd, orig_maxssd = Metric.symmetric_surface_measures_sitk(pred_img, label_img)
     except RuntimeError as err:
         logger.error('Surface evaluation failed! Using infinity: %s', err)
-        orig_mnssd = math.inf
-        orig_mdssd = math.inf
-        orig_stdssd = math.inf
-        orig_maxssd = math.inf
+        orig_mnssd = np.NAN
+        orig_mdssd = np.NAN
+        orig_stdssd = np.NAN
+        orig_maxssd = np.NAN
 
     result_metrics['Mean Symmetric Surface Distance'] = orig_mnssd
     # result_metrics['Median Symmetric Surface Distance'] = orig_mdssd
@@ -143,19 +161,18 @@ def _gather_individual_results(indiv_eval_file_path, header_row, mean_statistics
     try:
         results = pd.read_csv(indiv_eval_file_path, dtype=object)
         #set index, the rest are numbers
-        results.set_index('File Number', inplace=True)
+        results = results.set_index('File Number').astype(float)
     except:
-        logger.error('Could not find %s', search_path)
+        logger.error('Could not find %s', indiv_eval_file_path)
+        raise FileNotFoundError('Could not find %s', indiv_eval_file_path)
 
     if results.size > 0:
 
-        values = results.astype(float).values
-
-        average_results = np.mean(values, axis=0).tolist()
+        average_results = results.mean().values.tolist()
         average_results = [indiv_eval_file_path.stem] + average_results
         mean_statistics.append(average_results)
 
-        std_results = np.std(values, axis=0).tolist()
+        std_results = results.std().values.tolist()
         std_results = [indiv_eval_file_path.stem] + std_results
         std_statistics.append(std_results)
 

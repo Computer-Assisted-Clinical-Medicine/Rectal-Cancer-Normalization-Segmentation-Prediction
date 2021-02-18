@@ -20,10 +20,15 @@ class SegLoader(SegBasisLoader):
         #
         # (data_img, )
         label_img = sitk.Threshold(label_img, upper=cfg.num_classes_seg-1, outsideValue=cfg.num_classes_seg-1)
+        # label should be uint-8
+        if label_img.GetPixelID() != sitk.sitkUInt8:
+            label_img = sitk.Cast(label_img, sitk.sitkUInt8)
         return data_img, label_img
 
     def _check_images(self, data, lbl):
-        # print('ToDo: think of check')
+        assert np.any(np.isnan(data)) == False, 'Nans in the image'
+        assert np.any(np.isnan(lbl)) == False, 'Nans in the labels'
+        assert np.sum(lbl) > 100, 'Not enough labels in the image'
         logger.debug('          Checking Labels (min, max) %s %s:', np.min(lbl), np.max(lbl))
         logger.debug('          Shapes (Data, Label): %s %s', data.shape, lbl.shape)
 
