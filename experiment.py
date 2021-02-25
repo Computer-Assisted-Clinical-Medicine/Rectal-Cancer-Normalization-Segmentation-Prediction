@@ -13,7 +13,7 @@ from tqdm import tqdm
 
 import evaluation
 import SegmentationNetworkBasis.NetworkBasis.image as image
-from seg_data_loader import SegLoader, SegRatioLoader
+from seg_data_loader_new import SegLoader, SegRatioLoader
 from SegmentationNetworkBasis import config as cfg
 from SegmentationNetworkBasis.NetworkBasis.util import (make_csv_file,
                                                         write_configurations,
@@ -26,7 +26,8 @@ logger.setLevel(logging.DEBUG)
 
 class Experiment():
 
-    def __init__(self, name:str, hyper_parameters:dict, data_set:List, folds=5, seed=42, num_channels=1, output_path=None, restart=False, reinitialize_folds=False):
+    def __init__(self, name:str, hyper_parameters:dict, data_set:List, folds=5, seed=42, num_channels=1,
+                 output_path=None, restart=False, reinitialize_folds=False, folds_dir=None, preprocessed_dir=None):
         """Run experiments using a fixed set of hyperparameters
 
         Parameters
@@ -49,6 +50,11 @@ class Experiment():
                 If already finished folds should be restarted, by default False
             reinitialize_folds : bool, optional
                 If set to true, the split for the folds will be redone, by default False
+            folds_dir : str, optional
+                Where the fold descripions should be saved. All experiments sharing the 
+                same folds should have the same directory here, by default outputdir
+            preprocessed_dir : str, optional
+                Where the preprocessed files are saved
         """
         self.hyper_parameters = hyper_parameters
         self.seed = seed
@@ -79,15 +85,23 @@ class Experiment():
         #set hyperparameterfile to store all hyperparameters
         self.hyperparameter_file = self.output_path / 'hyperparameters.json'
 
+        # set directory for folds
+        if folds_dir == None:
+            self.folds_dir = self.output_path
+        else:
+            self.folds_dir = Path(folds_dir)
+        if not folds_dir.exists():
+            folds_dir.mkdir(parents=True)
+
         #set fold directory names
         self.fold_dir_names = [f'fold-{f}' for f in range(self.folds)]
         #set fold split file names
         self.datasets = []
         for f in range(self.folds):
             # set paths
-            train_csv = self.output_path/f'train-{f}-{self.folds}.csv'
-            vald_csv = self.output_path/f'vald-{f}-{self.folds}.csv'
-            test_csv = self.output_path/f'test-{f}-{self.folds}.csv'
+            train_csv = self.folds_dir/f'train-{f}-{self.folds}.csv'
+            vald_csv = self.folds_dir/f'vald-{f}-{self.folds}.csv'
+            test_csv = self.folds_dir/f'test-{f}-{self.folds}.csv'
             self.datasets.append({
                 'train' : train_csv,
                 'vald' : vald_csv,
@@ -98,6 +112,8 @@ class Experiment():
         self.data_set = data_set
 
         self.restart = restart
+
+        self.preprocessed_dir = preprocessed_dir
 
         return
 
@@ -153,7 +169,7 @@ class Experiment():
             cfg.num_channels = self.num_channels
             #cfg.train_dim = 256
             cfg.samples_per_volume = 128
-            cfg.batch_capacity_train = 5*cfg.samples_per_volume # chosen as multiple of samples per volume
+            cfg.batch_capacity_train = 4*cfg.samples_per_volume # chosen as multiple of samples per volume
             cfg.batch_capacity_valid = 2*cfg.samples_per_volume # chosen as multiple of samples per volume
             cfg.train_input_shape = [cfg.train_dim, cfg.train_dim, cfg.num_channels]
             cfg.train_label_shape = [cfg.train_dim, cfg.train_dim, cfg.num_classes_seg]
@@ -162,7 +178,8 @@ class Experiment():
             cfg.test_data_shape = [cfg.test_dim, cfg.test_dim, cfg.num_channels]
             cfg.test_label_shape = [cfg.test_dim, cfg.test_dim, cfg.num_classes_seg]
             logger.debug('   Test Shapes: %s (input) %s (labels)', cfg.test_data_shape, cfg.test_label_shape)
-            cfg.batch_size_train = 64
+            # set batch size
+            cfg.batch_size_train = 128
             # use smaller batch size for some networks
             if self.hyper_parameters['architecture'].get_name() == 'ResNet':
                 cfg.batch_size_train = 16
@@ -173,23 +190,25 @@ class Experiment():
             cfg.samples_per_volume = 64
             cfg.batch_capacity_train = 4*cfg.samples_per_volume # chosen as multiple of samples per volume
             cfg.batch_capacity_valid = 2*cfg.samples_per_volume # chosen as multiple of samples per volume
-            cfg.num_slices_train = 32
+            cfg.num_slices_train = 16 # with 16 the loader does not work, but with 8, the U-Net does not work.
             cfg.train_input_shape = [cfg.num_slices_train, cfg.train_dim, cfg.train_dim, cfg.num_channels]
             cfg.train_label_shape = [cfg.num_slices_train, cfg.train_dim, cfg.train_dim, cfg.num_classes_seg]
             logger.debug('   Train Shapes: %s (input), %s (labels)', cfg.train_input_shape, cfg.train_label_shape)
             #cfg.test_dim = 512
-            cfg.num_slices_test = 32
+            cfg.num_slices_test = 16
             cfg.test_data_shape = [cfg.num_slices_test, cfg.test_dim, cfg.test_dim, cfg.num_channels]
             cfg.test_label_shape = [cfg.num_slices_test, cfg.test_dim, cfg.test_dim, cfg.num_classes_seg]
             logger.debug('   Test Shapes: %s (input) %s (labels)', cfg.test_data_shape, cfg.test_label_shape)
             cfg.batch_size_train = 4 #Otherwise, VNet 3D fails
             cfg.batch_size_test = 1
 
-
     def training(self, folder_name, train_files, vald_files):
         tf.keras.backend.clear_session()
         # inits
         self.set_seed()
+
+        # set preprocessing dir
+        cfg.preprocessed_dir = self.preprocessed_dir
 
         #generate loader
         training_loader = SegRatioLoader(name='training_loader')
@@ -231,6 +250,9 @@ class Experiment():
 
         '''
         tf.keras.backend.clear_session()
+
+        # set preprocessing dir
+        cfg.preprocessed_dir = self.preprocessed_dir
 
         # inits
         self.set_seed()
@@ -277,9 +299,9 @@ class Experiment():
             f = Path(f)
             folder = f.parent
             file_number = f.name
-            prediction_path = Path(apply_path) / f'prediction-{f.name}-{epochs}.nrrd'
+            prediction_path = Path(apply_path) / f'prediction-{f.name}-{epochs}{cfg.file_suffix}'
 
-            label_path = folder /  (cfg.label_file_name_prefix + file_number + '.nrrd')
+            label_path = folder /  (cfg.label_file_name_prefix + file_number + cfg.file_suffix)
             try:
                 result_metrics = {}
                 result_metrics['File Number'] = file_number
@@ -360,39 +382,14 @@ class Experiment():
         cfg.trial_id = f'{self.name} - fold {f}'
 
         #try the actual training
-        try:
-            cfg.random_sampling_mode = cfg.SAMPLINGMODES.CONSTRAINED_LABEL
-            cfg.percent_of_object_samples = 50
-            self.training(folder_name, train_files, vald_files)
-        except tf.errors.ResourceExhaustedError as err:
-            logger.error(
-                'The model did not fit in memory, Training %s %s failed!',
-                self.hyper_parameters['architecture'].get_name(), self.hyper_parameters['loss']
-            )
-            logger.error(err)
-            return 
-        except Exception as err:
-            logger.error(
-                'Training %s %s failed!',
-                self.hyper_parameters['architecture'].get_name(), self.hyper_parameters['loss']
-                )
-            logger.error(err)
-            return
-        
-        try:
-            cfg.random_sampling_mode = cfg.SAMPLINGMODES.UNIFORM
-            self.applying(folder_name, test_files)
-        except Exception as err:
-            logger.error('Applying %s %s failed!',
-                    self.hyper_parameters['architecture'].get_name(), self.hyper_parameters['loss'])
-            logger.error(err)
-        
-        try:
-            self.evaluate_fold(folder_name, test_files)
-        except Exception as err:
-            logger.error('Evaluating %s %s failed!',
-                self.hyper_parameters['architecture'].get_name(), self.hyper_parameters['loss'])
-            logger.error(err)
+        cfg.random_sampling_mode = cfg.SAMPLINGMODES.CONSTRAINED_LABEL
+        cfg.percent_of_object_samples = 50
+        self.training(folder_name, train_files, vald_files)
+
+        cfg.random_sampling_mode = cfg.SAMPLINGMODES.UNIFORM
+        self.applying(folder_name, test_files)
+
+        self.evaluate_fold(folder_name, test_files)
 
         tqdm.write(f'Finished with {self.name} {folder_name} (Fold {f+1} of {self.folds})')
 

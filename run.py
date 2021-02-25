@@ -73,10 +73,8 @@ init_parameters = {
 train_parameters = {
     "l_r": 0.001,
     "optimizer": "Adam",
-    "epochs" : 1
+    "epochs" : 100
 }
-
-#TODO: fix naming of apply files
 
 constant_parameters = {
     "init_parameters": init_parameters,
@@ -87,7 +85,7 @@ constant_parameters = {
 #define the parameters that are being tuned
 dimensions = [2, 3]
 architectures = [UNet, VNet, DVN, ResNet]
-# architectures = [ResNet]
+# architectures = [VNet]
 
 def generate_folder_name(hyper_parameters):
     epochs = hyper_parameters['train_parameters']['epochs']
@@ -115,6 +113,11 @@ def generate_folder_name(hyper_parameters):
 #generate tensorflow command
 tensorboard_command = f'tensorboard --logdir="{experiment_dir.absolute()}"'
 print(f'To see the progress in tensorboard, run:\n{tensorboard_command}')
+
+# set config
+preprocessed_dir = Path(os.environ['experiment_dir']) / 'data_preprocessed'
+if not preprocessed_dir.exists():
+    preprocessed_dir.mkdir()
 
 #generate a set of hyperparameters for each dimension and architecture and run
 for d in dimensions:
@@ -146,10 +149,17 @@ for d in dimensions:
             output_path=current_experiment_path,
             data_set=data_list,
             folds=k_fold,
-            num_channels=n_channels
+            num_channels=n_channels,
+            folds_dir=experiment_dir / 'folds',
+            preprocessed_dir=preprocessed_dir
         )
-        experiment.run_all_folds()
-        experiment.evaluate()
+        try:
+            experiment.run_all_folds()
+        except Exception as e:
+            print(e)
+            print('Training failed')
+        else:
+            experiment.evaluate()
 
         #remove logger
         logger.removeHandler(fh_info)
