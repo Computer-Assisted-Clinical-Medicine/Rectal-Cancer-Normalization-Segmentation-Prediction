@@ -8,7 +8,7 @@ import SimpleITK as sitk
 sys.path.append(os.getcwd())
 from SegmentationNetworkBasis import config as cfg
 
-def create_test_files(test_path=Path('test_data'), n_files = 40):
+def create_test_files(test_path=Path('test_data'), n_files = 20):
     spacing = np.array([4, 1, 1, 1])
 
     if not test_path.exists():

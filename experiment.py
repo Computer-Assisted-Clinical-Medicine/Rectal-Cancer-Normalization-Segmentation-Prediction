@@ -204,8 +204,6 @@ class Experiment():
 
     def training(self, folder_name, train_files, vald_files):
         tf.keras.backend.clear_session()
-        # inits
-        self.set_seed()
 
         # set preprocessing dir
         cfg.preprocessed_dir = self.preprocessed_dir
@@ -254,8 +252,6 @@ class Experiment():
         # set preprocessing dir
         cfg.preprocessed_dir = self.preprocessed_dir
 
-        # inits
-        self.set_seed()
         testloader = SegLoader(
             mode=SegLoader.MODES.APPLY,
             name='test_loader'
@@ -280,8 +276,6 @@ class Experiment():
         do testing
 
         '''
-
-        self.set_seed()
 
         logger.info('Start evaluation of %s.', folder_name)
 
