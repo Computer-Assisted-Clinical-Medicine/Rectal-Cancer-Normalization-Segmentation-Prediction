@@ -5,8 +5,6 @@ from pathlib import Path
 from typing import List
 
 import numpy as np
-import pandas as pd
-import SimpleITK as sitk
 import tensorflow as tf
 import yaml
 from tqdm import tqdm
@@ -23,6 +21,7 @@ from SegmentationNetworkBasis.NetworkBasis.util import (make_csv_file,
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.DEBUG)
 
+#TODO: add learning rate scheduling
 
 class Experiment():
 
@@ -167,14 +166,14 @@ class Experiment():
     def _set_parameters_according_to_dimension(self):
         if self.hyper_parameters['dimensions'] == 2:
             cfg.num_channels = self.num_channels
-            #cfg.train_dim = 256
+            cfg.train_dim = 128
             cfg.samples_per_volume = 128
             cfg.batch_capacity_train = 4*cfg.samples_per_volume # chosen as multiple of samples per volume
             cfg.batch_capacity_valid = 2*cfg.samples_per_volume # chosen as multiple of samples per volume
             cfg.train_input_shape = [cfg.train_dim, cfg.train_dim, cfg.num_channels]
             cfg.train_label_shape = [cfg.train_dim, cfg.train_dim, cfg.num_classes_seg]
             logger.debug('   Train Shapes: %s (input), %s (labels)', cfg.train_input_shape, cfg.train_label_shape)
-            #cfg.test_dim = 512
+            cfg.test_dim = 256
             cfg.test_data_shape = [cfg.test_dim, cfg.test_dim, cfg.num_channels]
             cfg.test_label_shape = [cfg.test_dim, cfg.test_dim, cfg.num_classes_seg]
             logger.debug('   Test Shapes: %s (input) %s (labels)', cfg.test_data_shape, cfg.test_label_shape)
@@ -186,20 +185,28 @@ class Experiment():
             cfg.batch_size_test = 1
         elif self.hyper_parameters['dimensions'] == 3:
             cfg.num_channels = self.num_channels
-            #cfg.train_dim = 128
-            cfg.samples_per_volume = 64
+            cfg.train_dim = 128
+            cfg.samples_per_volume = 32
             cfg.batch_capacity_train = 4*cfg.samples_per_volume # chosen as multiple of samples per volume
             cfg.batch_capacity_valid = 2*cfg.samples_per_volume # chosen as multiple of samples per volume
-            cfg.num_slices_train = 16 # with 16 the loader does not work, but with 8, the U-Net does not work.
+            cfg.num_slices_train = 32 # with 16 the old loader does not work, but with 8, the U-Net does not work.
             cfg.train_input_shape = [cfg.num_slices_train, cfg.train_dim, cfg.train_dim, cfg.num_channels]
             cfg.train_label_shape = [cfg.num_slices_train, cfg.train_dim, cfg.train_dim, cfg.num_classes_seg]
             logger.debug('   Train Shapes: %s (input), %s (labels)', cfg.train_input_shape, cfg.train_label_shape)
-            #cfg.test_dim = 512
-            cfg.num_slices_test = 16
+            cfg.test_dim = 256
+            cfg.num_slices_test = 32
             cfg.test_data_shape = [cfg.num_slices_test, cfg.test_dim, cfg.test_dim, cfg.num_channels]
             cfg.test_label_shape = [cfg.num_slices_test, cfg.test_dim, cfg.test_dim, cfg.num_classes_seg]
             logger.debug('   Test Shapes: %s (input) %s (labels)', cfg.test_data_shape, cfg.test_label_shape)
-            cfg.batch_size_train = 4 #Otherwise, VNet 3D fails
+            cfg.batch_size_train = 8
+            if self.hyper_parameters['architecture'].get_name() == 'VNet':
+                cfg.batch_size_train = 4 # Otherwise, VNet 3D fails
+            elif self.hyper_parameters['architecture'].get_name() == 'ResNet': # Does not work, not enough memory on PC
+                cfg.batch_size_train = 2
+                cfg.train_dim = 16
+                cfg.num_slices_train = 16
+                cfg.train_input_shape = [cfg.num_slices_train, cfg.train_dim, cfg.train_dim, cfg.num_channels]
+                cfg.train_label_shape = [cfg.num_slices_train, cfg.train_dim, cfg.train_dim, cfg.num_classes_seg]
             cfg.batch_size_test = 1
 
     def training(self, folder_name, train_files, vald_files):
