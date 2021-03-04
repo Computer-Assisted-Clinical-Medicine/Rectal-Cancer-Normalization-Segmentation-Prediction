@@ -1,6 +1,5 @@
 import logging
 import os
-import time
 from pathlib import Path
 from typing import List
 
@@ -10,8 +9,7 @@ import yaml
 from tqdm import tqdm
 
 import evaluation
-import SegmentationNetworkBasis.NetworkBasis.image as image
-from seg_data_loader_new import SegLoader, SegRatioLoader
+from seg_data_loader import ApplyLoader, SegLoader
 from SegmentationNetworkBasis import config as cfg
 from SegmentationNetworkBasis.NetworkBasis.util import (make_csv_file,
                                                         write_configurations,
@@ -20,8 +18,6 @@ from SegmentationNetworkBasis.NetworkBasis.util import (make_csv_file,
 #configure logger
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.DEBUG)
-
-#TODO: add learning rate scheduling
 
 class Experiment():
 
@@ -169,7 +165,6 @@ class Experiment():
             cfg.train_dim = 128
             cfg.samples_per_volume = 128
             cfg.batch_capacity_train = 4*cfg.samples_per_volume # chosen as multiple of samples per volume
-            cfg.batch_capacity_valid = 2*cfg.samples_per_volume # chosen as multiple of samples per volume
             cfg.train_input_shape = [cfg.train_dim, cfg.train_dim, cfg.num_channels]
             cfg.train_label_shape = [cfg.train_dim, cfg.train_dim, cfg.num_classes_seg]
             logger.debug('   Train Shapes: %s (input), %s (labels)', cfg.train_input_shape, cfg.train_label_shape)
@@ -178,17 +173,15 @@ class Experiment():
             cfg.test_label_shape = [cfg.test_dim, cfg.test_dim, cfg.num_classes_seg]
             logger.debug('   Test Shapes: %s (input) %s (labels)', cfg.test_data_shape, cfg.test_label_shape)
             # set batch size
-            cfg.batch_size_train = 128
+            cfg.batch_size_train = 256
             # use smaller batch size for some networks
             if self.hyper_parameters['architecture'].get_name() == 'ResNet':
                 cfg.batch_size_train = 16
-            cfg.batch_size_test = 1
         elif self.hyper_parameters['dimensions'] == 3:
             cfg.num_channels = self.num_channels
             cfg.train_dim = 128
             cfg.samples_per_volume = 32
             cfg.batch_capacity_train = 4*cfg.samples_per_volume # chosen as multiple of samples per volume
-            cfg.batch_capacity_valid = 2*cfg.samples_per_volume # chosen as multiple of samples per volume
             cfg.num_slices_train = 32 # with 16 the old loader does not work, but with 8, the U-Net does not work.
             cfg.train_input_shape = [cfg.num_slices_train, cfg.train_dim, cfg.train_dim, cfg.num_channels]
             cfg.train_label_shape = [cfg.num_slices_train, cfg.train_dim, cfg.train_dim, cfg.num_classes_seg]
@@ -203,11 +196,10 @@ class Experiment():
                 cfg.batch_size_train = 4 # Otherwise, VNet 3D fails
             elif self.hyper_parameters['architecture'].get_name() == 'ResNet': # Does not work, not enough memory on PC
                 cfg.batch_size_train = 2
-                cfg.train_dim = 16
+                cfg.train_dim = 32
                 cfg.num_slices_train = 16
                 cfg.train_input_shape = [cfg.num_slices_train, cfg.train_dim, cfg.train_dim, cfg.num_channels]
                 cfg.train_label_shape = [cfg.num_slices_train, cfg.train_dim, cfg.train_dim, cfg.num_classes_seg]
-            cfg.batch_size_test = 1
 
     def training(self, folder_name, train_files, vald_files):
         tf.keras.backend.clear_session()
@@ -216,19 +208,21 @@ class Experiment():
         cfg.preprocessed_dir = self.preprocessed_dir
 
         #generate loader
-        training_loader = SegRatioLoader(name='training_loader')
+        training_loader = SegLoader(name='training_loader')
         training_dataset = training_loader(
             train_files,
             batch_size=cfg.batch_size_train,
             n_epochs=self.hyper_parameters['train_parameters']['epochs'],
             read_threads=cfg.train_reader_instances
         )
-        validation_dataset = SegRatioLoader(
-            mode=SegRatioLoader.MODES.VALIDATE,
+        validation_dataset = SegLoader(
+            mode=SegLoader.MODES.VALIDATE,
             name='validation_loader'
         )(
-            vald_files, batch_size=cfg.batch_size_train,
-            read_threads=cfg.vald_reader_instances
+            vald_files,
+            batch_size=cfg.batch_size_train,
+            read_threads=cfg.vald_reader_instances,
+            n_epochs=self.hyper_parameters['train_parameters']['epochs'],
         )
 
         net = self.hyper_parameters['architecture'](
@@ -244,10 +238,11 @@ class Experiment():
             folder_name=folder_name,
             training_dataset=training_dataset,
             validation_dataset=validation_dataset,
-            summary_steps_per_epoch=cfg.summary_steps_per_epoch,
             #add training parameters
             **(self.hyper_parameters["train_parameters"])
         )
+
+        return
 
     def applying(self, folder_name, test_files):
         '''!
@@ -259,22 +254,20 @@ class Experiment():
         # set preprocessing dir
         cfg.preprocessed_dir = self.preprocessed_dir
 
-        testloader = SegLoader(
-            mode=SegLoader.MODES.APPLY,
+        testloader = ApplyLoader(
             name='test_loader'
         )
 
         net = self.hyper_parameters['architecture'](
             self.hyper_parameters['loss'],
             is_training=False,
-            model_path=str(self.output_path/folder_name),
+            model_path=str(self.output_path/folder_name/'models'/'model-final'),
             **(self.hyper_parameters["init_parameters"])
             )
 
         logger.info('Started applying %s to test datset.', folder_name)
-        for f in tqdm(test_files, desc=f'{folder_name} (test)', unit='file', position=3):
-            test_dataset = testloader(f, batch_size=cfg.batch_size_test, read_threads=cfg.vald_reader_instances)
-            net.apply(test_dataset, f)
+        for f in tqdm(test_files, desc=f'{folder_name} (test)', unit='file'):
+            net.apply(testloader, f, apply_path=self.output_path/folder_name/'apply')
 
         tf.keras.backend.clear_session()
 
@@ -290,9 +283,9 @@ class Experiment():
         if not apply_path.exists():
             apply_path.mkdir()
 
-        epochs = str(self.hyper_parameters['train_parameters']['epochs'])
+        version = 'final'
 
-        eval_file_path = self.output_path / folder_name / f'evaluation-{folder_name}-{epochs}_test.csv'
+        eval_file_path = self.output_path / folder_name / f'evaluation-{folder_name}-{version}_test.csv'
         header_row = evaluation.make_csv_header()
         make_csv_file(eval_file_path, header_row)
 
@@ -300,7 +293,7 @@ class Experiment():
             f = Path(f)
             folder = f.parent
             file_number = f.name
-            prediction_path = Path(apply_path) / f'prediction-{f.name}-{epochs}{cfg.file_suffix}'
+            prediction_path = Path(apply_path) / f'prediction-{f.name}-{version}{cfg.file_suffix}'
 
             label_path = folder /  (cfg.label_file_name_prefix + file_number + cfg.file_suffix)
             try:
@@ -327,11 +320,7 @@ class Experiment():
         #export parameters
         self.export_hyperparameters()
 
-        for f, folder_name in zip(range(0, self.folds), self.fold_dir_names):
-            # set dir
-            folddir = self.output_path/folder_name
-            logger.info('workingdir is %s', folddir)
-
+        for f, in range(0, self.folds):
             self.run_fold(f)
 
         return
@@ -347,11 +336,11 @@ class Experiment():
 
         folder_name = self.fold_dir_names[f]
         folddir = self.output_path / folder_name
+        logger.info('workingdir is %s', folddir)
 
         # skip already finished folds
         if self.restart == False:
-            epochs = str(self.hyper_parameters['train_parameters']['epochs'])
-            eval_file_path = folddir / f'evaluation-{folder_name}-{epochs}_test.csv'
+            eval_file_path = folddir / f'evaluation-{folder_name}-final_test.csv'
             if eval_file_path.exists():
                 tqdm.write('Already trained, skip to next fold')
                 logger.info('Already trained, skip to next fold')
@@ -365,6 +354,7 @@ class Experiment():
             folddir.mkdir()
 
         cfg.num_files = len(train_files)
+        cfg.num_files_vald = len(vald_files)
 
         logger.info(
             '  Data Set %s: %s  train cases, %s  test cases, %s vald cases',
@@ -383,11 +373,9 @@ class Experiment():
         cfg.trial_id = f'{self.name} - fold {f}'
 
         #try the actual training
-        cfg.random_sampling_mode = cfg.SAMPLINGMODES.CONSTRAINED_LABEL
         cfg.percent_of_object_samples = 50
         self.training(folder_name, train_files, vald_files)
 
-        cfg.random_sampling_mode = cfg.SAMPLINGMODES.UNIFORM
         self.applying(folder_name, test_files)
 
         self.evaluate_fold(folder_name, test_files)

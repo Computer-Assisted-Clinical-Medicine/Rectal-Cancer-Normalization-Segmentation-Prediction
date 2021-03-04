@@ -24,8 +24,6 @@ os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 import tensorflow as tf
 
 import seg_data_loader
-import seg_data_loader_new
-import seg_data_loader_no_caching
 from SegmentationNetworkBasis import config as cfg
 from test_seg_data_loader import (get_loader, load_dataset,
                                   set_parameters_according_to_dimension,
@@ -47,29 +45,55 @@ def time_functions(dimension, name, module, timing):
     # get names from csv
     file_list, files_list_b = load_dataset(test_dir)
 
-    # set sampling mode
-    if name == 'test':
-        cfg.random_sampling_mode = cfg.SAMPLINGMODES.UNIFORM
-    else:
-        cfg.random_sampling_mode = cfg.SAMPLINGMODES.CONSTRAINED_LABEL
-
     # time the individual functions
     load_time = []
     sample_time = []
+    augmentation_images_time = []
+    augmentation_numpy_time = []
+    convert_images_time = []
+
     for file_id in files_list_b:
         start_time = time.perf_counter()
         data, lbl = data_loader._load_file(file_id)
         load = time.perf_counter()
-        samples, labels = data_loader._get_samples_from_volume(data, lbl)
-        finished = time.perf_counter()
-        # save times
         load_time.append(load - start_time)
-        sample_time.append(finished - load)
-    print(f'\tExecution time for {name} {dimension}D {module.__name__}: load: {np.mean(load_time):.2f}s, sample: {np.mean(sample_time):.2f}s')
-    timing[f'{name}-{dimension}D-{module.__name__}'] = {
+
+        _, _ = data_loader._get_samples_from_volume(data, lbl)
+        get_samples = time.perf_counter()
+        sample_time.append(get_samples - load)
+
+        # time augmentation
+        if hasattr(data_loader, '_augment_numpy'):
+            # augment whole images
+            _, _ = data_loader._augment_images(data, lbl)
+
+            augment_1 = time.perf_counter()
+            augmentation_images_time.append(augment_1 - get_samples)
+            # convert samples to numpy arrays
+            data = sitk.GetArrayFromImage(data)
+            lbl = sitk.GetArrayFromImage(lbl)
+            converted = time.perf_counter()
+            convert_images_time.append(converted - augment_1)
+            # augment the numpy arrays
+            _, _ = data_loader._augment_numpy(data, lbl)
+            augment_2 = time.perf_counter()
+            augmentation_numpy_time.append(augment_2 - converted)
+
+    print(f'\tExecution time for {name} {dimension}D {module.__name__}: load: {np.mean(load_time):.2f}s, sample (incl Augm): {np.mean(sample_time):.2f}s')
+    timing_dict = {
         'load file' : np.mean(load_time),
         'get sample' : np.mean(sample_time),
     }
+    if len(augmentation_images_time) > 0:
+        print(f'\tAugm im: {np.mean(augmentation_images_time):.2f}s, Augm. np: {np.mean(augmentation_numpy_time):.2f}s, Conv im: {np.mean(convert_images_time):.2f}')
+        timing_dict = {
+            'augment img.' : np.mean(augmentation_images_time),
+            'augment np' : np.mean(augmentation_numpy_time),
+            'conv. img.' : np.mean(convert_images_time),
+            **timing_dict
+        }
+
+    timing[f'{name}-{dimension}D-{module.__name__}'] = timing_dict
 
     return timing
 
@@ -91,12 +115,6 @@ def profile_functions(dimension, name, module):
 
     # get names from csv
     file_list, files_list_b = load_dataset(test_dir)
-
-    # set sampling mode
-    if name == 'test':
-        cfg.random_sampling_mode = cfg.SAMPLINGMODES.UNIFORM
-    else:
-        cfg.random_sampling_mode = cfg.SAMPLINGMODES.CONSTRAINED_LABEL
 
     def load_all_files():
         for file_id in files_list_b:
@@ -133,12 +151,6 @@ def time_wrapper(dimension, name, module, timing):
 
     data_file, _ = data_loader._get_filenames(str(file_list[0]))
     first_image = sitk.GetArrayFromImage(sitk.ReadImage(data_file))
-
-    # set sampling mode
-    if name == 'test':
-        cfg.random_sampling_mode = cfg.SAMPLINGMODES.UNIFORM
-    else:
-        cfg.random_sampling_mode = cfg.SAMPLINGMODES.CONSTRAINED_LABEL
 
     # call the loader
     if name == 'train':
@@ -244,8 +256,8 @@ def plot(dimension, samples_lbl, labels_lbl, samples_bkr=None, labels_bkr=None):
 timing = {}
 
 dimensions = [2,3]
-names = ['train', 'vald', 'test']
-modules = [seg_data_loader_new, seg_data_loader, seg_data_loader_no_caching]
+names = ['train', 'vald']
+modules = [seg_data_loader]
 
 # call functions and time them
 for dimension in dimensions:

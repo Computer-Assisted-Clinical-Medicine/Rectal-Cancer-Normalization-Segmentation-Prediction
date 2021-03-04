@@ -66,14 +66,15 @@ init_parameters = {
     "do_batch_normalization": False,
     "do_bias": True,
     "cross_hair": False,
-    "do_gradient_clipping" : False,
     "clipping_value" : 50,
 }
 
 train_parameters = {
     "l_r": 0.001,
     "optimizer": "Adam",
-    "epochs" : 100
+    "epochs" : 1,
+    "early_stopping" : True,
+    "reduce_lr_on_plateau" : False
 }
 
 constant_parameters = {
@@ -119,7 +120,8 @@ preprocessed_dir = Path(os.environ['experiment_dir']) / 'data_preprocessed'
 if not preprocessed_dir.exists():
     preprocessed_dir.mkdir()
 
-#generate a set of hyperparameters for each dimension and architecture and run
+#set up all experiments
+experiments = []
 for d in dimensions:
     for a in architectures:
         hyper_parameters = {
@@ -135,14 +137,6 @@ for d in dimensions:
         if not current_experiment_path.exists():
             current_experiment_path.mkdir()
 
-        #add more detailed logger for each network, when problems arise, use debug
-        #create file handlers
-        fh_info = logging.FileHandler(current_experiment_path/'log_info.txt')
-        fh_info.setLevel(logging.INFO)
-        fh_info.setFormatter(formatter)
-        #add to loggers
-        logger.addHandler(fh_info)
-
         experiment = Experiment(
             hyper_parameters=hyper_parameters,
             name=experiment_name,
@@ -153,13 +147,37 @@ for d in dimensions:
             folds_dir=experiment_dir / 'folds',
             preprocessed_dir=preprocessed_dir
         )
-        try:
-            experiment.run_all_folds()
-        except Exception as e:
-            print(e)
-            print('Training failed')
-        else:
-            experiment.evaluate()
+        experiments.append(experiment)
+
+
+# run all folds
+for f in range(k_fold):
+    for e in experiments:
+
+        #add more detailed logger for each network, when problems arise, use debug
+        log_dir = e.output_path / e.fold_dir_names[f]
+        if not log_dir.exists():
+            log_dir.mkdir(parents=True)
+        #create file handlers
+        fh_info = logging.FileHandler(log_dir/'log_info.txt')
+        fh_info.setLevel(logging.INFO)
+        fh_info.setFormatter(formatter)
+        #add to loggers
+        logger.addHandler(fh_info)
+
+        #create file handlers
+        fh_debug = logging.FileHandler(log_dir/'log_debug.txt')
+        fh_debug.setLevel(logging.DEBUG)
+        fh_debug.setFormatter(formatter)
+        #add to loggers
+        logger.addHandler(fh_debug)
+
+        e.run_fold(f)
 
         #remove logger
         logger.removeHandler(fh_info)
+        logger.removeHandler(fh_debug)
+
+# evaluate all experiments
+for e in experiments:
+    e.evaluate()

@@ -40,9 +40,15 @@ def create_test_files(test_path=Path('test_data'), n_files = 20):
         radius = np.random.rand()*.2 + .05
         labels = dist > 1-radius
         assert(np.sum(labels) > 0)
+
+        # set origin
+        origin = np.random.normal(10, size=3)
+        sitk_spacing = [1,1,4,1]
+
         label_image = sitk.GetImageFromArray(labels.astype(np.uint8))
         label_image = sitk.Cast(label_image, sitk.sitkUInt8)
-        label_image.SetSpacing(np.flip(spacing).tolist())
+        label_image.SetSpacing(sitk_spacing)
+        label_image.SetOrigin(origin)
         #write labelfile (make a sphere in the center with label one)
         sitk.WriteImage(label_image, str(labelfile))
 
@@ -51,7 +57,8 @@ def create_test_files(test_path=Path('test_data'), n_files = 20):
         #add noise
         image_data = image_data + np.abs(np.random.normal(size=shape, scale=128))
         image = sitk.GetImageFromArray(image_data)
-        image.SetSpacing(np.flip(spacing).tolist())
+        image.SetSpacing(sitk_spacing)
+        image.SetOrigin(origin)
         #write imagefile
         sitk.WriteImage(image, str(imagefile))
 

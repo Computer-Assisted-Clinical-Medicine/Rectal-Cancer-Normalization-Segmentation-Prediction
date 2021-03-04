@@ -8,8 +8,9 @@ import tensorflow as tf
 
 import create_test_files
 import seg_data_loader
-import seg_data_loader_new
 from SegmentationNetworkBasis import config as cfg
+
+# TODO: add tests for apply loader
 
 def set_parameters_according_to_dimension(dimension, num_channels, preprocessed_dir):
     if dimension == 2:
@@ -17,20 +18,17 @@ def set_parameters_according_to_dimension(dimension, num_channels, preprocessed_
         #cfg.train_dim = 256
         cfg.samples_per_volume = 160
         cfg.batch_capacity_train = 750
-        cfg.batch_capacity_valid = 450
         cfg.train_input_shape = [cfg.train_dim, cfg.train_dim, cfg.num_channels]
         cfg.train_label_shape = [cfg.train_dim, cfg.train_dim, cfg.num_classes_seg]
         #cfg.test_dim = 512
         cfg.test_data_shape = [cfg.test_dim, cfg.test_dim, cfg.num_channels]
         cfg.test_label_shape = [cfg.test_dim, cfg.test_dim, cfg.num_classes_seg]
         cfg.batch_size_train = 64
-        cfg.batch_size_test = 1
     elif dimension == 3:
         cfg.num_channels = num_channels
         #cfg.train_dim = 128
         cfg.samples_per_volume = 80
         cfg.batch_capacity_train = 250
-        cfg.batch_capacity_valid = 150
         cfg.num_slices_train = 8
         cfg.train_input_shape = [cfg.num_slices_train, cfg.train_dim, cfg.train_dim, cfg.num_channels]
         cfg.train_label_shape = [cfg.num_slices_train, cfg.train_dim, cfg.train_dim, cfg.num_classes_seg]
@@ -39,7 +37,6 @@ def set_parameters_according_to_dimension(dimension, num_channels, preprocessed_
         cfg.test_data_shape = [cfg.num_slices_test, cfg.test_dim, cfg.test_dim, cfg.num_channels]
         cfg.test_label_shape = [cfg.num_slices_test, cfg.test_dim, cfg.test_dim, cfg.num_classes_seg]
         cfg.batch_size_train = 16 #Otherwise, VNet 3D fails
-        cfg.batch_size_test = 1
 
     # set config
     if not preprocessed_dir.exists():
@@ -50,8 +47,8 @@ def set_parameters_according_to_dimension(dimension, num_channels, preprocessed_
     return
 
 @pytest.mark.parametrize('dimension', [2, 3])
-@pytest.mark.parametrize('name', ['train', 'vald', 'test'])
-@pytest.mark.parametrize('module', [seg_data_loader, seg_data_loader_new])
+@pytest.mark.parametrize('name', ['train', 'vald'])
+@pytest.mark.parametrize('module', [seg_data_loader])
 def test_functions(dimension, name, module):
 
     test_dir = Path('test_data')
@@ -68,52 +65,30 @@ def test_functions(dimension, name, module):
 
     print(f'Loading Dataset {name}.')
 
-    # set sampling mode
-    if name == 'test':
-        cfg.random_sampling_mode = cfg.SAMPLINGMODES.UNIFORM
-    else:
-        cfg.random_sampling_mode = cfg.SAMPLINGMODES.CONSTRAINED_LABEL
-
     print('\tLoad a numpy sample')
     data_read = data_loader._read_file_and_return_numpy_samples(files_list_b[0])
     if name == 'test':
         samples = data_read[0]
     else:
-        if module.__name__ == 'seg_data_loader':
-            ((samples, labels), (samples_bkr, labels_bkr)) = data_read
-        elif module.__name__ == 'seg_data_loader_new':
-            samples, labels = data_read
-        else:
-            raise NotImplementedError()
+        samples, labels = data_read
         print(f'\tSamples from foreground shape: {samples.shape}')
         print(f'\tLabels from foreground shape: {labels.shape}')
-        if module.__name__ == 'seg_data_loader':
-            print(f'\tSamples from background shape: {samples_bkr.shape}')
-            print(f'\tLabels from background shape: {labels_bkr.shape}')
-
-            assert(samples_bkr.shape[:-1] == labels_bkr.shape[:-1])
-
-            nan_slices = np.all(np.isnan(samples_bkr), axis=(1,2,3))
-            assert not np.any(nan_slices), f'{nan_slices.sum()} background sample slices contain NANs'
-
-            nan_slices = np.all(np.isnan(labels_bkr), axis=(1,2,3))
-            assert not np.any(nan_slices), f'{nan_slices.sum()} background label slices contain NANs'
 
         assert(samples.shape[:-1] == labels.shape[:-1])
 
         nan_slices = np.all(np.isnan(samples), axis=(1,2,3))
-        assert not np.any(nan_slices), f'{nan_slices.sum()} foreground sample slices contain NANs'
+        assert not np.any(nan_slices), f'{nan_slices.sum()} sample slices contain NANs'
 
         nan_slices = np.all(np.isnan(labels), axis=(1,2,3))
-        assert not np.any(nan_slices), f'{nan_slices.sum()} foreground label slices contain NANs'
+        assert not np.any(nan_slices), f'{nan_slices.sum()} label slices contain NANs'
 
     # call the wrapper function
     data_loader._read_wrapper(id_data_set=tf.squeeze(tf.convert_to_tensor(file_list[0], dtype=tf.string)))
 
 
 @pytest.mark.parametrize('dimension', [2, 3])
-@pytest.mark.parametrize('name', ['train', 'vald', 'test'])
-@pytest.mark.parametrize('module', [seg_data_loader, seg_data_loader_new])
+@pytest.mark.parametrize('name', ['train', 'vald'])
+@pytest.mark.parametrize('module', [seg_data_loader])
 def test_wrapper(dimension, name, module):
     n_epochs = 1
 
@@ -134,12 +109,6 @@ def test_wrapper(dimension, name, module):
 
     print(f'Loading Dataset {name}.')
 
-    # set sampling mode
-    if name == 'test':
-        cfg.random_sampling_mode = cfg.SAMPLINGMODES.UNIFORM
-    else:
-        cfg.random_sampling_mode = cfg.SAMPLINGMODES.CONSTRAINED_LABEL
-
     # call the loader
     if name == 'train':
         dataset = data_loader(
@@ -151,8 +120,6 @@ def test_wrapper(dimension, name, module):
     elif name == 'test':
         dataset = data_loader(
             file_list[0], # only pass one file to the test loader
-            batch_size=cfg.batch_size_train,
-            read_threads=cfg.vald_reader_instances
         )
     else:
         dataset = data_loader(
@@ -238,14 +205,14 @@ def set_seeds():
 def get_loader(name, module):
     #generate loader
     if name == 'train':
-        data_loader = module.SegRatioLoader(name='training_loader')
+        data_loader = module.SegLoader(name='training_loader')
     elif name == 'vald':
-        data_loader = module.SegRatioLoader(
-            mode=module.SegRatioLoader.MODES.VALIDATE,
+        data_loader = module.SegLoader(
+            mode=module.SegLoader.MODES.VALIDATE,
             name='validation_loader'
         )
     elif name == 'test':
-        data_loader = module.SegLoader(
+        data_loader = module.ApplyLoader(
             mode=module.SegLoader.MODES.APPLY,
             name='test_loader'
         )
@@ -268,6 +235,7 @@ def load_dataset(test_dir):
 if __name__ == '__main__':
     # run functions for better debugging
     for dimension in [2, 3]:
-        for name in ['train', 'vald', 'test']:
-            for module in [seg_data_loader, seg_data_loader_new]:
+        for name in ['train', 'vald']:
+            for module in [seg_data_loader]:
+                test_functions(dimension, name, module)
                 test_wrapper(dimension, name, module)
