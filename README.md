@@ -1,87 +1,28 @@
-# Abdominal Segmentation of Veins and Arteries
+# Segmentation of rectal cancer tumors
 
-One Paragraph of project description goes here
+This repository runs the training for rectal cancer segmentation using multiple 2D and 3D networks.
 
 ## Getting Started
 
-These instructions will get you a copy of the project up and running on your local machine for development and testing purposes. See deployment for notes on how to deploy the project on a live system.
+How everything can be run can be seen in the run.py file. Test data can also be created using the create_test_files.py script, these are also used during the testing.
+
+To try something out, different experiments can be created, which can be trained and evaluated using the Experiment class.
 
 ### Prerequisites
 
-What things you need to install the software and how to install them
-
-```
-Give examples
-```
+- The conda environment is described in the environment.yml
+- The environmental variable "data_dir" should point to the data directory. train_IDs.csv should contain the test files, dataset.json additional description. Prepare Data Rectal cancer contains classes to write different Dataset formats.
+- The variable "experiment_dir" should point to the directory, where the output is saved. The variables can be set in the IDE and are to make everything machine independent.
 
 ### Installing
 
-A step by step series of examples that tell you how to get a development env running
-
-Say what the step will be
-
-```
-Give the example
-```
-
-And repeat
-
-```
-until finished
-```
-
-End with an example of getting some data out of the system or using it for a little demo
+It is best to use conda to create a virtual environment
 
 ## Running the tests
 
-Explain how to run the automated tests for this system
+- The test can be run using pytest and will create a test_data directory, where the created test data will be saved.
+- time_seg_data_loader can be used to identify bottlenecks and profiles the different steps in the loader. For the profiles, snakeviz is used, the command line arguments for visualization are printed at the end of the script. Iti s best to run it in an interactive window for bezzer overview
 
-### Break down into end to end tests
+### Running the training
 
-Explain what these tests test and why
-
-```
-Give an example
-```
-
-### And coding style tests
-
-Explain what these tests test and why
-
-```
-Give an example
-```
-
-## Deployment
-
-Add additional notes about how to deploy this on a live system
-
-## Built With
-
-* [Dropwizard](http://www.dropwizard.io/1.0.2/docs/) - The web framework used
-* [Maven](https://maven.apache.org/) - Dependency Management
-* [ROME](https://rometools.github.io/rome/) - Used to generate RSS Feeds
-
-## Contributing
-
-Please read [CONTRIBUTING.md](https://gist.github.com/PurpleBooth/b24679402957c63ec426) for details on our code of conduct, and the process for submitting pull requests to us.
-
-## Versioning
-
-We use [SemVer](http://semver.org/) for versioning. For the versions available, see the [tags on this repository](https://github.com/your/project/tags). 
-
-## Authors
-
-* **Billie Thompson** - *Initial work* - [PurpleBooth](https://github.com/PurpleBooth)
-
-See also the list of [contributors](https://github.com/your/project/contributors) who participated in this project.
-
-## License
-
-This project is licensed under the MIT License - see the [LICENSE.md](LICENSE.md) file for details
-
-## Acknowledgments
-
-* Hat tip to anyone whose code was used
-* Inspiration
-* etc
+For training, just execute the run.py. You can use the command it will print ot start tensorboard to monitor the training. Different metric can be analyzed during training. It also supports the profiler and the Graph. HParams is also implemented but does not work very well, even though the normal hook is used.
