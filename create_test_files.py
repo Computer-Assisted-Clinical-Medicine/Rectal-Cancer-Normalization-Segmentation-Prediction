@@ -8,7 +8,21 @@ import SimpleITK as sitk
 sys.path.append(os.getcwd())
 from SegmentationNetworkBasis import config as cfg
 
-def create_test_files(test_path=Path('test_data'), n_files = 20):
+def create_test_files(test_path=Path('test_data'), n_files = 20) -> list:
+    """Create test file consisting of spheres for testing
+
+    Parameters
+    ----------
+    test_path : Path, optional
+        The path where the files will be written, by default Path('test_data')
+    n_files : int, optional
+        The number of files to create, by default 20
+
+    Returns
+    -------
+    list
+        List of file path in the format required by the framework
+    """
     spacing = np.array([4, 1, 1, 1])
 
     if not test_path.exists():

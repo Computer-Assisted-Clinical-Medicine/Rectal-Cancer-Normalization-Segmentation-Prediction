@@ -50,6 +50,17 @@ def set_parameters_according_to_dimension(dimension, num_channels, preprocessed_
 @pytest.mark.parametrize('name', ['train', 'vald'])
 @pytest.mark.parametrize('module', [seg_data_loader])
 def test_functions(dimension, name, module):
+    """Test the individual functions contained in the wrapper.
+
+    Parameters
+    ----------
+    dimension : int
+        The dimension (2 or 3)
+    name : str
+        The name, train, test or vald
+    module : DataLoader
+        the data loader to use]
+    """
 
     test_dir = Path('test_data')
 
@@ -90,6 +101,22 @@ def test_functions(dimension, name, module):
 @pytest.mark.parametrize('name', ['train', 'vald'])
 @pytest.mark.parametrize('module', [seg_data_loader])
 def test_wrapper(dimension, name, module):
+    """Test the complete wrapper and check shapes
+
+    Parameters
+    ----------
+    dimension : int
+        The dimension (2 or 3)
+    name : str
+        The name, train, test or vald
+    module : DataLoader
+        the data loader to use
+
+    Raises
+    ------
+    Exception
+        Error as detected
+    """
     n_epochs = 1
 
     test_dir = Path('test_data')

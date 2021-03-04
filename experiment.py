@@ -113,6 +113,8 @@ class Experiment():
         return
 
     def set_seed(self):
+        """Set the seed in tensorflow and numpy
+        """
         np.random.seed(self.seed)
         tf.random.set_seed(self.seed)
 
@@ -160,6 +162,8 @@ class Experiment():
         return
 
     def _set_parameters_according_to_dimension(self):
+        """This function will set up the shapes in the cfg module
+        """
         if self.hyper_parameters['dimensions'] == 2:
             cfg.num_channels = self.num_channels
             cfg.train_dim = 128
@@ -201,7 +205,18 @@ class Experiment():
                 cfg.train_input_shape = [cfg.num_slices_train, cfg.train_dim, cfg.train_dim, cfg.num_channels]
                 cfg.train_label_shape = [cfg.num_slices_train, cfg.train_dim, cfg.train_dim, cfg.num_classes_seg]
 
-    def training(self, folder_name, train_files, vald_files):
+    def training(self, folder_name:str, train_files:List, vald_files:List):
+        """Do the actual training
+
+        Parameters
+        ----------
+        folder_name : str
+            Training output will be in the output path in this subfolder
+        train_files : List
+            List of training files as string
+        vald_files : List
+            List of validation files as string
+        """
         tf.keras.backend.clear_session()
 
         # set preprocessing dir
@@ -244,11 +259,16 @@ class Experiment():
 
         return
 
-    def applying(self, folder_name, test_files):
-        '''!
-        do testing
+    def applying(self, folder_name:str, test_files:List):
+        """Apply the trained network to the test files
 
-        '''
+        Parameters
+        ----------
+        folder_name : str
+            Training output will be in the output path in this subfolder
+        test_files : List
+            List of test files as string
+        """
         tf.keras.backend.clear_session()
 
         # set preprocessing dir
@@ -385,6 +405,14 @@ class Experiment():
         return
 
     def evaluate(self):
+        """Evaluate the training over all folds
+
+        Raises
+        ------
+        FileNotFoundError
+            If and eval file was not found, most likely because the training failed
+            or is not finished yet
+        """
         #set eval files
         eval_files = []
         epochs = str(self.hyper_parameters['train_parameters']['epochs'])
@@ -394,7 +422,7 @@ class Experiment():
             )
         if not np.all([f.exists() for f in eval_files]):
             print(eval_files)
-            raise Exception('Eval file not found')
+            raise FileNotFoundError('Eval file not found')
         #combine previous evaluations
         evaluation.combine_evaluation_results_from_folds(
             self.output_path,
