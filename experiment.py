@@ -210,7 +210,7 @@ class Experiment():
             logger.debug('   Train Shapes: %s (input), %s (labels)', cfg.train_input_shape, cfg.train_label_shape)
             
         # see if the batch size is bigger than the validation set
-        if cfg.samples_per_volume * cfg.num_files_vald < cfg.batch_size_valid:
+        if cfg.samples_per_volume * cfg.num_files_vald <= cfg.batch_size_valid:
             cfg.batch_size_valid = cfg.samples_per_volume * cfg.num_files_vald
         else:
             cfg.batch_size_valid = cfg.batch_capacity_train
