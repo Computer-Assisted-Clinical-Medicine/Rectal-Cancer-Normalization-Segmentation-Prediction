@@ -1,8 +1,9 @@
+import copy
 import logging
-import os
 from pathlib import Path
 from typing import List
 
+import GPUtil
 import numpy as np
 import tensorflow as tf
 import yaml
@@ -22,7 +23,8 @@ logger.setLevel(logging.DEBUG)
 class Experiment():
 
     def __init__(self, name:str, hyper_parameters:dict, data_set:List, folds=5, seed=42, num_channels=1,
-                 output_path=None, restart=False, reinitialize_folds=False, folds_dir=None, preprocessed_dir=None):
+                 output_path=None, restart=False, reinitialize_folds=False, folds_dir=None, preprocessed_dir=None,
+                 tensorboard_images=False):
         """Run experiments using a fixed set of hyperparameters
 
         Parameters
@@ -49,25 +51,21 @@ class Experiment():
                 Where the fold descripions should be saved. All experiments sharing the 
                 same folds should have the same directory here, by default outputdir
             preprocessed_dir : str, optional
-                Where the preprocessed files are saved
+                Where the preprocessed files are saved,
+            self.tensorboard_images : bool, optional
+                Wether to write images to tensorboard, this takes a bit, so should only be used for debugging, by default False
         """
-        self.hyper_parameters = hyper_parameters
+        # do a deep copy of the parameters, because they contain lists and dicts
+        self.hyper_parameters = copy.deepcopy(hyper_parameters)
         self.seed = seed
         self.name = name
         self.folds = folds
         self.num_channels = num_channels
 
-        #set path different on the Server
-        if cfg.ONSERVER:
-            self.output_path = Path("tmp", self.name)
-            os.environ["CUDA_VISIBLE_DEVICES"] = "0"
-            physical_devices = tf.config.experimental.list_physical_devices('GPU')
-            tf.config.experimental.set_memory_growth(physical_devices[0], True)
+        if output_path == None:
+            self.output_path = Path('Experiments', self.name)
         else:
-            if output_path == None:
-                self.output_path = Path('Experiments', self.name)
-            else:
-                self.output_path = Path(output_path)
+            self.output_path = Path(output_path)
 
         if not self.output_path.exists():
             self.output_path.mkdir()
@@ -109,6 +107,8 @@ class Experiment():
         self.restart = restart
 
         self.preprocessed_dir = preprocessed_dir
+
+        self.tensorboard_images = tensorboard_images
 
         return
 
@@ -162,48 +162,91 @@ class Experiment():
         return
 
     def _set_parameters_according_to_dimension(self):
-        """This function will set up the shapes in the cfg module
+        """This function will set up the shapes in the cfg module so that they
+        will run on the current GPU.
         """
-        if self.hyper_parameters['dimensions'] == 2:
-            cfg.num_channels = self.num_channels
-            cfg.train_dim = 128
-            cfg.samples_per_volume = 128
-            cfg.batch_capacity_train = 4*cfg.samples_per_volume # chosen as multiple of samples per volume
+
+        cfg.num_channels = self.num_channels
+        cfg.train_dim = 128 # the resolution in plane
+        cfg.num_slices_train = 32 # the resolution in z-direction
+
+        # determine batch size
+        cfg.batch_size_train = self.estimate_batch_size()
+        cfg.batch_size_valid = cfg.batch_size_train
+
+        # set shape according to the dimension
+        dim = self.hyper_parameters['dimensions']
+        if dim == 2:
+            # set shape
             cfg.train_input_shape = [cfg.train_dim, cfg.train_dim, cfg.num_channels]
             cfg.train_label_shape = [cfg.train_dim, cfg.train_dim, cfg.num_classes_seg]
-            logger.debug('   Train Shapes: %s (input), %s (labels)', cfg.train_input_shape, cfg.train_label_shape)
-            cfg.test_dim = 256
-            cfg.test_data_shape = [cfg.test_dim, cfg.test_dim, cfg.num_channels]
-            cfg.test_label_shape = [cfg.test_dim, cfg.test_dim, cfg.num_classes_seg]
-            logger.debug('   Test Shapes: %s (input) %s (labels)', cfg.test_data_shape, cfg.test_label_shape)
-            # set batch size
-            cfg.batch_size_train = 256
-            # use smaller batch size for some networks
-            if self.hyper_parameters['architecture'].get_name() == 'ResNet':
-                cfg.batch_size_train = 16
-        elif self.hyper_parameters['dimensions'] == 3:
-            cfg.num_channels = self.num_channels
-            cfg.train_dim = 128
-            cfg.samples_per_volume = 32
+
+            # set sample numbers
+            # there are 10-30 layers per image containing foreground data. Half the
+            # samples are taken from the foreground, so take about 64 samples
+            # to cover all the foreground pixels at least once on average, but
+            cfg.samples_per_volume = 64
             cfg.batch_capacity_train = 4*cfg.samples_per_volume # chosen as multiple of samples per volume
-            cfg.num_slices_train = 32 # with 16 the old loader does not work, but with 8, the U-Net does not work.
+            logger.debug('   Train Shapes: %s (input), %s (labels)', cfg.train_input_shape, cfg.train_label_shape)
+
+        elif dim == 3:
+            # set shape
+            # if batch size too small, decrease z-extent
+            if cfg.batch_size_train < 4:
+                cfg.num_slices_train = cfg.num_slices_train // 2
+                cfg.batch_size_train = cfg.batch_size_train * 2
+                # if still to small, decrease patch extent in plane
+                if cfg.batch_size_train < 4:
+                    cfg.train_dim = cfg.train_dim // 2
+                    cfg.batch_size_train = cfg.batch_size_train * 2
             cfg.train_input_shape = [cfg.num_slices_train, cfg.train_dim, cfg.train_dim, cfg.num_channels]
             cfg.train_label_shape = [cfg.num_slices_train, cfg.train_dim, cfg.train_dim, cfg.num_classes_seg]
+            
+            # set sample numbers
+            # most patches should cover the whole tumore, so a lower sample number
+            # can be used
+            cfg.samples_per_volume = 8
+            cfg.batch_capacity_train = 4*cfg.samples_per_volume # chosen as multiple of samples per volume
             logger.debug('   Train Shapes: %s (input), %s (labels)', cfg.train_input_shape, cfg.train_label_shape)
-            cfg.test_dim = 256
-            cfg.num_slices_test = 32
-            cfg.test_data_shape = [cfg.num_slices_test, cfg.test_dim, cfg.test_dim, cfg.num_channels]
-            cfg.test_label_shape = [cfg.num_slices_test, cfg.test_dim, cfg.test_dim, cfg.num_classes_seg]
-            logger.debug('   Test Shapes: %s (input) %s (labels)', cfg.test_data_shape, cfg.test_label_shape)
-            cfg.batch_size_train = 8
-            if self.hyper_parameters['architecture'].get_name() == 'VNet':
-                cfg.batch_size_train = 4 # Otherwise, VNet 3D fails
-            elif self.hyper_parameters['architecture'].get_name() == 'ResNet': # Does not work, not enough memory on PC
-                cfg.batch_size_train = 2
-                cfg.train_dim = 32
-                cfg.num_slices_train = 16
-                cfg.train_input_shape = [cfg.num_slices_train, cfg.train_dim, cfg.train_dim, cfg.num_channels]
-                cfg.train_label_shape = [cfg.num_slices_train, cfg.train_dim, cfg.train_dim, cfg.num_classes_seg]
+            
+        # see if the batch size is bigger than the validation set
+        if cfg.samples_per_volume * cfg.num_files_vald < cfg.batch_size_valid:
+            cfg.batch_size_valid = cfg.samples_per_volume * cfg.num_files_vald
+        else:
+            cfg.batch_size_valid = cfg.batch_capacity_train
+
+    def estimate_batch_size(self):
+        """The batch size estimation is basically trail and error. So far tested
+        with 128x128x2 patches in 2D and 128x128x32x2 in 3D, if using different
+        values, guesstimate the relation to the memory.
+
+        Returns
+        -------
+        int
+            The recommended batch size
+        """
+        # set batch size
+        # determine GPU memory (in MB)
+        gpu_number = int(tf.test.gpu_device_name()[-1])
+        gpu_memory = int(np.round(GPUtil.getGPUs()[gpu_number].memoryTotal))
+
+        a_name = self.hyper_parameters['architecture'].get_name()
+        dim = self.hyper_parameters['dimensions']
+
+        if a_name == 'UNet':
+            # filters scale after the first filter, so use that for estimation
+            first_f = self.hyper_parameters['init_parameters']['n_filters'][0]
+            if dim == 2:
+                # this was determined by trail and error for 128x128x2 patches
+                memory_consumption_guess = 2 * first_f
+            elif dim == 3:
+                # this was determined by trail and error for 128x128x32x2 patches
+                memory_consumption_guess = 64 * first_f
+        else:
+            raise NotImplementedError('No heuristic implemented for this network.')
+        
+        # return estimated recommended batch number
+        return np.round(gpu_memory // memory_consumption_guess)
 
     def training(self, folder_name:str, train_files:List, vald_files:List):
         """Do the actual training
@@ -235,10 +278,28 @@ class Experiment():
             name='validation_loader'
         )(
             vald_files,
-            batch_size=cfg.batch_size_train,
+            batch_size=cfg.batch_size_valid,
             read_threads=cfg.vald_reader_instances,
-            n_epochs=self.hyper_parameters['train_parameters']['epochs'],
+            n_epochs=self.hyper_parameters['train_parameters']['epochs']
         )
+
+        # just use one sample with the foreground class using a random train file
+        if self.tensorboard_images:
+            visualization_dataset = SegLoader(
+                name='visualization',
+                frac_obj=1,
+                samples_per_volume=1
+            )(
+                [train_files[np.random.randint(len(train_files))]],
+                batch_size=1,
+                read_threads=1,
+                n_epochs=self.hyper_parameters['train_parameters']['epochs']
+            )
+        else:
+            visualization_dataset = None
+
+        # only do a graph for the first fold
+        write_graph = (folder_name == 'fold-0')
 
         net = self.hyper_parameters['architecture'](
             self.hyper_parameters['loss'],
@@ -253,6 +314,8 @@ class Experiment():
             folder_name=folder_name,
             training_dataset=training_dataset,
             validation_dataset=validation_dataset,
+            visualization_dataset = visualization_dataset,
+            write_graph=write_graph,
             #add training parameters
             **(self.hyper_parameters["train_parameters"])
         )
@@ -388,9 +451,6 @@ class Experiment():
         epoch_samples = cfg.samples_per_volume * cfg.num_files
         if not epoch_samples % cfg.batch_size_train == 0:
             print('Sample Number not divisible by batch size, consider changing it.')
-
-        # set the trial id for tensorboard
-        cfg.trial_id = f'{self.name} - fold {f}'
 
         #try the actual training
         cfg.percent_of_object_samples = 50

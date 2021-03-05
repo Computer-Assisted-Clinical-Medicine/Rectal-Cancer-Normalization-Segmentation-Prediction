@@ -10,7 +10,7 @@ tf_logger = logging.getLogger('tensorflow')
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 
 from experiment import Experiment
-from SegmentationNetworkBasis.architecture import DVN, ResNet, UNet, VNet
+from SegmentationNetworkBasis.architecture import UNet
 
 #configure loggers
 logger = logging.getLogger()
@@ -72,42 +72,59 @@ init_parameters = {
 train_parameters = {
     "l_r": 0.001,
     "optimizer": "Adam",
-    "epochs" : 1,
-    "early_stopping" : True,
-    "reduce_lr_on_plateau" : False
+    "epochs" : 100,
+    "early_stopping" : False,
+    "reduce_lr_on_plateau" : True
 }
 
 constant_parameters = {
     "init_parameters": init_parameters,
     "train_parameters": train_parameters,
-    "loss" : 'DICE'
+    "loss" : 'DICE',
+    'architecture' : UNet
 }
 
 #define the parameters that are being tuned
 dimensions = [2, 3]
-architectures = [UNet, VNet, DVN, ResNet]
-# architectures = [VNet]
+# residual connections
+res = [True, False]
+# multiply the number of filters by a fixed factor
+filter_multiplier = [1, 2, 4, 8]
 
 def generate_folder_name(hyper_parameters):
     epochs = hyper_parameters['train_parameters']['epochs']
 
-    if hyper_parameters['init_parameters']['drop_out'][0]:
-        do = 'DO'
-    else:
-        do = 'nDO'
-
-    if hyper_parameters['init_parameters']['do_batch_normalization']:
-        bn = 'BN'
-    else:
-        bn = 'nBN'
-
-    folder_name = "-".join([
+    params = [
         hyper_parameters['architecture'].get_name() + str(hyper_parameters['dimensions']) + 'D',
-        hyper_parameters['loss'],
-        do,
-        bn,
-        str(epochs)
-    ])
+        hyper_parameters['loss']
+    ]
+
+    # residual connections if it is an attribute
+    if 'res_connect' in hyper_parameters['init_parameters']:
+        if hyper_parameters['init_parameters']['res_connect']:
+            params.append('Res')
+        else:
+            params.append('nRes')
+
+    # filter multiplier
+    params.append('f_'+str(hyper_parameters['init_parameters']['n_filters'][0]//8))
+
+    # batch norm
+    if hyper_parameters['init_parameters']['do_batch_normalization']:
+        params.append('BN')
+    else:
+        params.append('nBN')
+
+    # dropout
+    if hyper_parameters['init_parameters']['drop_out'][0]:
+        params.append('DO')
+    else:
+        params.append('nDO')
+
+    # add epoch number
+    params.append(str(epochs))
+
+    folder_name = "-".join(params)
 
     return folder_name
 
@@ -123,31 +140,37 @@ if not preprocessed_dir.exists():
 #set up all experiments
 experiments = []
 for d in dimensions:
-    for a in architectures:
-        hyper_parameters = {
-            **constant_parameters,
-            'dimensions' : d,
-            'architecture' : a
-        }
+    if d == 3:
+        # Otherwise, out of memory
+        filter_multiplier = [1, 2, 4]
+    for f in filter_multiplier:
+        for r in res:
+            hyper_parameters = {
+                **constant_parameters,
+                'dimensions' : d,
+            }
+            hyper_parameters['init_parameters']['res_connect'] = r
+            hyper_parameters['init_parameters']['n_filters'] = [f*8, f*16, f*32, f*64, f*128]
 
-        #define experiment
-        experiment_name = generate_folder_name(hyper_parameters)
-        
-        current_experiment_path = Path(experiment_dir, experiment_name)
-        if not current_experiment_path.exists():
-            current_experiment_path.mkdir()
+            #define experiment
+            experiment_name = generate_folder_name(hyper_parameters)
+            
+            current_experiment_path = Path(experiment_dir, experiment_name)
+            if not current_experiment_path.exists():
+                current_experiment_path.mkdir()
 
-        experiment = Experiment(
-            hyper_parameters=hyper_parameters,
-            name=experiment_name,
-            output_path=current_experiment_path,
-            data_set=data_list,
-            folds=k_fold,
-            num_channels=n_channels,
-            folds_dir=experiment_dir / 'folds',
-            preprocessed_dir=preprocessed_dir
-        )
-        experiments.append(experiment)
+            experiment = Experiment(
+                hyper_parameters=hyper_parameters,
+                name=experiment_name,
+                output_path=current_experiment_path,
+                data_set=data_list,
+                folds=k_fold,
+                num_channels=n_channels,
+                folds_dir=experiment_dir / 'folds',
+                preprocessed_dir=preprocessed_dir,
+                tensorboard_images=True
+            )
+            experiments.append(experiment)
 
 
 # run all folds
@@ -172,7 +195,11 @@ for f in range(k_fold):
         #add to loggers
         logger.addHandler(fh_debug)
 
-        e.run_fold(f)
+        try:
+            e.run_fold(f)
+        except Exception as e:
+            print(e)
+            print('Training failed')
 
         #remove logger
         logger.removeHandler(fh_info)

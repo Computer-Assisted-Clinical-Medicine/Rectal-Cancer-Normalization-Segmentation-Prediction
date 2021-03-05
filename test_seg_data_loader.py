@@ -1,6 +1,7 @@
 import os
 from pathlib import Path
 
+import GPUtil
 import numpy as np
 import pytest
 import SimpleITK as sitk
@@ -12,31 +13,58 @@ from SegmentationNetworkBasis import config as cfg
 
 # TODO: add tests for apply loader
 
-def set_parameters_according_to_dimension(dimension, num_channels, preprocessed_dir):
-    if dimension == 2:
-        cfg.num_channels = num_channels
-        #cfg.train_dim = 256
-        cfg.samples_per_volume = 160
-        cfg.batch_capacity_train = 750
+def set_parameters_according_to_dimension(dim, num_channels, preprocessed_dir):
+    """This function will set up the shapes in the cfg module so that they
+    will run on the current GPU.
+    """
+    
+    cfg.num_files_vald = 2
+
+    cfg.num_channels = num_channels
+    cfg.train_dim = 128 # the resolution in plane
+    cfg.num_slices_train = 32 # the resolution in z-direction
+
+    # determine batch size
+    cfg.batch_size_train = estimate_batch_size(dim)
+    cfg.batch_size_valid = cfg.batch_size_train
+
+    # set shape according to the dimension
+    if dim == 2:
+        # set shape
         cfg.train_input_shape = [cfg.train_dim, cfg.train_dim, cfg.num_channels]
         cfg.train_label_shape = [cfg.train_dim, cfg.train_dim, cfg.num_classes_seg]
-        #cfg.test_dim = 512
-        cfg.test_data_shape = [cfg.test_dim, cfg.test_dim, cfg.num_channels]
-        cfg.test_label_shape = [cfg.test_dim, cfg.test_dim, cfg.num_classes_seg]
-        cfg.batch_size_train = 64
-    elif dimension == 3:
-        cfg.num_channels = num_channels
-        #cfg.train_dim = 128
-        cfg.samples_per_volume = 80
-        cfg.batch_capacity_train = 250
-        cfg.num_slices_train = 8
+
+        # set sample numbers
+        # there are 10-30 layers per image containing foreground data. Half the
+        # samples are taken from the foreground, so take about 64 samples
+        # to cover all the foreground pixels at least once on average, but
+        cfg.samples_per_volume = 64
+        cfg.batch_capacity_train = 4*cfg.samples_per_volume # chosen as multiple of samples per volume
+
+    elif dim == 3:
+        # set shape
+        # if batch size too small, decrease z-extent
+        if cfg.batch_size_train < 4:
+            cfg.num_slices_train = cfg.num_slices_train // 2
+            cfg.batch_size_train = cfg.batch_size_train * 2
+            # if still to small, decrease patch extent in plane
+            if cfg.batch_size_train < 4:
+                cfg.train_dim = cfg.train_dim // 2
+                cfg.batch_size_train = cfg.batch_size_train * 2
         cfg.train_input_shape = [cfg.num_slices_train, cfg.train_dim, cfg.train_dim, cfg.num_channels]
         cfg.train_label_shape = [cfg.num_slices_train, cfg.train_dim, cfg.train_dim, cfg.num_classes_seg]
-        #cfg.test_dim = 512
-        cfg.num_slices_test = 8
-        cfg.test_data_shape = [cfg.num_slices_test, cfg.test_dim, cfg.test_dim, cfg.num_channels]
-        cfg.test_label_shape = [cfg.num_slices_test, cfg.test_dim, cfg.test_dim, cfg.num_classes_seg]
-        cfg.batch_size_train = 16 #Otherwise, VNet 3D fails
+        
+        # set sample numbers
+        # most patches should cover the whole tumore, so a lower sample number
+        # can be used
+        cfg.samples_per_volume = 8
+        cfg.batch_capacity_train = 4*cfg.samples_per_volume # chosen as multiple of samples per volume
+        
+    # see if the batch size is bigger than the validation set
+    if cfg.samples_per_volume * cfg.num_files_vald < cfg.batch_size_valid:
+        cfg.batch_size_valid = cfg.samples_per_volume * cfg.num_files_vald
+    else:
+        cfg.batch_size_valid = cfg.batch_capacity_train
 
     # set config
     if not preprocessed_dir.exists():
@@ -44,7 +72,38 @@ def set_parameters_according_to_dimension(dimension, num_channels, preprocessed_
     cfg.preprocessed_dir = str(preprocessed_dir)
     cfg.normalizing_method == cfg.NORMALIZING.PERCENT5
 
-    return
+
+def estimate_batch_size(dim):
+    """The batch size estimation is basically trail and error. So far tested
+    with 128x128x2 patches in 2D and 128x128x32x2 in 3D, if using different
+    values, guesstimate the relation to the memory.
+
+    Returns
+    -------
+    int
+        The recommended batch size
+    """
+    # set batch size
+    # determine GPU memory (in MB)
+    gpu_number = int(tf.test.gpu_device_name()[-1])
+    gpu_memory = int(np.round(GPUtil.getGPUs()[gpu_number].memoryTotal))
+
+    a_name = 'UNet' # name is irrelevant
+
+    if a_name == 'UNet':
+        # filters scale after the first filter, so use that for estimation
+        first_f = 8
+        if dim == 2:
+            # this was determined by trail and error for 128x128x2 patches
+            memory_consumption_guess = 2 * first_f
+        elif dim == 3:
+            # this was determined by trail and error for 128x128x32x2 patches
+            memory_consumption_guess = 64 * first_f
+    else:
+        raise NotImplementedError('No heuristic implemented for this network.')
+    
+    # return estimated recommended batch number
+    return np.round(gpu_memory // memory_consumption_guess)
 
 @pytest.mark.parametrize('dimension', [2, 3])
 @pytest.mark.parametrize('name', ['train', 'vald'])
