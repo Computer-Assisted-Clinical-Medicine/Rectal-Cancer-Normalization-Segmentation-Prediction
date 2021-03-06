@@ -208,12 +208,13 @@ class Experiment():
             cfg.samples_per_volume = 8
             cfg.batch_capacity_train = 4*cfg.samples_per_volume # chosen as multiple of samples per volume
             logger.debug('   Train Shapes: %s (input), %s (labels)', cfg.train_input_shape, cfg.train_label_shape)
-            
+        
+        # set the valid batch size
+        cfg.batch_size_valid = cfg.batch_size_train
         # see if the batch size is bigger than the validation set
-        if cfg.samples_per_volume * cfg.num_files_vald <= cfg.batch_size_valid:
-            cfg.batch_size_valid = cfg.samples_per_volume * cfg.num_files_vald
-        else:
-            cfg.batch_size_valid = cfg.batch_capacity_train
+        if cfg.samples_per_volume * cfg.number_of_vald <= cfg.batch_size_valid:
+            cfg.batch_size_valid = cfg.samples_per_volume * cfg.number_of_vald
+            
 
     def estimate_batch_size(self):
         """The batch size estimation is basically trail and error. So far tested
@@ -421,6 +422,8 @@ class Experiment():
         folddir = self.output_path / folder_name
         logger.info('workingdir is %s', folddir)
 
+        tqdm.write(f'Starting with {self.name} {folder_name} (Fold {f+1} of {self.folds})')
+
         # skip already finished folds
         if self.restart == False:
             eval_file_path = folddir / f'evaluation-{folder_name}-final_test.csv'
@@ -437,7 +440,7 @@ class Experiment():
             folddir.mkdir()
 
         cfg.num_files = len(train_files)
-        cfg.num_files_vald = len(vald_files)
+        assert cfg.number_of_vald == len(vald_files), 'Wrong number of valid files'
 
         logger.info(
             '  Data Set %s: %s  train cases, %s  test cases, %s vald cases',
@@ -445,8 +448,6 @@ class Experiment():
         )
 
         self._set_parameters_according_to_dimension()
-
-        tqdm.write(f'Starting with {self.name} {folder_name} (Fold {f+1} of {self.folds})')
 
         epoch_samples = cfg.samples_per_volume * cfg.num_files
         if not epoch_samples % cfg.batch_size_train == 0:

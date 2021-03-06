@@ -1,6 +1,7 @@
 import json
 import logging
 import os
+import shutil
 from pathlib import Path
 
 import numpy as np
@@ -200,6 +201,10 @@ for f in range(k_fold):
         except Exception as e:
             print(e)
             print('Training failed')
+            # remove tensorboard log dir if training failed (to not clutter tensorboard)
+            tb_log_dir = log_dir / 'logs'
+            if tb_log_dir.exists():
+                shutil.rmtree(tb_log_dir)
 
         #remove logger
         logger.removeHandler(fh_info)

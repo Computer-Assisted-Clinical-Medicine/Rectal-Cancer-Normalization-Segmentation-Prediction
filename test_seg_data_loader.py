@@ -18,7 +18,7 @@ def set_parameters_according_to_dimension(dim, num_channels, preprocessed_dir):
     will run on the current GPU.
     """
     
-    cfg.num_files_vald = 2
+    cfg.number_of_vald = 2
 
     cfg.num_channels = num_channels
     cfg.train_dim = 128 # the resolution in plane
@@ -60,11 +60,11 @@ def set_parameters_according_to_dimension(dim, num_channels, preprocessed_dir):
         cfg.samples_per_volume = 8
         cfg.batch_capacity_train = 4*cfg.samples_per_volume # chosen as multiple of samples per volume
         
-    # see if the batch size is bigger than the validation set
-    if cfg.samples_per_volume * cfg.num_files_vald < cfg.batch_size_valid:
-        cfg.batch_size_valid = cfg.samples_per_volume * cfg.num_files_vald
-    else:
-        cfg.batch_size_valid = cfg.batch_capacity_train
+        # set the valid batch size
+        cfg.batch_size_valid = cfg.batch_size_train
+        # see if the batch size is bigger than the validation set
+        if cfg.samples_per_volume * cfg.number_of_vald <= cfg.batch_size_valid:
+            cfg.batch_size_valid = cfg.samples_per_volume * cfg.number_of_vald
 
     # set config
     if not preprocessed_dir.exists():
