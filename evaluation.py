@@ -133,15 +133,22 @@ def combine_evaluation_results_from_folds(experiment_path, eval_files):
     path, experiment = os.path.split(experiment_path)
     eval_mean_file_path = os.path.join(experiment_path, 'evaluation-mean-' + experiment + '.csv')
     eval_std_file_path = os.path.join(experiment_path, 'evaluation-std-' + experiment + '.csv')
+    all_statistics_path = os.path.join(experiment_path, 'evaluation-all-files.csv')
     header_row = make_csv_header()
     make_csv_file(eval_mean_file_path, header_row)
     make_csv_file(eval_std_file_path, header_row)
     mean_statistics = []
     std_statistics = []
+    all_statistics = []
 
     for indiv_eval_file_path in eval_files:
         _gather_individual_results(indiv_eval_file_path, header_row,
-                                    mean_statistics, std_statistics)
+                                    mean_statistics, std_statistics, all_statistics)
+
+    # concatenate to one array
+    all_statistics = pd.concat(all_statistics).sort_values('File Number')
+    # write to file
+    all_statistics.to_csv(all_statistics_path)
 
     for row in mean_statistics:
         with open(eval_mean_file_path, 'a', newline='') as evaluation_file:
@@ -156,7 +163,7 @@ def combine_evaluation_results_from_folds(experiment_path, eval_files):
             eval_csv_writer.writerow(row)
 
 
-def _gather_individual_results(indiv_eval_file_path, header_row, mean_statistics, std_statistics):
+def _gather_individual_results(indiv_eval_file_path, header_row, mean_statistics, std_statistics, all_statistics):
 
     try:
         results = pd.read_csv(indiv_eval_file_path, dtype=object)
@@ -175,6 +182,9 @@ def _gather_individual_results(indiv_eval_file_path, header_row, mean_statistics
         std_results = results.std().values.tolist()
         std_results = [indiv_eval_file_path.stem] + std_results
         std_statistics.append(std_results)
+
+        # append to all results
+        all_statistics.append(results)
 
 
 def make_boxplot_graphic(experiment_path, eval_files):
@@ -231,3 +241,4 @@ def make_boxplot_graphic(experiment_path, eval_files):
         #         print(title, y_label, file_path)
 
         plt.savefig(os.path.join(experiment_path, 'plots', title.replace(' ', '') + '.png'), transparent=True)
+        plt.close()

@@ -2,15 +2,22 @@ import json
 import logging
 import os
 import shutil
+import sys
 from pathlib import Path
 
+import matplotlib
+# if on cluster, use other backend
+if 'CLUSTER' in os.environ:
+    matplotlib.use('Agg')
+import matplotlib.pyplot as plt
 import numpy as np
+import pandas as pd
 
 #logger has to be set before tensorflow is imported
 tf_logger = logging.getLogger('tensorflow')
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 
-from experiment import Experiment
+from experiment import Experiment, export_batch_file
 from SegmentationNetworkBasis.architecture import UNet
 
 #configure loggers
@@ -49,7 +56,7 @@ train_list = np.loadtxt(data_dir / 'train_IDs.csv', dtype='str')
 
 data_list = np.array([str(data_dir / t) for t in train_list])
 
-k_fold = 3
+k_fold = 5
 
 # get number of channels from database file
 data_dict_file = data_dir / 'dataset.json'
@@ -74,8 +81,11 @@ train_parameters = {
     "l_r": 0.001,
     "optimizer": "Adam",
     "epochs" : 100,
-    "early_stopping" : False,
-    "reduce_lr_on_plateau" : True
+    "early_stopping" : True,
+    "patience_es" : 15,
+    "reduce_lr_on_plateau" : True,
+    "patience_lr_plat" : 5,
+    "factor_lr_plat" : 0.5
 }
 
 constant_parameters = {
@@ -141,9 +151,6 @@ if not preprocessed_dir.exists():
 #set up all experiments
 experiments = []
 for d in dimensions:
-    if d == 3:
-        # Otherwise, out of memory
-        filter_multiplier = [1, 2, 4]
     for f in filter_multiplier:
         for r in res:
             hyper_parameters = {
@@ -173,24 +180,40 @@ for d in dimensions:
             )
             experiments.append(experiment)
 
-
-# run all folds
-for f in range(k_fold):
+# if on cluster, export slurm files
+if 'CLUSTER' in os.environ:
+    slurm_files = []
+    working_dir = Path('').absolute()
+    if not working_dir.exists():
+        working_dir.mkdir()
     for e in experiments:
+        slurm_files.append(e.export_slurm_file(working_dir))
+
+    export_batch_file(
+        filename=Path(os.environ['experiment_dir']) / 'start_all_jobs.sh',
+        commands=[f'sbatch {f}' for f in slurm_files]
+    )
+    sys.exit()
+
+
+for e in experiments:
+    # run all folds
+    for f in range(k_fold):
 
         #add more detailed logger for each network, when problems arise, use debug
-        log_dir = e.output_path / e.fold_dir_names[f]
-        if not log_dir.exists():
-            log_dir.mkdir(parents=True)
+        fold_dir = e.output_path / e.fold_dir_names[f]
+        if not fold_dir.exists():
+            fold_dir.mkdir(parents=True)
+
         #create file handlers
-        fh_info = logging.FileHandler(log_dir/'log_info.txt')
+        fh_info = logging.FileHandler(fold_dir/'log_info.txt')
         fh_info.setLevel(logging.INFO)
         fh_info.setFormatter(formatter)
         #add to loggers
         logger.addHandler(fh_info)
 
         #create file handlers
-        fh_debug = logging.FileHandler(log_dir/'log_debug.txt')
+        fh_debug = logging.FileHandler(fold_dir/'log_debug.txt')
         fh_debug.setLevel(logging.DEBUG)
         fh_debug.setFormatter(formatter)
         #add to loggers
@@ -202,7 +225,7 @@ for f in range(k_fold):
             print(e)
             print('Training failed')
             # remove tensorboard log dir if training failed (to not clutter tensorboard)
-            tb_log_dir = log_dir / 'logs'
+            tb_log_dir = fold_dir / 'logs'
             if tb_log_dir.exists():
                 shutil.rmtree(tb_log_dir)
 
@@ -210,6 +233,74 @@ for f in range(k_fold):
         logger.removeHandler(fh_info)
         logger.removeHandler(fh_debug)
 
-# evaluate all experiments
-for e in experiments:
+    # evaluate all experiments
     e.evaluate()
+
+# collect all results
+metrics = ['Dice']
+results_means = []
+results_stds = []
+hparams = []
+for e in experiments:
+    results_file = e.output_path / 'evaluation-all-files.csv'
+    if results_file.exists():
+        results = pd.read_csv(results_file)
+        # save results
+        results_means.append(results[metrics].mean())
+        results_stds.append(results[metrics].std())
+        # and parameters
+        hparams.append({
+            **e.hyper_parameters['init_parameters'],
+            **e.hyper_parameters['train_parameters'],
+            'loss' : e.hyper_parameters['loss'],
+            'architecture' : e.hyper_parameters['architecture'],
+            'dimensions' : e.hyper_parameters['dimensions']
+        })
+    else:
+        print(f'Could not find the evaluation file {results_file}.')
+
+# convert to dataframes
+hparams = pd.DataFrame(hparams)
+results_means = pd.DataFrame(results_means)
+results_stds = pd.DataFrame(results_stds)
+# find changed parameters
+changed_params = []
+for c in hparams:
+    if hparams[c].astype(str).unique().size > 1:
+        changed_params.append(c)
+hparams_changed = hparams[changed_params]
+# if n_filters, use the first
+if 'n_filters' in hparams_changed:
+    hparams_changed.loc[hparams_changed.index,'n_filters'] = hparams_changed['n_filters'].apply(lambda x: x[0])
+
+# plot all metrics with all parameters
+fig, axes = plt.subplots(nrows=len(metrics), ncols=len(changed_params), sharey=True, figsize=(10,6))
+# fix the dimensions
+axes = axes.reshape((len(metrics), len(changed_params)))
+
+for m, ax_row in zip(metrics, axes):
+    for c, ax in zip(changed_params, ax_row):
+        # group by the other values
+        unused_columns = [cn for cn in changed_params if c != cn]
+        for group, data in hparams_changed.groupby(unused_columns):
+            # plot them with the same line
+            ax.plot(data[c], results_means.loc[data.index,m], marker='x', label=str(group))
+        # ylabel if it is the first image
+        if c == changed_params[0]:
+            ax.set_ylabel(m)
+        # xlabel if it is the last row
+        if m == metrics[-1]:
+            ax.set_xlabel(c)
+        # if the class is bool, replace the labels with the boolean values
+        if type(hparams_changed.iloc[0][c]) == np.bool_:
+            ax.set_xticks([0,1])
+            ax.set_xticklabels(['false', 'true'])
+
+        # set the legend with title
+        ax.legend(title = str(tuple(str(c)[:5] for c in unused_columns)))
+
+fig.suptitle('Hypereparameter Comparison')
+plt.tight_layout()
+plt.savefig(experiment_dir / 'hyperparameter_comparison.pdf')
+plt.show()
+plt.close()

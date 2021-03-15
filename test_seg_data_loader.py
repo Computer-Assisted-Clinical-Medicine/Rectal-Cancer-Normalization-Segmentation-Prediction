@@ -11,8 +11,6 @@ import create_test_files
 import seg_data_loader
 from SegmentationNetworkBasis import config as cfg
 
-# TODO: add tests for apply loader
-
 def set_parameters_according_to_dimension(dim, num_channels, preprocessed_dir):
     """This function will set up the shapes in the cfg module so that they
     will run on the current GPU.
@@ -282,6 +280,33 @@ def test_wrapper(dimension, name, module):
 
         # get the fraction of samples containing a label
         assert np.mean(n_objects.reshape(-1) > 0) > cfg.percent_of_object_samples / 100
+
+def test_apply_loader(module=seg_data_loader):
+
+    test_dir = Path('test_data')
+
+    set_parameters_according_to_dimension(3, 2, test_dir/'data_preprocessed')
+
+    # get names from csv
+    file_list, _ = load_dataset(test_dir)
+    filename = file_list[0]
+
+    loader = get_loader('test', module)
+
+    image_data = loader(filename)
+
+    # make sure the processed image and the image without padding are the same (except the batch dimension)
+    processed_image = sitk.GetArrayFromImage(loader.get_processed_image(filename))
+    padding_removed = loader.remove_padding(image_data)
+    assert np.allclose(processed_image, padding_removed[0]), 'padded image with padding removed is not the same as the original image'
+
+    # test the stitching
+    window_shape = np.array(cfg.train_input_shape[:3])+4
+    # turn an image into windows and then stitch it back together
+    image_data_windowed = loader.get_windowed_test_sample(image_data, window_shape)
+    image_data_stitched = loader.stitch_patches(image_data_windowed)
+    image_data_stitched_no_padding = loader.remove_padding(image_data_stitched)
+    assert np.allclose(padding_removed, image_data_stitched_no_padding)
 
 def set_seeds():
     tf.keras.backend.clear_session()

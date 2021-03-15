@@ -1,6 +1,9 @@
 import copy
 import logging
+import os
 from pathlib import Path
+import stat
+import sys
 from typing import List
 
 import GPUtil
@@ -61,6 +64,8 @@ class Experiment():
         self.name = name
         self.folds = folds
         self.num_channels = num_channels
+        self.reinitialize_folds = reinitialize_folds
+        self.data_set = np.array(data_set)
 
         if output_path == None:
             self.output_path = Path('Experiments', self.name)
@@ -76,7 +81,7 @@ class Experiment():
             self.hyper_parameters["evaluate_on_finetuned"]=False
 
         #set hyperparameterfile to store all hyperparameters
-        self.hyperparameter_file = self.output_path / 'hyperparameters.json'
+        self.experiment_file = self.output_path / 'parameters.yaml'
 
         # set directory for folds
         if folds_dir == None:
@@ -101,14 +106,16 @@ class Experiment():
                 'test' : test_csv
             })
         # to the data split
-        self.setup_folds(data_set, overwrite=reinitialize_folds)
-        self.data_set = data_set
+        self.setup_folds(self.data_set, overwrite=self.reinitialize_folds)
 
         self.restart = restart
 
         self.preprocessed_dir = preprocessed_dir
 
         self.tensorboard_images = tensorboard_images
+
+        #export parameters
+        self.export_experiment()
 
         return
 
@@ -143,6 +150,8 @@ class Experiment():
             #test is the section
             test_indices = test_folds[f]
             remaining_indices = np.setdiff1d(all_indices, test_folds[f])
+            # this orders the indices, so shuffle them again
+            remaining_indices=np.random.permutation(remaining_indices)
             #number of validation is set in config
             vald_indices = remaining_indices[:cfg.number_of_vald]
             #the rest is used for training
@@ -228,8 +237,12 @@ class Experiment():
         """
         # set batch size
         # determine GPU memory (in MB)
-        gpu_number = int(tf.test.gpu_device_name()[-1])
-        gpu_memory = int(np.round(GPUtil.getGPUs()[gpu_number].memoryTotal))
+        if len(tf.test.gpu_device_name()) > 0:
+            gpu_number = int(tf.test.gpu_device_name()[-1])
+            gpu_memory = int(np.round(GPUtil.getGPUs()[gpu_number].memoryTotal))
+        else:
+            # if no GPU was found, use 8 GB
+            gpu_memory = 1024*1024*8
 
         a_name = self.hyper_parameters['architecture'].get_name()
         dim = self.hyper_parameters['dimensions']
@@ -401,9 +414,6 @@ class Experiment():
         self.hyper_parameters["evaluate_on_finetuned"] = False
         self.set_seed()
 
-        #export parameters
-        self.export_hyperparameters()
-
         for f, in range(0, self.folds):
             self.run_fold(f)
 
@@ -451,7 +461,10 @@ class Experiment():
 
         epoch_samples = cfg.samples_per_volume * cfg.num_files
         if not epoch_samples % cfg.batch_size_train == 0:
-            print('Sample Number not divisible by batch size, consider changing it.')
+            print('Sample Number not divisible by batch size, epochs will run a little bit short.')
+        if cfg.batch_size_train > cfg.samples_per_volume * cfg.num_files:
+            print('Reduce batch size to epoch size')
+            cfg.batch_size_train = cfg.samples_per_volume * cfg.num_files
 
         #try the actual training
         cfg.percent_of_object_samples = 50
@@ -476,10 +489,10 @@ class Experiment():
         """
         #set eval files
         eval_files = []
-        epochs = str(self.hyper_parameters['train_parameters']['epochs'])
+        version = 'final'
         for f_name in self.fold_dir_names:
             eval_files.append(
-                self.output_path / f_name / f'evaluation-{f_name}-{epochs}_test.csv'
+                self.output_path / f_name / f'evaluation-{f_name}-{version}_test.csv'
             )
         if not np.all([f.exists() for f in eval_files]):
             print(eval_files)
@@ -495,6 +508,240 @@ class Experiment():
             eval_files
         )
 
-    def export_hyperparameters(self):
-        with open(self.hyperparameter_file, 'w') as f:
-            yaml.dump(self.hyper_parameters, f)
+    def export_experiment(self):
+        experiment_dict = {
+            'name' : self.name,
+            'hyper_parameters' : self.hyper_parameters,
+            'data_set' : [str(f) for f in self.data_set],
+            'folds' : self.folds,
+            'seed' : self.seed,
+            'num_channels' : self.num_channels,
+            'output_path' : self.output_path,
+            'restart' : self.restart,
+            'reinitialize_folds' : self.reinitialize_folds,
+            'folds_dir' : self.folds_dir,
+            'preprocessed_dir' : self.preprocessed_dir,
+            'tensorboard_images' : self.tensorboard_images
+        }
+        with open(self.experiment_file, 'w') as f:
+            yaml.dump(experiment_dict, f)
+
+    def export_slurm_file(self, working_dir):
+        run_script = Path(sys.argv[0]).absolute().parent / 'run_single_experiment.py'
+        job_dir = Path(os.environ['experiment_dir']) / 'slurm_jobs'
+        if not job_dir.exists():
+            job_dir.mkdir()
+        log_dir = self.output_path / 'slurm_logs'
+        if not log_dir.exists():
+            log_dir.mkdir(parents=True)
+        job_file = job_dir / f'run_{self.name}.sh'
+        export_slurm_job(
+            filename = job_file,
+            command=f'python {run_script} -f $SLURM_ARRAY_TASK_ID -e {self.output_path}',
+            job_name=self.name,
+            venv_dir=Path(sys.argv[0]).absolute().parent / 'venv',
+            workingdir=working_dir,
+            job_type='GPU',
+            hours=2,
+            minutes=0,
+            log_dir=log_dir,
+            array_job=True,
+            array_range=f'0-{self.folds-1}',
+            variables={
+                'data_dir' : os.environ['data_dir'],
+                'experiment_dir' : os.environ['experiment_dir']
+            }
+        )
+        return job_file
+
+    def from_file(file):
+        with open(file, 'r') as f:
+            parameters = yaml.load(f, Loader=yaml.Loader)
+        return Experiment(**parameters)
+
+
+def export_slurm_job(filename, command, job_name=None, workingdir=None, venv_dir='venv',
+    job_type='CPU', cpus=1, hours=0, minutes=30, log_dir=None, log_file=None, error_file=None,
+    array_job=False, array_range='0-4', singleton=False, variables={}):
+    """Generates a slurm file to run jobs on the cluster
+
+    Parameters
+    ----------
+    filename : Path or str
+        Where the slurm file should be saved
+    command : str
+        The command to run (can also be multiple commands separated by line breaks)
+    job_name : str, optional
+        The name displayed in squeue and used for log_name, by default None
+    workingdir : str, optional
+        The directory in Segmentation_Experiment, if None, basedir is used, by default None
+    venv_dir : str, optional
+        The directory of the virtual environment, by default venv
+    job_type : str, optional
+        type of job, CPU, GPU or GPU_no_K80, by default 'CPU'
+    cpus : int, optional
+        number of CPUs, by default 1
+    hours : int, optional
+        Time the job should run in hours, by default 0
+    minutes : int, optional
+        Time the job should run in minutes, by default 30
+    log_dir : str, optional
+        dir where the logs should be saved if None logs/job_name/, by default None
+    log_file : str, optional
+        name of the log file, if None job_name_job_id_log.txt, by default None
+    error_file : str, optional
+        name of the errors file, if None job_name_job_id_log_errors.txt, by default None
+    array_job : bool, optional
+        If set to true, array_range should be set, by default False
+    array_range : str, optional
+        array_range as str (comma separated or start-stop (ends included)), by default '0-4'
+    singleton : bool, optional
+        if only one job with that name and user should be running, by default False
+    variables : dict, optional
+        environmental variables to write {name : value} $EXPDIR can be used, by default {}
+    """
+
+    if job_type == 'CPU':
+        assert(hours==0)
+        assert(minutes <= 30)
+    else:
+        assert(minutes < 60)
+        assert(hours <= 48)
+
+    if log_dir is None:
+        log_dir = Path('logs/{job_name}/')
+    else:
+        log_dir = Path(log_dir)
+
+    if log_file is None:
+        if array_job:
+            log_file = log_dir / f'{job_name}_%a_%A_log.txt'
+        else:
+            log_file = log_dir / f'{job_name}_%j_log.txt'
+    else:
+        log_file = log_dir / log_file
+
+    if error_file is None:
+        if array_job:
+            error_file = log_dir / f'{job_name}_%a_%A_errors.txt'
+        else:
+            error_file = log_dir / f'{job_name}_%j_errors.txt'
+    else:
+        error_file = log_dir / error_file
+
+    filename = Path(filename)
+
+    slurm_file = '#!/bin/bash\n\n'
+    if job_name is not None:
+        slurm_file += f"#SBATCH --job-name={job_name}\n"
+
+    slurm_file += f'#SBATCH --cpus-per-task={cpus}\n'
+    slurm_file += f'#SBATCH --ntasks-per-node=1\n'
+    slurm_file += f'#SBATCH --time={hours:02d}:{minutes:02d}:00\n'
+    slurm_file += '#SBATCH --mem=32gb\n'
+
+    if job_type == 'GPU' or job_type == 'GPU_no_K80':
+        slurm_file += '\n#SBATCH --partition=gpu-single\n'
+        slurm_file += '#SBATCH --gres=gpu:1\n'
+    if job_type == 'GPU_no_K80':
+        # exclude all K80 nodes
+        slurm_file += '#SBATCH --exclude=h05c0101,h05c0201,h05c0301,h05c0401,h05c0501,'
+        slurm_file += 'h05c0601,h05c0701,h05c0801,h05c0901,h06c0101,h06c0201,h06c0301,'
+        slurm_file += 'h06c0401,h06c0501,h06c0601,h06c0701,h06c0801,h06c0901\n'
+
+    if array_job:
+        slurm_file += f'\n#SBATCH --array={array_range}\n'
+
+    # add logging
+    slurm_file += f'\n#SBATCH --output={str(log_file)}\n'
+    slurm_file += f'#SBATCH --error={str(error_file)}\n'
+
+    if singleton:
+        slurm_file += '\n#SBATCH --dependency=singleton\n'
+
+    # define workdir, add diagnostic info
+    slurm_file += '''
+echo "Set Workdir"
+WSDIR=/gpfs/bwfor/work/ws/hd_mo173-myws
+echo $WSDIR
+EXPDIR=$WSDIR\n'''
+
+    # print task ID depending on type
+    if array_job:
+        slurm_file +='\necho "My SLURM_ARRAY_TASK_ID: " $SLURM_ARRAY_TASK_ID\n'
+    else:
+        slurm_file +='\necho "My SLURM_JOB_ID: " $SLURM_JOB_ID\n'
+
+    slurm_file += '''\necho "job started on Node: $HOSTNAME"
+
+echo "Load modules"
+
+module load devel/python_intel/3.7
+'''
+
+    # add environmental variables
+    if len(variables) > 0:
+        slurm_file += '\n'
+    for key, val in variables.items():
+        slurm_file += f'export {key}="{val}"\n'
+
+    if 'GPU' in job_type:
+        slurm_file += '''module load devel/cuda/10.1
+module load lib/cudnn/7.6.5-cuda-10.1
+
+echo "Get GPU info"
+nvidia-smi
+'''
+
+    slurm_file += '\necho "Go to workingdir"\n'
+    if workingdir is None:
+        slurm_file += 'cd $EXPDIR/nnUNet\n'
+    else:
+        slurm_file += f'cd {Path(workingdir).absolute()}\n'
+
+    # activate virtual environment
+    slurm_file += '\necho "Activate virtual environment"\n'
+    slurm_file += f'source {Path(venv_dir).absolute()}/bin/activate\n'
+
+
+    # run the real command
+    slurm_file += '\necho "Start calculation"\n\n'
+    slurm_file += command
+    slurm_file += '\n\necho "Finished"'
+    
+    if not filename.parent.exists():
+        filename.parent.mkdir(parents=True)
+    # write to file
+    with open(filename, 'w+') as f:
+        f.write(slurm_file)
+
+    return
+
+def export_batch_file(filename, commands):
+    """Exports a list of commands (one per line) as batch script
+
+    Parameters
+    ----------
+    filename : str or Path
+        The new file
+    commands : [str]
+        List of commands (as strings)
+    """
+
+    filename = Path(filename)
+
+    batch_file = '#!/bin/bash'
+
+    for c in commands:
+        batch_file += f'\n\n{c}'
+
+    if not filename.parent.exists():
+        filename.parent.mkdir(parents=True)
+    # write to file
+    with open(filename, 'w+') as f:
+        f.write(batch_file)
+
+    # set permission
+    os.chmod(filename, stat.S_IRWXU)
+
+    return
