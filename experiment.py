@@ -542,7 +542,7 @@ class Experiment():
             venv_dir=Path(sys.argv[0]).absolute().parent / 'venv',
             workingdir=working_dir,
             job_type='GPU',
-            hours=2,
+            hours=24,
             minutes=0,
             log_dir=log_dir,
             array_job=True,

@@ -8,7 +8,6 @@ tf_logger = logging.getLogger('tensorflow')
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 
 from experiment import Experiment
-from SegmentationNetworkBasis.architecture import UNet
 from run import plot_hparam_comparison
 
 def init_argparse():
@@ -83,26 +82,20 @@ fh_debug.setFormatter(formatter)
 #add to loggers
 logger.addHandler(fh_debug)
 
-import tensorflow as tf
-print(tf.config.list_physical_devices('GPU'))
-logger.info('#### GPU LIST ####')
-logger.info(tf.config.list_physical_devices('GPU'))
-logger.info(tf.__version__)
-logger.info(tf.python.client.device_lib.list_local_devices())
-
 # run experiment
 experiment.run_fold(f)
 # try to evaluate it (this will only work if this is the last fold)
 try:
     experiment.evaluate()
 except:
-    print('Could not evaluate the experiment.')
+    print('Could not evaluate the experiment (happens if not all folds are finished).')
 else:
     print('Evaluation finished.')
 
 try:
     plot_hparam_comparison(hyperparameter_file, hyperparameter_changed_file, experiment_dir)
-except:
+except Exception as e:
+    print(e)
     print('Plotting of hyperparameter comparison failed.')
 else:
     print('Hyperparameter comparison was plotted.')
