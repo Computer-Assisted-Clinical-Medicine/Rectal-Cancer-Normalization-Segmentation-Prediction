@@ -1,18 +1,15 @@
 import argparse
 import logging
 import os
-import shutil
 from pathlib import Path
-
 
 #logger has to be set before tensorflow is imported
 tf_logger = logging.getLogger('tensorflow')
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 
-
 from experiment import Experiment
 from SegmentationNetworkBasis.architecture import UNet
-
+from run import plot_hparam_comparison
 
 def init_argparse():
     parser = argparse.ArgumentParser(
@@ -49,6 +46,9 @@ for h in tf_logger.handlers:
 
 data_dir = Path(os.environ['data_dir'])
 experiment_dir = Path(os.environ['experiment_dir'])
+
+hyperparameter_file = experiment_dir / 'hyperparameters.csv'
+hyperparameter_changed_file = experiment_dir / 'hyperparameters_changed.csv'
 
 current_experiment_dir = Path(args.experiment_dir)
 f = args.fold
@@ -99,6 +99,13 @@ except:
     print('Could not evaluate the experiment.')
 else:
     print('Evaluation finished.')
+
+try:
+    plot_hparam_comparison(hyperparameter_file, hyperparameter_changed_file, experiment_dir)
+except:
+    print('Plotting of hyperparameter comparison failed.')
+else:
+    print('Hyperparameter comparison was plotted.')
 
 #remove logger
 logger.removeHandler(fh_info)

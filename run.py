@@ -20,6 +20,63 @@ os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 from experiment import Experiment, export_batch_file
 from SegmentationNetworkBasis.architecture import UNet
 
+def plot_hparam_comparison(hparam_file, hparam_changed_file, experiment_dir, metrics = ['Dice']):
+    hparams = pd.read_csv(hparam_file)
+    hparams_changed = pd.read_csv(hparam_changed_file)
+    # collect all results
+    results_means = []
+    results_stds = []
+    for results_file in hparams['result_file']:
+        if Path(results_file).exists():
+            results = pd.read_csv(results_file)
+            # save results
+            results_means.append(results[metrics].mean())
+            results_stds.append(results[metrics].std())
+        else:
+            print(f'Could not find the evaluation file {results_file}.')
+            results_means.append(pd.Series({m : pd.NA for m in metrics}))
+            results_stds.append(pd.Series({m : pd.NA for m in metrics}))
+
+    # convert to dataframes
+    results_means = pd.DataFrame(results_means)
+    results_stds = pd.DataFrame(results_stds)
+
+    # plot all metrics with all parameters
+    fig, axes = plt.subplots(nrows=len(metrics), ncols=len(changed_params), sharey=True, figsize=(10,6))
+    # fix the dimensions
+    axes = axes.reshape((len(metrics), len(changed_params)))
+
+    for m, ax_row in zip(metrics, axes):
+        for c, ax in zip(changed_params, ax_row):
+            # group by the other values
+            unused_columns = [cn for cn in changed_params if c != cn]
+            for group, data in hparams_changed.groupby(unused_columns):
+                # plot them with the same line
+                # get the data
+                m_data = results_means.loc[data.index,m]
+                # only plot if not nan
+                if not m_data.isna().all():
+                    ax.plot(data.loc[m_data.notna(), c], m_data[m_data.notna()], marker='x', label=str(group))
+            # ylabel if it is the first image
+            if c == changed_params[0]:
+                ax.set_ylabel(m)
+            # xlabel if it is the last row
+            if m == metrics[-1]:
+                ax.set_xlabel(c)
+            # if the class is bool, replace the labels with the boolean values
+            if type(hparams_changed.iloc[0][c]) == np.bool_:
+                ax.set_xticks([0,1])
+                ax.set_xticklabels(['false', 'true'])
+
+            # set the legend with title
+            ax.legend(title = str(tuple(str(c)[:5] for c in unused_columns)))
+
+    fig.suptitle('Hypereparameter Comparison')
+    plt.tight_layout()
+    plt.savefig(experiment_dir / 'hyperparameter_comparison.pdf')
+    plt.show()
+    plt.close()
+
 #configure loggers
 logger = logging.getLogger()
 logger.setLevel(logging.DEBUG)
@@ -144,7 +201,7 @@ tensorboard_command = f'tensorboard --logdir="{experiment_dir.absolute()}"'
 print(f'To see the progress in tensorboard, run:\n{tensorboard_command}')
 
 # set config
-preprocessed_dir = Path(os.environ['experiment_dir']) / 'data_preprocessed'
+preprocessed_dir = experiment_dir / 'data_preprocessed'
 if not preprocessed_dir.exists():
     preprocessed_dir.mkdir()
 
@@ -180,6 +237,40 @@ for d in dimensions:
             )
             experiments.append(experiment)
 
+# export the hyperparameters
+# collect all results
+metrics = ['Dice']
+hparams = []
+for e in experiments:
+    results_file = e.output_path / 'evaluation-all-files.csv'
+    # and parameters
+    hparams.append({
+        **e.hyper_parameters['init_parameters'],
+        **e.hyper_parameters['train_parameters'],
+        'loss' : e.hyper_parameters['loss'],
+        'architecture' : e.hyper_parameters['architecture'].__name__,
+        'dimensions' : e.hyper_parameters['dimensions'],
+        'result_file' : results_file
+    })
+
+# convert to dataframes
+hparams = pd.DataFrame(hparams)
+# find changed parameters
+changed_params = []
+# drop the results file when analyzing the changed hyperparameters
+for c in hparams.drop(columns='result_file'):
+    if hparams[c].astype(str).unique().size > 1:
+        changed_params.append(c)
+hparams_changed = hparams[changed_params]
+# if n_filters, use the first
+if 'n_filters' in hparams_changed:
+    hparams_changed.loc[hparams_changed.index,'n_filters'] = hparams_changed['n_filters'].apply(lambda x: x[0])
+
+hyperparameter_file = experiment_dir / 'hyperparameters.csv'
+hparams.to_csv(hyperparameter_file)
+hyperparameter_changed_file = experiment_dir / 'hyperparameters_changed.csv'
+hparams_changed.to_csv(hyperparameter_changed_file)
+
 # if on cluster, export slurm files
 if 'CLUSTER' in os.environ:
     slurm_files = []
@@ -190,7 +281,7 @@ if 'CLUSTER' in os.environ:
         slurm_files.append(e.export_slurm_file(working_dir))
 
     export_batch_file(
-        filename=Path(os.environ['experiment_dir']) / 'start_all_jobs.sh',
+        filename=experiment_dir / 'start_all_jobs.sh',
         commands=[f'sbatch {f}' for f in slurm_files]
     )
     sys.exit()
@@ -236,71 +327,4 @@ for e in experiments:
     # evaluate all experiments
     e.evaluate()
 
-# collect all results
-metrics = ['Dice']
-results_means = []
-results_stds = []
-hparams = []
-for e in experiments:
-    results_file = e.output_path / 'evaluation-all-files.csv'
-    if results_file.exists():
-        results = pd.read_csv(results_file)
-        # save results
-        results_means.append(results[metrics].mean())
-        results_stds.append(results[metrics].std())
-        # and parameters
-        hparams.append({
-            **e.hyper_parameters['init_parameters'],
-            **e.hyper_parameters['train_parameters'],
-            'loss' : e.hyper_parameters['loss'],
-            'architecture' : e.hyper_parameters['architecture'],
-            'dimensions' : e.hyper_parameters['dimensions']
-        })
-    else:
-        print(f'Could not find the evaluation file {results_file}.')
-
-# convert to dataframes
-hparams = pd.DataFrame(hparams)
-results_means = pd.DataFrame(results_means)
-results_stds = pd.DataFrame(results_stds)
-# find changed parameters
-changed_params = []
-for c in hparams:
-    if hparams[c].astype(str).unique().size > 1:
-        changed_params.append(c)
-hparams_changed = hparams[changed_params]
-# if n_filters, use the first
-if 'n_filters' in hparams_changed:
-    hparams_changed.loc[hparams_changed.index,'n_filters'] = hparams_changed['n_filters'].apply(lambda x: x[0])
-
-# plot all metrics with all parameters
-fig, axes = plt.subplots(nrows=len(metrics), ncols=len(changed_params), sharey=True, figsize=(10,6))
-# fix the dimensions
-axes = axes.reshape((len(metrics), len(changed_params)))
-
-for m, ax_row in zip(metrics, axes):
-    for c, ax in zip(changed_params, ax_row):
-        # group by the other values
-        unused_columns = [cn for cn in changed_params if c != cn]
-        for group, data in hparams_changed.groupby(unused_columns):
-            # plot them with the same line
-            ax.plot(data[c], results_means.loc[data.index,m], marker='x', label=str(group))
-        # ylabel if it is the first image
-        if c == changed_params[0]:
-            ax.set_ylabel(m)
-        # xlabel if it is the last row
-        if m == metrics[-1]:
-            ax.set_xlabel(c)
-        # if the class is bool, replace the labels with the boolean values
-        if type(hparams_changed.iloc[0][c]) == np.bool_:
-            ax.set_xticks([0,1])
-            ax.set_xticklabels(['false', 'true'])
-
-        # set the legend with title
-        ax.legend(title = str(tuple(str(c)[:5] for c in unused_columns)))
-
-fig.suptitle('Hypereparameter Comparison')
-plt.tight_layout()
-plt.savefig(experiment_dir / 'hyperparameter_comparison.pdf')
-plt.show()
-plt.close()
+plot_hparam_comparison(hyperparameter_file, hyperparameter_changed_file, experiment_dir)
