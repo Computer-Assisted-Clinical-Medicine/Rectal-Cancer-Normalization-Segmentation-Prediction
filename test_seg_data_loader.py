@@ -68,7 +68,7 @@ def set_parameters_according_to_dimension(dim, num_channels, preprocessed_dir):
     if not preprocessed_dir.exists():
         preprocessed_dir.mkdir(parents=True)
     cfg.preprocessed_dir = str(preprocessed_dir)
-    cfg.normalizing_method == cfg.NORMALIZING.PERCENT5
+    cfg.normalizing_method == cfg.NORMALIZING.QUANTILE
 
 
 def estimate_batch_size(dim):

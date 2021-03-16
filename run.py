@@ -19,8 +19,54 @@ os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 
 from experiment import Experiment, export_batch_file
 from SegmentationNetworkBasis.architecture import UNet
+from SegmentationNetworkBasis.segbasisloader import NORMALIZING
 
-def plot_hparam_comparison(hparam_file, hparam_changed_file, experiment_dir, metrics = ['Dice']):
+
+def generate_folder_name(hyper_parameters):
+    epochs = hyper_parameters['train_parameters']['epochs']
+
+    params = [
+        hyper_parameters['architecture'].get_name() + str(hyper_parameters['dimensions']) + 'D',
+        hyper_parameters['loss']
+    ]
+
+    # residual connections if it is an attribute
+    if 'res_connect' in hyper_parameters['init_parameters']:
+        if hyper_parameters['init_parameters']['res_connect']:
+            params.append('Res')
+        else:
+            params.append('nRes')
+
+    # filter multiplier
+    params.append('f_'+str(hyper_parameters['init_parameters']['n_filters'][0]//8))
+
+    # batch norm
+    if hyper_parameters['init_parameters']['do_batch_normalization']:
+        params.append('BN')
+    else:
+        params.append('nBN')
+
+    # dropout
+    if hyper_parameters['init_parameters']['drop_out'][0]:
+        params.append('DO')
+    else:
+        params.append('nDO')
+
+    # normalization
+    params.append(str(hyper_parameters['data_loader_parameters']['normalizing_method'].name))
+
+    # add epoch number
+    params.append(str(epochs))
+
+    folder_name = "-".join(params)
+
+    return folder_name
+
+
+def plot_hparam_comparison(experiment_dir, metrics = ['Dice']):
+    hparam_file = experiment_dir / 'hyperparameters.csv'
+    hparam_changed_file = experiment_dir / 'hyperparameters_changed.csv'
+
     hparams = pd.read_csv(hparam_file)
     hparams_changed = pd.read_csv(hparam_changed_file)
     changed_params = hparams_changed.columns[1:]
@@ -50,7 +96,7 @@ def plot_hparam_comparison(hparam_file, hparam_changed_file, experiment_dir, met
         figsize=(4*len(changed_params),6*len(metrics))
     )
     # fix the dimensions
-    axes = axes.reshape((len(metrics), len(changed_params)))
+    axes = np.array(axes).reshape((len(metrics), len(changed_params)))
 
     for m, ax_row in zip(metrics, axes):
         for c, ax in zip(changed_params, ax_row):
@@ -80,8 +126,46 @@ def plot_hparam_comparison(hparam_file, hparam_changed_file, experiment_dir, met
     fig.suptitle('Hypereparameter Comparison')
     plt.tight_layout()
     plt.savefig(experiment_dir / 'hyperparameter_comparison.pdf')
-    plt.show()
     plt.close()
+
+
+def compare_hyperparameters(experiments, experiment_dir):
+    # export the hyperparameters
+    hyperparameter_file = experiment_dir / 'hyperparameters.csv'
+    hyperparameter_changed_file = experiment_dir / 'hyperparameters_changed.csv'
+    # collect all results
+    hparams = []
+    for e in experiments:
+        results_file = e.output_path / 'evaluation-all-files.csv'
+        # and parameters
+        hparams.append({
+            **e.hyper_parameters['init_parameters'],
+            **e.hyper_parameters['train_parameters'],
+            **e.hyper_parameters['data_loader_parameters'],
+            'loss' : e.hyper_parameters['loss'],
+            'architecture' : e.hyper_parameters['architecture'].__name__,
+            'dimensions' : e.hyper_parameters['dimensions'],
+            'result_file' : results_file
+        })
+
+    # convert to dataframes
+    hparams = pd.DataFrame(hparams)
+    # find changed parameters
+    changed_params = []
+    # drop the results file when analyzing the changed hyperparameters
+    for c in hparams.drop(columns='result_file'):
+        if hparams[c].astype(str).unique().size > 1:
+            changed_params.append(c)
+    hparams_changed = hparams[changed_params].copy()
+    # if n_filters, use the first
+    if 'n_filters' in hparams_changed:
+        hparams_changed.loc[:,'n_filters'] = hparams_changed['n_filters'].apply(lambda x: x[0])
+    if 'normalizing_method' in hparams_changed:
+        hparams_changed.loc[:,'normalizing_method'] = hparams_changed['normalizing_method'].apply(lambda x: x.name)
+
+    hparams.to_csv(hyperparameter_file)
+    hparams_changed.to_csv(hyperparameter_changed_file)
+
 
 if __name__ == '__main__':
 
@@ -132,19 +216,21 @@ if __name__ == '__main__':
     n_channels = len(data_dict['modality'])
 
     #define the parameters that are constant
+    f = 8
     init_parameters = {
         "regularize": [True, 'L2', 0.0000001],
         "drop_out": [True, 0.01],
         "activation": "elu",
-        "do_batch_normalization": False,
         "do_bias": True,
         "cross_hair": False,
         "clipping_value" : 50,
+        "res_connect" : True,
+        'n_filters' : [f*8, f*16, f*32, f*64, f*128]
     }
 
     train_parameters = {
-        "l_r": 0.001,
-        "optimizer": "Adam",
+        "l_r" : 0.001,
+        "optimizer" : "Adam",
         "epochs" : 100,
         "early_stopping" : True,
         "patience_es" : 15,
@@ -153,56 +239,25 @@ if __name__ == '__main__':
         "factor_lr_plat" : 0.5
     }
 
+    data_loader_parameters = {
+        "normalizing_method" : NORMALIZING.MEAN_STD,
+        "do_resampling" : True
+    }
+
     constant_parameters = {
-        "init_parameters": init_parameters,
-        "train_parameters": train_parameters,
+        "init_parameters" : init_parameters,
+        "train_parameters" : train_parameters,
+        "data_loader_parameters" : data_loader_parameters,
         "loss" : 'DICE',
         'architecture' : UNet
     }
 
-    #define the parameters that are being tuned
+    # normalization method
+    normalization_methods = [NORMALIZING.QUANTILE, NORMALIZING.MEAN_STD]
+    # do batch norm
+    batch_norm = [True, False]
+    # dimensions
     dimensions = [2, 3]
-    # residual connections
-    res = [True, False]
-    # multiply the number of filters by a fixed factor
-    filter_multiplier = [1, 2, 4, 8]
-
-    def generate_folder_name(hyper_parameters):
-        epochs = hyper_parameters['train_parameters']['epochs']
-
-        params = [
-            hyper_parameters['architecture'].get_name() + str(hyper_parameters['dimensions']) + 'D',
-            hyper_parameters['loss']
-        ]
-
-        # residual connections if it is an attribute
-        if 'res_connect' in hyper_parameters['init_parameters']:
-            if hyper_parameters['init_parameters']['res_connect']:
-                params.append('Res')
-            else:
-                params.append('nRes')
-
-        # filter multiplier
-        params.append('f_'+str(hyper_parameters['init_parameters']['n_filters'][0]//8))
-
-        # batch norm
-        if hyper_parameters['init_parameters']['do_batch_normalization']:
-            params.append('BN')
-        else:
-            params.append('nBN')
-
-        # dropout
-        if hyper_parameters['init_parameters']['drop_out'][0]:
-            params.append('DO')
-        else:
-            params.append('nDO')
-
-        # add epoch number
-        params.append(str(epochs))
-
-        folder_name = "-".join(params)
-
-        return folder_name
 
     #generate tensorflow command
     tensorboard_command = f'tensorboard --logdir="{experiment_dir.absolute()}"'
@@ -215,15 +270,15 @@ if __name__ == '__main__':
 
     #set up all experiments
     experiments = []
-    for d in dimensions:
-        for f in filter_multiplier:
-            for r in res:
+    for n in normalization_methods:
+        for b in batch_norm:
+            for d in dimensions:
                 hyper_parameters = {
                     **constant_parameters,
-                    'dimensions' : d,
+                    'dimensions' : d
                 }
-                hyper_parameters['init_parameters']['res_connect'] = r
-                hyper_parameters['init_parameters']['n_filters'] = [f*8, f*16, f*32, f*64, f*128]
+                hyper_parameters['init_parameters']['do_batch_normalization'] = b
+                hyper_parameters['data_loader_parameters']['normalizing_method'] = n
 
                 #define experiment
                 experiment_name = generate_folder_name(hyper_parameters)
@@ -245,39 +300,8 @@ if __name__ == '__main__':
                 )
                 experiments.append(experiment)
 
-    # export the hyperparameters
-    # collect all results
-    metrics = ['Dice']
-    hparams = []
-    for e in experiments:
-        results_file = e.output_path / 'evaluation-all-files.csv'
-        # and parameters
-        hparams.append({
-            **e.hyper_parameters['init_parameters'],
-            **e.hyper_parameters['train_parameters'],
-            'loss' : e.hyper_parameters['loss'],
-            'architecture' : e.hyper_parameters['architecture'].__name__,
-            'dimensions' : e.hyper_parameters['dimensions'],
-            'result_file' : results_file
-        })
-
-    # convert to dataframes
-    hparams = pd.DataFrame(hparams)
-    # find changed parameters
-    changed_params = []
-    # drop the results file when analyzing the changed hyperparameters
-    for c in hparams.drop(columns='result_file'):
-        if hparams[c].astype(str).unique().size > 1:
-            changed_params.append(c)
-    hparams_changed = hparams[changed_params]
-    # if n_filters, use the first
-    if 'n_filters' in hparams_changed:
-        hparams_changed.loc[hparams_changed.index,'n_filters'] = hparams_changed['n_filters'].apply(lambda x: x[0])
-
-    hyperparameter_file = experiment_dir / 'hyperparameters.csv'
-    hparams.to_csv(hyperparameter_file)
-    hyperparameter_changed_file = experiment_dir / 'hyperparameters_changed.csv'
-    hparams_changed.to_csv(hyperparameter_changed_file)
+    # export all hyperparameters
+    compare_hyperparameters(experiments, experiment_dir)
 
     # if on cluster, export slurm files
     if 'CLUSTER' in os.environ:
@@ -294,11 +318,10 @@ if __name__ == '__main__':
         )
         sys.exit()
 
-
+    # if not on cluster, perform the experiments
     for e in experiments:
         # run all folds
         for f in range(k_fold):
-
             #add more detailed logger for each network, when problems arise, use debug
             fold_dir = e.output_path / e.fold_dir_names[f]
             if not fold_dir.exists():
@@ -334,5 +357,5 @@ if __name__ == '__main__':
 
         # evaluate all experiments
         e.evaluate()
-
-    plot_hparam_comparison(hyperparameter_file, hyperparameter_changed_file, experiment_dir)
+        # do intermediate plots
+        plot_hparam_comparison(experiment_dir)

@@ -280,7 +280,10 @@ class Experiment():
         cfg.preprocessed_dir = self.preprocessed_dir
 
         #generate loader
-        training_loader = SegLoader(name='training_loader')
+        training_loader = SegLoader(
+            name='training_loader',
+            **self.hyper_parameters['data_loader_parameters']
+        )
         training_dataset = training_loader(
             train_files,
             batch_size=cfg.batch_size_train,
@@ -289,7 +292,8 @@ class Experiment():
         )
         validation_dataset = SegLoader(
             mode=SegLoader.MODES.VALIDATE,
-            name='validation_loader'
+            name='validation_loader',
+            **self.hyper_parameters['data_loader_parameters']
         )(
             vald_files,
             batch_size=cfg.batch_size_valid,

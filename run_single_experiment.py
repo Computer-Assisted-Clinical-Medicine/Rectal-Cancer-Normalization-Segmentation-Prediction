@@ -46,9 +46,6 @@ for h in tf_logger.handlers:
 data_dir = Path(os.environ['data_dir'])
 experiment_dir = Path(os.environ['experiment_dir'])
 
-hyperparameter_file = experiment_dir / 'hyperparameters.csv'
-hyperparameter_changed_file = experiment_dir / 'hyperparameters_changed.csv'
-
 current_experiment_dir = Path(args.experiment_dir)
 f = args.fold
 
@@ -93,7 +90,7 @@ else:
     print('Evaluation finished.')
 
 try:
-    plot_hparam_comparison(hyperparameter_file, hyperparameter_changed_file, experiment_dir)
+    plot_hparam_comparison(experiment_dir)
 except Exception as e:
     print(e)
     print('Plotting of hyperparameter comparison failed.')
