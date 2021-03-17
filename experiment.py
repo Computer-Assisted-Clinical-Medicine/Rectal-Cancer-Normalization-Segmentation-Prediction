@@ -438,14 +438,6 @@ class Experiment():
 
         tqdm.write(f'Starting with {self.name} {folder_name} (Fold {f+1} of {self.folds})')
 
-        # skip already finished folds
-        if self.restart == False:
-            eval_file_path = folddir / f'evaluation-{folder_name}-final_test.csv'
-            if eval_file_path.exists():
-                tqdm.write('Already trained, skip to next fold')
-                logger.info('Already trained, skip to next fold')
-                return
-
         train_files = np.loadtxt(self.datasets[f]['train'], dtype='str', delimiter=',')
         vald_files = np.loadtxt(self.datasets[f]['vald'], dtype='str', delimiter=',')
         test_files = np.loadtxt(self.datasets[f]['test'], dtype='str', delimiter=',')
@@ -471,12 +463,21 @@ class Experiment():
             cfg.batch_size_train = cfg.samples_per_volume * cfg.num_files
 
         #try the actual training
-        cfg.percent_of_object_samples = 50
-        self.training(folder_name, train_files, vald_files)
+        model_final = folddir / 'models' / 'model-final'
+        if self.restart == False and model_final.exists():
+            tqdm.write('Already trained, skip training.')
+            logger.info('Already trained, skip training.')
+        else:
+            self.training(folder_name, train_files, vald_files)
 
-        self.applying(folder_name, test_files)
-
-        self.evaluate_fold(folder_name, test_files)
+        # do the application and evaluation
+        eval_file_path = folddir / f'evaluation-{folder_name}-final_test.csv'
+        if eval_file_path.exists():
+            tqdm.write('Already evaluated, skip evaluation.')
+            logger.info('Already evaluated, skip evaluation.')
+        else:
+            self.applying(folder_name, test_files)
+            self.evaluate_fold(folder_name, test_files)
 
         tqdm.write(f'Finished with {self.name} {folder_name} (Fold {f+1} of {self.folds})')
 

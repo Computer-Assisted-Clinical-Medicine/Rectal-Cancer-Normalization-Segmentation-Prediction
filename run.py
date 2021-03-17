@@ -162,6 +162,9 @@ def compare_hyperparameters(experiments, experiment_dir):
         hparams_changed.loc[:,'n_filters'] = hparams_changed['n_filters'].apply(lambda x: x[0])
     if 'normalizing_method' in hparams_changed:
         hparams_changed.loc[:,'normalizing_method'] = hparams_changed['normalizing_method'].apply(lambda x: x.name)
+    # ignore do_bias (it is set the opposite to batch_norm)
+    if 'do_bias' in hparams_changed and 'do_batch_normalization'  in hparams_changed:
+        hparams_changed.drop(columns='do_bias', inplace=True)
 
     hparams.to_csv(hyperparameter_file)
     hparams_changed.to_csv(hyperparameter_changed_file)
@@ -278,6 +281,7 @@ if __name__ == '__main__':
                     'dimensions' : d
                 }
                 hyper_parameters['init_parameters']['do_batch_normalization'] = b
+                hyper_parameters['init_parameters']['do_bias'] = not b # bias should be the opposite of batch norm
                 hyper_parameters['data_loader_parameters']['normalizing_method'] = n
 
                 #define experiment
