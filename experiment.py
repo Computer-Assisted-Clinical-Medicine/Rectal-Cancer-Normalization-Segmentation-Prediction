@@ -312,7 +312,8 @@ class Experiment():
             visualization_dataset = SegLoader(
                 name='visualization',
                 frac_obj=1,
-                samples_per_volume=1
+                samples_per_volume=1,
+                **self.hyper_parameters['data_loader_parameters']
             )(
                 [train_files[np.random.randint(len(train_files))]],
                 batch_size=1,
@@ -362,7 +363,8 @@ class Experiment():
         cfg.preprocessed_dir = self.preprocessed_dir
 
         testloader = ApplyLoader(
-            name='test_loader'
+            name='test_loader',
+            **self.hyper_parameters['data_loader_parameters']
         )
 
         net = self.hyper_parameters['architecture'](
