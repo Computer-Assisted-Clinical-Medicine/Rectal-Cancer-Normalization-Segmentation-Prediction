@@ -67,6 +67,12 @@ class Experiment():
         self.reinitialize_folds = reinitialize_folds
         self.data_set = np.array(data_set)
 
+        # check input
+        if len(data_set) == 0:
+            raise ValueError('Dataset is empty.')
+        if cfg.number_of_vald*self.folds > self.data_set.size:
+            raise ValueError('Dataset to small for the specified folds.')
+
         if output_path == None:
             self.output_path = Path('Experiments', self.name)
         else:

@@ -6,6 +6,7 @@ import sys
 from pathlib import Path
 
 import matplotlib
+
 # if on cluster, use other backend
 if 'CLUSTER' in os.environ:
     matplotlib.use('Agg')
@@ -17,9 +18,22 @@ import pandas as pd
 tf_logger = logging.getLogger('tensorflow')
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 
+# set tf thread mode
+os.environ['TF_GPU_THREAD_MODE'] = 'gpu_private'
+
 from experiment import Experiment, export_batch_file
 from SegmentationNetworkBasis.architecture import UNet
 from SegmentationNetworkBasis.segbasisloader import NORMALIZING
+
+debug = False
+if debug:
+    # run everything eagerly
+    import tensorflow as tf
+    tf.config.experimental_run_functions_eagerly(True)
+    # do numeric checks (for NaNs)
+    tf.debugging.enable_check_numerics(
+        stack_height_limit=30, path_length_limit=50
+    )
 
 
 def generate_folder_name(hyper_parameters):
@@ -80,7 +94,8 @@ def plot_hparam_comparison(experiment_dir, metrics = ['Dice']):
             results_means.append(results[metrics].mean())
             results_stds.append(results[metrics].std())
         else:
-            print(f'Could not find the evaluation file {results_file}.')
+            print(f'Could not find the evaluation file {results_file}'
+                +' (probably not finished with training yet).')
             results_means.append(pd.Series({m : pd.NA for m in metrics}))
             results_stds.append(pd.Series({m : pd.NA for m in metrics}))
 
@@ -102,13 +117,20 @@ def plot_hparam_comparison(experiment_dir, metrics = ['Dice']):
         for c, ax in zip(changed_params, ax_row):
             # group by the other values
             unused_columns = [cn for cn in changed_params if c != cn]
+            # if there are no unused columns, use the changed one
+            if len(unused_columns) == 0:
+                unused_columns = list(changed_params)
             for group, data in hparams_changed.groupby(unused_columns):
                 # plot them with the same line
                 # get the data
                 m_data = results_means.loc[data.index,m]
                 # only plot if not nan
                 if not m_data.isna().all():
-                    ax.plot(data.loc[m_data.notna(), c], m_data[m_data.notna()], marker='x', label=str(group))
+                    ax.plot(
+                        data.loc[m_data.notna(), c], m_data[m_data.notna()],
+                        marker='x',
+                        label=str(group)
+                    )
             # ylabel if it is the first image
             if c == changed_params[0]:
                 ax.set_ylabel(m)
@@ -243,7 +265,6 @@ if __name__ == '__main__':
     }
 
     data_loader_parameters = {
-        "normalizing_method" : NORMALIZING.MEAN_STD,
         "do_resampling" : True
     }
 
@@ -256,7 +277,7 @@ if __name__ == '__main__':
     }
 
     # normalization method
-    normalization_methods = [NORMALIZING.QUANTILE, NORMALIZING.MEAN_STD]
+    normalization_methods = [NORMALIZING.HISTOGRAM_MATCHING, NORMALIZING.QUANTILE, NORMALIZING.MEAN_STD]
     # do batch norm
     batch_norm = [True, False]
     # dimensions
@@ -361,5 +382,8 @@ if __name__ == '__main__':
 
         # evaluate all experiments
         e.evaluate()
-        # do intermediate plots
-        plot_hparam_comparison(experiment_dir)
+        # do intermediate plots (at least try to)
+        try:
+            plot_hparam_comparison(experiment_dir)
+        except Exception as e:
+            print(f'Failed to to intermediate plots because of {e}.')

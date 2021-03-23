@@ -10,6 +10,7 @@ import tensorflow as tf
 import create_test_files
 import seg_data_loader
 from SegmentationNetworkBasis import config as cfg
+from SegmentationNetworkBasis.segbasisloader import NORMALIZING
 
 def set_parameters_according_to_dimension(dim, num_channels, preprocessed_dir):
     """This function will set up the shapes in the cfg module so that they
@@ -103,10 +104,18 @@ def estimate_batch_size(dim):
     # return estimated recommended batch number
     return np.round(gpu_memory // memory_consumption_guess)
 
-@pytest.mark.parametrize('dimension', [2, 3])
-@pytest.mark.parametrize('name', ['train', 'vald'])
-@pytest.mark.parametrize('module', [seg_data_loader])
-def test_functions(dimension, name, module):
+
+dimensions = [2, 3]
+names = ['train', 'vald']
+modules = [seg_data_loader]
+normalizing_methods = [NORMALIZING.QUANTILE, NORMALIZING.WINDOW, NORMALIZING.MEAN_STD, NORMALIZING.HISTOGRAM_MATCHING]
+
+
+@pytest.mark.parametrize('dimension', dimensions)
+@pytest.mark.parametrize('name', names)
+@pytest.mark.parametrize('module', modules)
+@pytest.mark.parametrize('normalizing_method', normalizing_methods)
+def test_functions(dimension, name, module, normalizing_method):
     """Test the individual functions contained in the wrapper.
 
     Parameters
@@ -126,15 +135,26 @@ def test_functions(dimension, name, module):
     set_seeds()
 
     #generate loader
-    data_loader = get_loader(name, module)
+    data_loader = get_loader(name, module, normalizing_method)
 
     # get names from csv
     file_list, files_list_b = load_dataset(test_dir)
 
     print(f'Loading Dataset {name}.')
 
+    # execute the callbacks
+    for m in data_loader.normalization_callbacks:
+        m([sitk.ReadImage(data_loader._get_filenames(f)[0]) for f in file_list])
+
     print('\tLoad a numpy sample')
     data_read = data_loader._read_file_and_return_numpy_samples(files_list_b[0])
+
+    assert data_read[0].shape[0] == cfg.samples_per_volume, 'Wrong number of samples per volume'
+    assert data_read[0].shape[1:] == tuple(cfg.train_input_shape), 'Wrong sample shape'
+
+    assert data_read[0].shape[0] == cfg.samples_per_volume, 'Wrong number of samples per volume'
+    assert data_read[1].shape[1:] == tuple(cfg.train_label_shape), 'Wrong label shape'
+
     if name == 'test':
         samples = data_read[0]
     else:
@@ -154,10 +174,11 @@ def test_functions(dimension, name, module):
     data_loader._read_wrapper(id_data_set=tf.squeeze(tf.convert_to_tensor(file_list[0], dtype=tf.string)))
 
 
-@pytest.mark.parametrize('dimension', [2, 3])
-@pytest.mark.parametrize('name', ['train', 'vald'])
-@pytest.mark.parametrize('module', [seg_data_loader])
-def test_wrapper(dimension, name, module):
+@pytest.mark.parametrize('dimension', dimensions)
+@pytest.mark.parametrize('name', names)
+@pytest.mark.parametrize('module', modules)
+@pytest.mark.parametrize('normalizing_method', normalizing_methods)
+def test_wrapper(dimension, name, module, normalizing_method):
     """Test the complete wrapper and check shapes
 
     Parameters
@@ -183,7 +204,7 @@ def test_wrapper(dimension, name, module):
     set_seeds()
 
     #generate loader
-    data_loader = get_loader(name, module)
+    data_loader = get_loader(name, module, normalizing_method)
 
     # get names from csv
     file_list, _ = load_dataset(test_dir)
@@ -209,7 +230,8 @@ def test_wrapper(dimension, name, module):
         dataset = data_loader(
             file_list,
             batch_size=cfg.batch_size_train,
-            read_threads=cfg.vald_reader_instances
+            read_threads=cfg.vald_reader_instances,
+            n_epochs=n_epochs
         )
 
     print('\tLoad samples using the data loader')
@@ -313,10 +335,13 @@ def set_seeds():
     np.random.seed(42)
     tf.random.set_seed(42)
 
-def get_loader(name, module):
+def get_loader(name, module, normalizing_method):
     #generate loader
     if name == 'train':
-        data_loader = module.SegLoader(name='training_loader')
+        data_loader = module.SegLoader(
+            name='training_loader',
+            normalizing_method=normalizing_method
+        )
     elif name == 'vald':
         data_loader = module.SegLoader(
             mode=module.SegLoader.MODES.VALIDATE,
@@ -345,8 +370,8 @@ def load_dataset(test_dir):
 
 if __name__ == '__main__':
     # run functions for better debugging
-    for dimension in [2, 3]:
-        for name in ['train', 'vald']:
-            for module in [seg_data_loader]:
-                test_functions(dimension, name, module)
-                test_wrapper(dimension, name, module)
+    for dimension in dimensions:
+        for name in names:
+            for normalizing_method in normalizing_methods:
+                test_functions(dimension, name, seg_data_loader, normalizing_method)
+                test_wrapper(dimension, name, seg_data_loader, normalizing_method)
