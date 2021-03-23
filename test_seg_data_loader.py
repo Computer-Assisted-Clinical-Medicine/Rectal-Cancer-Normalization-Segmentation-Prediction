@@ -108,7 +108,7 @@ def estimate_batch_size(dim):
 dimensions = [2, 3]
 names = ['train', 'vald']
 modules = [seg_data_loader]
-normalizing_methods = [NORMALIZING.QUANTILE, NORMALIZING.WINDOW, NORMALIZING.MEAN_STD, NORMALIZING.HISTOGRAM_MATCHING]
+normalizing_methods = [NORMALIZING.QUANTILE, NORMALIZING.WINDOW, NORMALIZING.MEAN_STD, NORMALIZING.HISTOGRAM_MATCHING, NORMALIZING.Z_SCORE]
 
 
 @pytest.mark.parametrize('dimension', dimensions)
@@ -303,7 +303,9 @@ def test_wrapper(dimension, name, module, normalizing_method):
         # get the fraction of samples containing a label
         assert np.mean(n_objects.reshape(-1) > 0) > cfg.percent_of_object_samples / 100
 
-def test_apply_loader(module=seg_data_loader):
+@pytest.mark.parametrize('module', modules)
+@pytest.mark.parametrize('normalizing_method', normalizing_methods)
+def test_apply_loader(module, normalizing_method):
 
     test_dir = Path('test_data')
 
@@ -313,7 +315,7 @@ def test_apply_loader(module=seg_data_loader):
     file_list, _ = load_dataset(test_dir)
     filename = file_list[0]
 
-    loader = get_loader('test', module)
+    loader = get_loader('test', module, normalizing_method)
 
     image_data = loader(filename)
 

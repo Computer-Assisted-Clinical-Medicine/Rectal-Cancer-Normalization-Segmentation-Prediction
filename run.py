@@ -277,7 +277,7 @@ if __name__ == '__main__':
     }
 
     # normalization method
-    normalization_methods = [NORMALIZING.HISTOGRAM_MATCHING, NORMALIZING.QUANTILE, NORMALIZING.MEAN_STD]
+    normalization_methods = [NORMALIZING.HISTOGRAM_MATCHING, NORMALIZING.Z_SCORE, NORMALIZING.QUANTILE, NORMALIZING.MEAN_STD]
     # do batch norm
     batch_norm = [True, False]
     # dimensions
