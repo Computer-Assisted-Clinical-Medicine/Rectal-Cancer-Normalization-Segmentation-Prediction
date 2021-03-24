@@ -124,6 +124,8 @@ def plot_hparam_comparison(experiment_dir, metrics = ['Dice']):
                 # plot them with the same line
                 # get the data
                 m_data = results_means.loc[data.index,m]
+                # sort by values
+                m_data.sort_values()
                 # only plot if not nan
                 if not m_data.isna().all():
                     ax.plot(
@@ -277,9 +279,13 @@ if __name__ == '__main__':
     }
 
     # normalization method
-    normalization_methods = [NORMALIZING.HISTOGRAM_MATCHING, NORMALIZING.Z_SCORE, NORMALIZING.QUANTILE, NORMALIZING.MEAN_STD]
+    normalization_methods = [
+        NORMALIZING.HM_QUANTILE, NORMALIZING.HM_QUANT_MEAN,
+        NORMALIZING.HISTOGRAM_MATCHING, NORMALIZING.Z_SCORE,
+        NORMALIZING.QUANTILE, NORMALIZING.MEAN_STD
+    ]
     # do batch norm
-    batch_norm = [True, False]
+    batch_norm = [False]
     # dimensions
     dimensions = [2, 3]
 

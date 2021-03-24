@@ -108,7 +108,9 @@ def estimate_batch_size(dim):
 dimensions = [2, 3]
 names = ['train', 'vald']
 modules = [seg_data_loader]
-normalizing_methods = [NORMALIZING.QUANTILE, NORMALIZING.WINDOW, NORMALIZING.MEAN_STD, NORMALIZING.HISTOGRAM_MATCHING, NORMALIZING.Z_SCORE]
+normalizing_methods = [NORMALIZING.HM_QUANTILE, NORMALIZING.HM_QUANT_MEAN,
+    NORMALIZING.QUANTILE, NORMALIZING.WINDOW, NORMALIZING.MEAN_STD,
+    NORMALIZING.HISTOGRAM_MATCHING, NORMALIZING.Z_SCORE]
 
 
 @pytest.mark.parametrize('dimension', dimensions)
