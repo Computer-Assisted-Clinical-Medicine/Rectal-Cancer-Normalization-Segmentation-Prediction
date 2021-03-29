@@ -133,6 +133,10 @@ def plot_hparam_comparison(experiment_dir, metrics = ['Dice']):
                         marker='x',
                         label=str(group)
                     )
+                # if the label is text, turn it
+                if not pd.api.types.is_numeric_dtype(data.loc[m_data.index, c]):
+                    ax.set_xticks(list(data.loc[m_data.index, c]))
+                    ax.set_xticklabels(list(data.loc[m_data.index, c]), rotation=45, ha='right')
             # ylabel if it is the first image
             if c == changed_params[0]:
                 ax.set_ylabel(m)

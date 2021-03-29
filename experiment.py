@@ -548,13 +548,17 @@ class Experiment():
         if not log_dir.exists():
             log_dir.mkdir(parents=True)
         job_file = job_dir / f'run_{self.name}.sh'
+        if self.hyper_parameters['dimensions'] == 3:
+            gpu_type = 'GPU_no_K80'
+        else:
+            gpu_type = 'GPU'
         export_slurm_job(
             filename = job_file,
             command=f'python {run_script} -f $SLURM_ARRAY_TASK_ID -e {self.output_path}',
             job_name=self.name,
             venv_dir=Path(sys.argv[0]).absolute().parent / 'venv',
             workingdir=working_dir,
-            job_type='GPU',
+            job_type=gpu_type,
             hours=24,
             minutes=0,
             log_dir=log_dir,
