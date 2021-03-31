@@ -81,9 +81,18 @@ logger.addHandler(fh_debug)
 
 # run experiment
 experiment.run_fold(f)
+
 # try to evaluate it (this will only work if this is the last fold)
 try:
     experiment.evaluate()
+except:
+    print('Could not evaluate the experiment (happens if not all folds are finished).')
+else:
+    print('Evaluation finished.')
+
+# try to evaluate the external testset
+try:
+    experiment.evaluate_external_testset()
 except:
     print('Could not evaluate the experiment (happens if not all folds are finished).')
 else:
@@ -96,6 +105,14 @@ except Exception as e:
     print('Plotting of hyperparameter comparison failed.')
 else:
     print('Hyperparameter comparison was plotted.')
+
+try:
+    plot_hparam_comparison(experiment_dir, external=True)
+except Exception as e:
+    print(e)
+    print('Plotting of hyperparameter comparison on the external testset failed.')
+else:
+    print('Hyperparameter comparison on the external testset was plotted.')
 
 #remove logger
 logger.removeHandler(fh_info)

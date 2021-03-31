@@ -77,9 +77,16 @@ def generate_folder_name(hyper_parameters):
     return folder_name
 
 
-def plot_hparam_comparison(experiment_dir, metrics = ['Dice']):
+def plot_hparam_comparison(experiment_dir, metrics = ['Dice'], external=False):
     hparam_file = experiment_dir / 'hyperparameters.csv'
     hparam_changed_file = experiment_dir / 'hyperparameters_changed.csv'
+
+    if external:
+        file_field = 'result_file_external_testset'
+        result_name = 'hyperparameter_comparison_external_testset.pdf'
+    else:
+        file_field = 'result_file'
+        result_name = 'hyperparameter_comparison.pdf'
 
     hparams = pd.read_csv(hparam_file)
     hparams_changed = pd.read_csv(hparam_changed_file)
@@ -87,7 +94,7 @@ def plot_hparam_comparison(experiment_dir, metrics = ['Dice']):
     # collect all results
     results_means = []
     results_stds = []
-    for results_file in hparams['result_file']:
+    for results_file in hparams[file_field]:
         if Path(results_file).exists():
             results = pd.read_csv(results_file)
             # save results
@@ -133,10 +140,11 @@ def plot_hparam_comparison(experiment_dir, metrics = ['Dice']):
                         marker='x',
                         label=str(group)
                     )
-                # if the label is text, turn it
-                if not pd.api.types.is_numeric_dtype(data.loc[m_data.index, c]):
-                    ax.set_xticks(list(data.loc[m_data.index, c]))
-                    ax.set_xticklabels(list(data.loc[m_data.index, c]), rotation=45, ha='right')
+            # if the label is text, turn it
+            labels = hparams_changed[c]
+            if not pd.api.types.is_numeric_dtype(labels):
+                ax.set_xticks(list(labels))
+                ax.set_xticklabels(list(labels), rotation=45, ha='right')
             # ylabel if it is the first image
             if c == changed_params[0]:
                 ax.set_ylabel(m)
@@ -153,7 +161,7 @@ def plot_hparam_comparison(experiment_dir, metrics = ['Dice']):
 
     fig.suptitle('Hypereparameter Comparison')
     plt.tight_layout()
-    plt.savefig(experiment_dir / 'hyperparameter_comparison.pdf')
+    plt.savefig(experiment_dir / result_name)
     plt.close()
 
 
@@ -164,7 +172,9 @@ def compare_hyperparameters(experiments, experiment_dir):
     # collect all results
     hparams = []
     for e in experiments:
-        results_file = e.output_path / 'evaluation-all-files.csv'
+        res_name = 'evaluation-all-files.csv'
+        results_file = e.output_path / 'results_test' / res_name
+        results_file_external = e.output_path / 'results_external_testset' / res_name
         # and parameters
         hparams.append({
             **e.hyper_parameters['init_parameters'],
@@ -173,7 +183,8 @@ def compare_hyperparameters(experiments, experiment_dir):
             'loss' : e.hyper_parameters['loss'],
             'architecture' : e.hyper_parameters['architecture'].__name__,
             'dimensions' : e.hyper_parameters['dimensions'],
-            'result_file' : results_file
+            'result_file' : results_file,
+            'result_file_external_testset' : results_file_external
         })
 
     # convert to dataframes
@@ -191,8 +202,11 @@ def compare_hyperparameters(experiments, experiment_dir):
     if 'normalizing_method' in hparams_changed:
         hparams_changed.loc[:,'normalizing_method'] = hparams_changed['normalizing_method'].apply(lambda x: x.name)
     # ignore do_bias (it is set the opposite to batch_norm)
-    if 'do_bias' in hparams_changed and 'do_batch_normalization'  in hparams_changed:
+    if 'do_bias' in hparams_changed and 'do_batch_normalization' in hparams_changed:
         hparams_changed.drop(columns='do_bias', inplace=True)
+    # drop column specifying the files
+    if 'result_file_external_testset' in hparams_changed:
+        hparams_changed.drop(columns='result_file_external_testset', inplace=True)
 
     hparams.to_csv(hyperparameter_file)
     hparams_changed.to_csv(hyperparameter_changed_file)
@@ -232,9 +246,13 @@ if __name__ == '__main__':
     logger.addHandler(ch)
     tf_logger.addHandler(ch)
 
+    # load training files
     train_list = np.loadtxt(data_dir / 'train_IDs.csv', dtype='str')
+    train_list = np.array([str(data_dir / t) for t in train_list])
 
-    data_list = np.array([str(data_dir / t) for t in train_list])
+    # load test files
+    test_list = np.loadtxt(data_dir / 'test_IDs.csv', dtype='str')
+    test_list = np.array([str(data_dir / t) for t in test_list])
 
     k_fold = 5
 
@@ -326,7 +344,8 @@ if __name__ == '__main__':
                     hyper_parameters=hyper_parameters,
                     name=experiment_name,
                     output_path=current_experiment_path,
-                    data_set=data_list,
+                    data_set=train_list,
+                    external_test_set=test_list,
                     folds=k_fold,
                     num_channels=n_channels,
                     folds_dir=experiment_dir / 'folds',
@@ -392,8 +411,11 @@ if __name__ == '__main__':
 
         # evaluate all experiments
         e.evaluate()
+        # also evaluate on the external testset
+        e.evaluate_external_testset()
         # do intermediate plots (at least try to)
         try:
             plot_hparam_comparison(experiment_dir)
+            plot_hparam_comparison(experiment_dir, external=True)
         except Exception as e:
             print(f'Failed to to intermediate plots because of {e}.')

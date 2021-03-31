@@ -28,10 +28,15 @@ class SegLoader(SegBasisLoader):
         sitk.Image, sitk.Image
             The converted images
         """
-        label_img = sitk.Threshold(label_img, upper=cfg.num_classes_seg-1, outsideValue=cfg.num_classes_seg-1)
-        # label should be uint-8
-        if label_img.GetPixelID() != sitk.sitkUInt8:
-            label_img = sitk.Cast(label_img, sitk.sitkUInt8)
+        if label_img is not None:
+            label_img = sitk.Threshold(
+                label_img,
+                upper=cfg.num_classes_seg-1,
+                outsideValue=cfg.num_classes_seg-1
+            )
+            # label should be uint-8
+            if label_img.GetPixelID() != sitk.sitkUInt8:
+                label_img = sitk.Cast(label_img, sitk.sitkUInt8)
         return data_img, label_img
 
 class ApplyLoader(ApplyBasisLoader):
