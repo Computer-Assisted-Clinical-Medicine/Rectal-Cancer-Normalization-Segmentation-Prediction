@@ -1,7 +1,7 @@
 import copy
 import logging
 import os
-from pathlib import Path
+from pathlib import Path, PurePath
 import stat
 import sys
 from typing import List
@@ -26,7 +26,7 @@ logger.setLevel(logging.DEBUG)
 class Experiment():
 
     def __init__(self, name:str, hyper_parameters:dict, data_set:List, external_test_set=None, folds=5, seed=42, num_channels=1,
-                 output_path=None, restart=False, reinitialize_folds=False, folds_dir=None, preprocessed_dir=None,
+                 output_path_rel=None, restart=False, reinitialize_folds=False, folds_dir_rel=None, preprocessed_dir_rel=None,
                  tensorboard_images=False):
         """Run experiments using a fixed set of hyperparameters
 
@@ -46,17 +46,18 @@ class Experiment():
                 the global seed, by default 42
             num_channels: int, optional
                 the number of channels in the data, default 1
-            output_path : str, optional
-                path to write output in, if None and not on server, Experiments is used, by default None
+            output_path_rel : str, optional
+                path to write output in (relative to the experiment_dir env. variable),
+                if None Experiments is used, by default None
             restart : bool, optional
                 If already finished folds should be restarted, by default False
             reinitialize_folds : bool, optional
                 If set to true, the split for the folds will be redone, by default False
-            folds_dir : str, optional
-                Where the fold descripions should be saved. All experiments sharing the 
-                same folds should have the same directory here, by default outputdir
-            preprocessed_dir : str, optional
-                Where the preprocessed files are saved,
+            folds_dir_rel : str, optional
+                Where the fold descripions should be saved (relative to the experiment_dir env. variable).
+                All experiments sharing the same folds should have the same directory here, by default outputdir/folds
+            preprocessed_dir_rel : str, optional
+                Where the preprocessed files are saved (relative to the experiment_dir env. variable),
             self.tensorboard_images : bool, optional
                 Wether to write images to tensorboard, this takes a bit, so should only be used for debugging, by default False
         """
@@ -72,6 +73,9 @@ class Experiment():
         if self.external_test_set is not None:
             self.external_test_set = np.array(self.external_test_set)
 
+        # get the environmental variables
+        self.data_dir = Path(os.environ['data_dir'])
+        self.experiment_dir = Path(os.environ['experiment_dir'])
 
         # check input
         if len(data_set) == 0:
@@ -79,10 +83,15 @@ class Experiment():
         if cfg.number_of_vald*self.folds > self.data_set.size:
             raise ValueError('Dataset to small for the specified folds.')
 
-        if output_path == None:
-            self.output_path = Path('Experiments', self.name)
+        if output_path_rel == None:
+            self.output_path_rel = PurePath('Experiments', self.name)
         else:
-            self.output_path = Path(output_path)
+            self.output_path_rel = PurePath(output_path_rel)
+            if self.output_path_rel.is_absolute():
+                raise ValueError(f'output_path_rel is an absolute path')
+
+        # set the absolute path (which will not be exported)
+        self.output_path = self.experiment_dir / Path(self.output_path_rel)
 
         if not self.output_path.exists():
             self.output_path.mkdir()
@@ -96,12 +105,17 @@ class Experiment():
         self.experiment_file = self.output_path / 'parameters.yaml'
 
         # set directory for folds
-        if folds_dir == None:
-            self.folds_dir = self.output_path
+        if folds_dir_rel == None:
+            self.folds_dir_rel = self.output_path / 'folds'
         else:
-            self.folds_dir = Path(folds_dir)
-        if not folds_dir.exists():
-            folds_dir.mkdir(parents=True)
+            self.folds_dir_rel = PurePath(folds_dir_rel)
+            if self.folds_dir_rel.is_absolute():
+                raise ValueError(f'folds_dir_rel is an absolute path')
+
+        self.folds_dir = self.experiment_dir / Path(self.folds_dir_rel)
+
+        if not self.folds_dir.exists():
+            self.folds_dir.mkdir(parents=True)
 
         #set fold directory names
         self.fold_dir_names = [f'fold-{f}' for f in range(self.folds)]
@@ -122,7 +136,14 @@ class Experiment():
 
         self.restart = restart
 
-        self.preprocessed_dir = preprocessed_dir
+        self.preprocessed_dir_rel = PurePath(preprocessed_dir_rel)
+
+        if self.preprocessed_dir_rel.is_absolute():
+            raise ValueError(f'preprocessed_dir_rel is an absolute path')
+
+        self.preprocessed_dir = self.experiment_dir / Path(self.preprocessed_dir_rel)
+        if not self.preprocessed_dir.exists():
+            self.preprocessed_dir.mkdir()
 
         self.tensorboard_images = tensorboard_images
 
@@ -383,8 +404,14 @@ class Experiment():
             )
 
         logger.info('Started applying %s to test datset.', folder_name)
+
+        apply_path = self.output_path/folder_name/apply_name
         for f in tqdm(test_files, desc=f'{folder_name} (test)', unit='file'):
-            net.apply(testloader, f, apply_path=self.output_path/folder_name/apply_name)
+            result_image = apply_path/f'sample-{f.name}-preprocessed{cfg.file_suffix}'
+            if not result_image.exists():
+                net.apply(testloader, f, apply_path=apply_path)
+
+            # TODO: postprocess the images
 
         tf.keras.backend.clear_session()
 
@@ -469,6 +496,11 @@ class Experiment():
         train_files = np.loadtxt(self.datasets[f]['train'], dtype='str', delimiter=',')
         vald_files = np.loadtxt(self.datasets[f]['vald'], dtype='str', delimiter=',')
         test_files = np.loadtxt(self.datasets[f]['test'], dtype='str', delimiter=',')
+
+        # add the path
+        train_files = np.array([self.data_dir / t for t in train_files])
+        vald_files = np.array([self.data_dir / t for t in vald_files])
+        test_files = np.array([self.data_dir / t for t in test_files])
 
         if not folddir.exists():
             folddir.mkdir()
@@ -582,11 +614,11 @@ class Experiment():
             'folds' : self.folds,
             'seed' : self.seed,
             'num_channels' : self.num_channels,
-            'output_path' : self.output_path,
+            'output_path_rel' : self.output_path_rel,
             'restart' : self.restart,
             'reinitialize_folds' : self.reinitialize_folds,
-            'folds_dir' : self.folds_dir,
-            'preprocessed_dir' : self.preprocessed_dir,
+            'folds_dir' : self.folds_dir_rel,
+            'preprocessed_dir_rel' : self.preprocessed_dir_rel,
             'tensorboard_images' : self.tensorboard_images
         }
         with open(self.experiment_file, 'w') as f:
@@ -598,7 +630,7 @@ class Experiment():
         return Experiment(**parameters)
 
     def export_slurm_file(self, working_dir):
-        run_script = Path(sys.argv[0]).absolute().parent / 'run_single_experiment.py'
+        run_script = Path(sys.argv[0]).resolve().parent / 'run_single_experiment.py'
         job_dir = Path(os.environ['experiment_dir']) / 'slurm_jobs'
         if not job_dir.exists():
             job_dir.mkdir()
@@ -614,7 +646,7 @@ class Experiment():
             filename = job_file,
             command=f'python {run_script} -f $SLURM_ARRAY_TASK_ID -e {self.output_path}',
             job_name=self.name,
-            venv_dir=Path(sys.argv[0]).absolute().parent / 'venv',
+            venv_dir=Path(sys.argv[0]).resolve().parent / 'venv',
             workingdir=working_dir,
             job_type=gpu_type,
             hours=24,
@@ -767,11 +799,11 @@ nvidia-smi
     if workingdir is None:
         slurm_file += 'cd $EXPDIR/nnUNet\n'
     else:
-        slurm_file += f'cd {Path(workingdir).absolute()}\n'
+        slurm_file += f'cd {Path(workingdir).resolve()}\n'
 
     # activate virtual environment
     slurm_file += '\necho "Activate virtual environment"\n'
-    slurm_file += f'source {Path(venv_dir).absolute()}/bin/activate\n'
+    slurm_file += f'source {Path(venv_dir).resolve()}/bin/activate\n'
 
 
     # run the real command

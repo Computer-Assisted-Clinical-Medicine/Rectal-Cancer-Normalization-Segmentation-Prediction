@@ -248,11 +248,11 @@ if __name__ == '__main__':
 
     # load training files
     train_list = np.loadtxt(data_dir / 'train_IDs.csv', dtype='str')
-    train_list = np.array([str(data_dir / t) for t in train_list])
+    train_list = np.array([str(t) for t in train_list])
 
     # load test files
     test_list = np.loadtxt(data_dir / 'test_IDs.csv', dtype='str')
-    test_list = np.array([str(data_dir / t) for t in test_list])
+    test_list = np.array([str(t) for t in test_list])
 
     k_fold = 5
 
@@ -312,13 +312,11 @@ if __name__ == '__main__':
     dimensions = [2, 3]
 
     #generate tensorflow command
-    tensorboard_command = f'tensorboard --logdir="{experiment_dir.absolute()}"'
+    tensorboard_command = f'tensorboard --logdir="{experiment_dir.resolve()}"'
     print(f'To see the progress in tensorboard, run:\n{tensorboard_command}')
 
     # set config
-    preprocessed_dir = experiment_dir / 'data_preprocessed'
-    if not preprocessed_dir.exists():
-        preprocessed_dir.mkdir()
+    preprocessed_dir = 'data_preprocessed'
 
     #set up all experiments
     experiments = []
@@ -336,20 +334,16 @@ if __name__ == '__main__':
                 #define experiment
                 experiment_name = generate_folder_name(hyper_parameters)
                 
-                current_experiment_path = Path(experiment_dir, experiment_name)
-                if not current_experiment_path.exists():
-                    current_experiment_path.mkdir()
-
                 experiment = Experiment(
                     hyper_parameters=hyper_parameters,
                     name=experiment_name,
-                    output_path=current_experiment_path,
+                    output_path_rel=experiment_name,
                     data_set=train_list,
                     external_test_set=test_list,
                     folds=k_fold,
                     num_channels=n_channels,
-                    folds_dir=experiment_dir / 'folds',
-                    preprocessed_dir=preprocessed_dir,
+                    folds_dir_rel='folds',
+                    preprocessed_dir_rel=preprocessed_dir,
                     tensorboard_images=True
                 )
                 experiments.append(experiment)
@@ -360,7 +354,7 @@ if __name__ == '__main__':
     # if on cluster, export slurm files
     if 'CLUSTER' in os.environ:
         slurm_files = []
-        working_dir = Path('').absolute()
+        working_dir = Path('').resolve()
         if not working_dir.exists():
             working_dir.mkdir()
         for e in experiments:
