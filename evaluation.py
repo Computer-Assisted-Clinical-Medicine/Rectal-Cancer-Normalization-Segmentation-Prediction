@@ -240,5 +240,5 @@ def make_boxplot_graphic(experiment_path, eval_files):
         #     except Exception:
         #         print(title, y_label, file_path)
 
-        plt.savefig(os.path.join(experiment_path, 'plots', title.replace(' ', '') + '.png'), transparent=True)
+        plt.savefig(os.path.join(experiment_path, 'plots', title.replace(' ', '') + '.png'), transparent=False)
         plt.close()

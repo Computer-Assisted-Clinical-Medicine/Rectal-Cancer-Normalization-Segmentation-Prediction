@@ -77,16 +77,23 @@ def generate_folder_name(hyper_parameters):
     return folder_name
 
 
-def plot_hparam_comparison(experiment_dir, metrics = ['Dice'], external=False):
+def plot_hparam_comparison(experiment_dir, metrics = ['Dice'], external=False, postprocessed=False):
     hparam_file = experiment_dir / 'hyperparameters.csv'
     hparam_changed_file = experiment_dir / 'hyperparameters_changed.csv'
 
     if external:
-        file_field = 'result_file_external_testset'
-        result_name = 'hyperparameter_comparison_external_testset.pdf'
+        file_field = 'results_file_external_testset'
+        result_name = 'hyperparameter_comparison_external_testset'
     else:
-        file_field = 'result_file'
-        result_name = 'hyperparameter_comparison.pdf'
+        file_field = 'results_file'
+        result_name = 'hyperparameter_comparison'
+
+    if postprocessed:
+        file_field += '_postprocessed'
+        result_name += '_postprocessed'
+
+    # add pdf
+    result_name += '.pdf'
 
     hparams = pd.read_csv(hparam_file)
     hparams_changed = pd.read_csv(hparam_changed_file)
@@ -173,8 +180,10 @@ def compare_hyperparameters(experiments, experiment_dir):
     hparams = []
     for e in experiments:
         res_name = 'evaluation-all-files.csv'
-        results_file = e.output_path / 'results_test' / res_name
-        results_file_external = e.output_path / 'results_external_testset' / res_name
+        results_file = e.output_path / 'results_test_final' / res_name
+        results_file_postprocessed = e.output_path / 'results_test_final-postprocessed' / res_name
+        results_file_external = e.output_path / 'results_external_testset_final' / res_name
+        results_file_external_testset_postprocessed = e.output_path / 'results_external_testset_final-postprocessed' / res_name
         # and parameters
         hparams.append({
             **e.hyper_parameters['init_parameters'],
@@ -183,8 +192,10 @@ def compare_hyperparameters(experiments, experiment_dir):
             'loss' : e.hyper_parameters['loss'],
             'architecture' : e.hyper_parameters['architecture'].__name__,
             'dimensions' : e.hyper_parameters['dimensions'],
-            'result_file' : results_file,
-            'result_file_external_testset' : results_file_external
+            'results_file' : results_file,
+            'results_file_postprocessed' : results_file_postprocessed,
+            'results_file_external_testset' : results_file_external,
+            'results_file_external_testset_postprocessed' : results_file_external_testset_postprocessed
         })
 
     # convert to dataframes
@@ -192,7 +203,7 @@ def compare_hyperparameters(experiments, experiment_dir):
     # find changed parameters
     changed_params = []
     # drop the results file when analyzing the changed hyperparameters
-    for c in hparams.drop(columns='result_file'):
+    for c in hparams.drop(columns='results_file'):
         if hparams[c].astype(str).unique().size > 1:
             changed_params.append(c)
     hparams_changed = hparams[changed_params].copy()
@@ -205,8 +216,14 @@ def compare_hyperparameters(experiments, experiment_dir):
     if 'do_bias' in hparams_changed and 'do_batch_normalization' in hparams_changed:
         hparams_changed.drop(columns='do_bias', inplace=True)
     # drop column specifying the files
-    if 'result_file_external_testset' in hparams_changed:
-        hparams_changed.drop(columns='result_file_external_testset', inplace=True)
+    if 'results_file_postprocessed' in hparams_changed:
+        hparams_changed.drop(columns='results_file_postprocessed', inplace=True)
+    # drop column specifying the files
+    if 'results_file_external_testset' in hparams_changed:
+        hparams_changed.drop(columns='results_file_external_testset', inplace=True)
+    # drop column specifying the files
+    if 'results_file_external_testset_postprocessed' in hparams_changed:
+        hparams_changed.drop(columns='results_file_external_testset_postprocessed', inplace=True)
 
     hparams.to_csv(hyperparameter_file)
     hparams_changed.to_csv(hyperparameter_changed_file)
@@ -411,5 +428,7 @@ if __name__ == '__main__':
         try:
             plot_hparam_comparison(experiment_dir)
             plot_hparam_comparison(experiment_dir, external=True)
+            plot_hparam_comparison(experiment_dir, postprocessed=True)
+            plot_hparam_comparison(experiment_dir, external=True, postprocessed=True)
         except Exception as e:
             print(f'Failed to to intermediate plots because of {e}.')
