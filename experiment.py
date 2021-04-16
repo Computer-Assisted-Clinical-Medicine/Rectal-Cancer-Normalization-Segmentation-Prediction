@@ -661,7 +661,7 @@ class Experiment():
             'output_path_rel' : self.output_path_rel,
             'restart' : self.restart,
             'reinitialize_folds' : self.reinitialize_folds,
-            'folds_dir' : self.folds_dir_rel,
+            'folds_dir_rel' : self.folds_dir_rel,
             'preprocessed_dir_rel' : self.preprocessed_dir_rel,
             'tensorboard_images' : self.tensorboard_images
         }
