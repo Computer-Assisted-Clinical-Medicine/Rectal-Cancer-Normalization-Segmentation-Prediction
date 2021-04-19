@@ -746,6 +746,14 @@ def export_slurm_job(filename, command, job_name=None, workingdir=None, venv_dir
     variables : dict, optional
         environmental variables to write {name : value} $EXPDIR can be used, by default {}
     """
+    # this new node dos not work
+    exclude_nodes = ['h08c0301', 'h08c0401', 'h08c0501']
+    if job_type == 'GPU_no_K80':
+        exclude_nodes += [
+            'h05c0101', 'h05c0201', 'h05c0301', 'h05c0401', 'h05c0501', 'h06c0301',
+            'h05c0601', 'h05c0701', 'h05c0801', 'h05c0901', 'h06c0101', 'h06c0201',
+            'h06c0401', 'h06c0501', 'h06c0601', 'h06c0701', 'h06c0801', 'h06c0901'
+        ]
 
     if job_type == 'CPU':
         assert(hours==0)
@@ -789,11 +797,9 @@ def export_slurm_job(filename, command, job_name=None, workingdir=None, venv_dir
     if job_type == 'GPU' or job_type == 'GPU_no_K80':
         slurm_file += '\n#SBATCH --partition=gpu-single\n'
         slurm_file += '#SBATCH --gres=gpu:1\n'
-    if job_type == 'GPU_no_K80':
-        # exclude all K80 nodes
-        slurm_file += '#SBATCH --exclude=h05c0101,h05c0201,h05c0301,h05c0401,h05c0501,'
-        slurm_file += 'h05c0601,h05c0701,h05c0801,h05c0901,h06c0101,h06c0201,h06c0301,'
-        slurm_file += 'h06c0401,h06c0501,h06c0601,h06c0701,h06c0801,h06c0901\n'
+
+    if len(exclude_nodes) > 0:
+        slurm_file += '#SBATCH --exclude=' + ','.join(exclude_nodes) + '\n'
 
     if array_job:
         slurm_file += f'\n#SBATCH --array={array_range}\n'
