@@ -648,13 +648,10 @@ class Experiment():
         self.evaluate(name='external_testset')
 
     def export_experiment(self):
-        if self.external_test_set is not None:
-            ext_set = [str(f) for f in self.external_test_set]
         experiment_dict = {
             'name' : self.name,
             'hyper_parameters' : self.hyper_parameters,
             'data_set' : [str(f) for f in self.data_set],
-            'external_test_set' : ext_set,
             'folds' : self.folds,
             'seed' : self.seed,
             'num_channels' : self.num_channels,
@@ -665,6 +662,9 @@ class Experiment():
             'preprocessed_dir_rel' : self.preprocessed_dir_rel,
             'tensorboard_images' : self.tensorboard_images
         }
+        if self.external_test_set is not None:
+            ext_set = [str(f) for f in self.external_test_set]
+            experiment_dict['external_test_set'] = ext_set
         with open(self.experiment_file, 'w') as f:
             yaml.dump(experiment_dict, f)
 

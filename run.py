@@ -192,6 +192,7 @@ def compare_hyperparameters(experiments, experiment_dir):
             'loss' : e.hyper_parameters['loss'],
             'architecture' : e.hyper_parameters['architecture'].__name__,
             'dimensions' : e.hyper_parameters['dimensions'],
+            'path' : e.output_path,
             'results_file' : results_file,
             'results_file_postprocessed' : results_file_postprocessed,
             'results_file_external_testset' : results_file_external,
@@ -215,6 +216,9 @@ def compare_hyperparameters(experiments, experiment_dir):
     # ignore do_bias (it is set the opposite to batch_norm)
     if 'do_bias' in hparams_changed and 'do_batch_normalization' in hparams_changed:
         hparams_changed.drop(columns='do_bias', inplace=True)
+    # drop column specifying the files
+    if 'path' in hparams_changed:
+        hparams_changed.drop(columns='path', inplace=True)
     # drop column specifying the files
     if 'results_file_postprocessed' in hparams_changed:
         hparams_changed.drop(columns='results_file_postprocessed', inplace=True)
