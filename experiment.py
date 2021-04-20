@@ -530,9 +530,9 @@ class Experiment():
         test_files = np.loadtxt(self.datasets[f]['test'], dtype='str', delimiter=',')
 
         # add the path
-        train_files = np.array([self.data_dir / t for t in train_files])
-        vald_files = np.array([self.data_dir / t for t in vald_files])
-        test_files = np.array([self.data_dir / t for t in test_files])
+        train_files = np.array([str(self.data_dir / t) for t in train_files])
+        vald_files = np.array([str(self.data_dir / t) for t in vald_files])
+        test_files = np.array([str(self.data_dir / t) for t in test_files])
 
         if not folddir.exists():
             folddir.mkdir()
