@@ -95,15 +95,15 @@ def plot_hparam_comparison(experiment_dir, metrics = ['Dice'], external=False, p
     # add pdf
     result_name += '.pdf'
 
-    hparams = pd.read_csv(hparam_file)
-    hparams_changed = pd.read_csv(hparam_changed_file)
+    hparams = pd.read_csv(hparam_file, sep=';')
+    hparams_changed = pd.read_csv(hparam_changed_file, sep=';')
     changed_params = hparams_changed.columns[1:]
     # collect all results
     results_means = []
     results_stds = []
     for results_file in hparams[file_field]:
         if Path(results_file).exists():
-            results = pd.read_csv(results_file)
+            results = pd.read_csv(results_file, sep=';')
             # save results
             results_means.append(results[metrics].mean())
             results_stds.append(results[metrics].std())
@@ -229,8 +229,8 @@ def compare_hyperparameters(experiments, experiment_dir):
     if 'results_file_external_testset_postprocessed' in hparams_changed:
         hparams_changed.drop(columns='results_file_external_testset_postprocessed', inplace=True)
 
-    hparams.to_csv(hyperparameter_file)
-    hparams_changed.to_csv(hyperparameter_changed_file)
+    hparams.to_csv(hyperparameter_file, sep=';')
+    hparams_changed.to_csv(hyperparameter_changed_file, sep=';')
 
 
 if __name__ == '__main__':

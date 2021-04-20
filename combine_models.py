@@ -21,7 +21,7 @@ def calculate_ensemble_weights(experiments, metric='Dice'):
         out_path = e.output_path
         result_path = out_path / 'results_test_final-postprocessed'
         result_file = result_path / 'evaluation-mean-results_test_final-postprocessed.csv'
-        results = pd.read_csv(result_file)
+        results = pd.read_csv(result_file, sep=';')
         assert results.shape[0] > 0, f'The result file is empty ({result_file})'
         print(result_file)
         print(results)
@@ -57,7 +57,7 @@ if __name__ == '__main__':
 
     hparam_file = experiment_dir / 'hyperparameters.csv'
     experiments = []
-    for e in pd.read_csv(hparam_file)['path']:
+    for e in pd.read_csv(hparam_file, sep=';')['path']:
         param_file = Path(e) / 'parameters.yaml'
         experiments.append(Experiment.from_file(param_file))
 
