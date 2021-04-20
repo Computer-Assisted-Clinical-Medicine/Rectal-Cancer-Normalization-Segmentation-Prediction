@@ -22,6 +22,9 @@ def calculate_ensemble_weights(experiments, metric='Dice'):
         result_path = out_path / 'results_test_final-postprocessed'
         result_file = result_path / 'evaluation-mean-results_test_final-postprocessed.csv'
         results = pd.read_csv(result_file)
+        assert results.shape[0] > 0, f'The result file is empty ({result_file})'
+        print(result_file)
+        print(results)
         for number, r in results.iterrows():
             models.append({
                 'model' : e.name,
@@ -29,6 +32,7 @@ def calculate_ensemble_weights(experiments, metric='Dice'):
                 'metric' : r[metric],
                 'fold_dir' : out_path / e.fold_dir_names[number]
             })
+    print(models)
     models = pd.DataFrame(models)
     # determine fold weight
     fold_mean = models.groupby('fold')['metric'].mean()

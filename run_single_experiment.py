@@ -85,7 +85,7 @@ experiment.run_fold(f)
 # try to evaluate it (this will only work if this is the last fold)
 try:
     experiment.evaluate()
-except:
+except FileNotFoundError:
     print('Could not evaluate the experiment (happens if not all folds are finished).')
 else:
     print('Evaluation finished.')
@@ -93,23 +93,21 @@ else:
 # try to evaluate the external testset
 try:
     experiment.evaluate_external_testset()
-except:
+except FileNotFoundError:
     print('Could not evaluate the experiment (happens if not all folds are finished).')
 else:
     print('Evaluation finished.')
 
 try:
     plot_hparam_comparison(experiment_dir)
-except Exception as e:
-    print(e)
+except FileNotFoundError:
     print('Plotting of hyperparameter comparison failed.')
 else:
     print('Hyperparameter comparison was plotted.')
 
 try:
     plot_hparam_comparison(experiment_dir, external=True)
-except Exception as e:
-    print(e)
+except FileNotFoundError:
     print('Plotting of hyperparameter comparison on the external testset failed.')
 else:
     print('Hyperparameter comparison on the external testset was plotted.')
