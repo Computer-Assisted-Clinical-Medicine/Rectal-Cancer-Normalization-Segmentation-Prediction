@@ -148,7 +148,7 @@ def combine_evaluation_results_from_folds(experiment_path, eval_files):
     # concatenate to one array
     all_statistics = pd.concat(all_statistics).sort_values('File Number')
     # write to file
-    all_statistics.to_csv(all_statistics_path)
+    all_statistics.to_csv(all_statistics_path, sep=';')
 
     for row in mean_statistics:
         with open(eval_mean_file_path, 'a', newline='') as evaluation_file:
@@ -166,7 +166,7 @@ def combine_evaluation_results_from_folds(experiment_path, eval_files):
 def _gather_individual_results(indiv_eval_file_path, header_row, mean_statistics, std_statistics, all_statistics):
 
     try:
-        results = pd.read_csv(indiv_eval_file_path, dtype=object)
+        results = pd.read_csv(indiv_eval_file_path, dtype=object, sep=';')
         #set index, the rest are numbers
         results = results.set_index('File Number').astype(float)
     except:
@@ -209,7 +209,7 @@ def make_boxplot_graphic(experiment_path, eval_files):
         for indiv_eval_file_path in eval_files:
 
             individual_results = pd.read_csv(indiv_eval_file_path, dtype=object,
-                                                usecols=[title]).values
+                                                usecols=[title], sep=';').values
             data.append(np.squeeze(np.float32(individual_results)))
 
             labels.append(indiv_eval_file_path.parent.name)

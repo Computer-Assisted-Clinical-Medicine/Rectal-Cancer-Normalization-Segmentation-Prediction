@@ -1,13 +1,14 @@
 import copy
 import logging
 import os
-from pathlib import Path, PurePath
 import stat
 import sys
+from pathlib import Path, PurePath
 from typing import List
 
 import GPUtil
 import numpy as np
+import pandas as pd
 import tensorflow as tf
 import yaml
 from tqdm import tqdm
@@ -16,9 +17,7 @@ import evaluation
 from seg_data_loader import ApplyLoader, SegLoader
 from SegmentationNetworkBasis import config as cfg
 from SegmentationNetworkBasis import postprocessing
-from SegmentationNetworkBasis.NetworkBasis.util import (make_csv_file,
-                                                        write_configurations,
-                                                        write_metrics_to_csv)
+from SegmentationNetworkBasis.NetworkBasis.util import write_configurations
 
 #configure logger
 logger = logging.getLogger(__name__)
@@ -464,8 +463,9 @@ class Experiment():
             raise FileNotFoundError(f'The apply path {apply_path} does not exist.')
 
         eval_file_path = self.output_path / folder_name / f'evaluation-{folder_name}-{version}_{name}.csv'
-        header_row = evaluation.make_csv_header()
-        make_csv_file(eval_file_path, header_row)
+
+        # remember the results
+        results = []
 
         for f in test_files:
             f = Path(f)
@@ -486,11 +486,16 @@ class Experiment():
                 )
 
                 #append result to eval file
-                write_metrics_to_csv(eval_file_path, header_row, result_metrics)
+                results.append(result_metrics)
                 logger.info('        Finished Evaluation for %s', file_number)
             except RuntimeError as err:
                 logger.error("    !!! Evaluation of %s failed for %s, %s", folder_name, f.name, err)
-        
+
+        # write evaluation results
+        results = pd.DataFrame(results)
+        results.set_index('File Number', inplace=True)
+        results.to_csv(eval_file_path, sep=';')
+
         return
 
 
