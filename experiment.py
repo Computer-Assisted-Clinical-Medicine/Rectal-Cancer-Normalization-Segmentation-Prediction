@@ -644,7 +644,7 @@ class Experiment():
             #make plots
             evaluation.make_boxplot_graphic(
                 output_path,
-                eval_files
+                output_path / 'evaluation-all-files.csv'
             )
 
     def evaluate_external_testset(self):

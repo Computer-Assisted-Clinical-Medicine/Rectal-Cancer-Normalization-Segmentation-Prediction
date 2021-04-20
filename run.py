@@ -108,7 +108,8 @@ def plot_hparam_comparison(experiment_dir, metrics = ['Dice'], external=False, p
             results_means.append(results[metrics].mean())
             results_stds.append(results[metrics].std())
         else:
-            print(f'Could not find the evaluation file {results_file}'
+            name = Path(results_file).parent.parent.name
+            print(f'Could not find the evaluation file for {name}'
                 +' (probably not finished with training yet).')
             results_means.append(pd.Series({m : pd.NA for m in metrics}))
             results_stds.append(pd.Series({m : pd.NA for m in metrics}))

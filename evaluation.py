@@ -1,43 +1,18 @@
-import csv
-import glob
 import logging
-import math
 import os
 
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import SimpleITK as sitk
-import tensorflow as tf
 
 import SegmentationNetworkBasis.NetworkBasis.image as Image
 import SegmentationNetworkBasis.NetworkBasis.metric as Metric
-from SegmentationNetworkBasis import config as cfg
-from SegmentationNetworkBasis.NetworkBasis.util import make_csv_file
 
 #configure logger
 logger = logging.getLogger(__name__)
 #disable the font manager logger
 logging.getLogger('matplotlib.font_manager').disabled = True
-
-def make_csv_header():
-    header_row = ['File Number', 'Slices']
-    header_row += ['Volume (L)', 'Volume (P)',
-                'Dice',
-                'Confusion Rate',
-                'Connectivity',
-                'Fragmentation',
-                # 'Volume Similarity',
-                'False Negative',
-                'False Positive',
-                'Hausdorff',
-                'Mean Symmetric Surface Distance',
-                # 'Median Symmetric Surface Distance',
-                # 'STD Symmetric Surface Distance',
-                # 'Max Symmetric Surface Distance'
-                ]
-
-    return header_row
 
 
 def evaluate_segmentation_prediction(result_metrics, prediction_path, label_path):
@@ -134,111 +109,57 @@ def combine_evaluation_results_from_folds(experiment_path, eval_files):
     eval_mean_file_path = os.path.join(experiment_path, 'evaluation-mean-' + experiment + '.csv')
     eval_std_file_path = os.path.join(experiment_path, 'evaluation-std-' + experiment + '.csv')
     all_statistics_path = os.path.join(experiment_path, 'evaluation-all-files.csv')
-    header_row = make_csv_header()
-    make_csv_file(eval_mean_file_path, header_row)
-    make_csv_file(eval_std_file_path, header_row)
-    mean_statistics = []
-    std_statistics = []
-    all_statistics = []
 
-    for indiv_eval_file_path in eval_files:
-        _gather_individual_results(indiv_eval_file_path, header_row,
-                                    mean_statistics, std_statistics, all_statistics)
+    statistics = []
+    for e in eval_files:
+        data = pd.read_csv(e, sep=';')
+        data['fold'] = e.parent.name
+        statistics.append(data)
 
     # concatenate to one array
-    all_statistics = pd.concat(all_statistics).sort_values('File Number')
+    statistics = pd.concat(statistics).sort_values('File Number')
     # write to file
-    all_statistics.to_csv(all_statistics_path, sep=';')
+    statistics.to_csv(all_statistics_path, sep=';')
 
-    for row in mean_statistics:
-        with open(eval_mean_file_path, 'a', newline='') as evaluation_file:
-            eval_csv_writer = csv.writer(evaluation_file, delimiter=',', quotechar='"',
-                                         quoting=csv.QUOTE_MINIMAL)
-            eval_csv_writer.writerow(row)
+    mean_statistics = statistics.groupby('fold').mean()
+    mean_statistics.to_csv(eval_mean_file_path, sep=';')
 
-    for row in std_statistics:
-        with open(eval_std_file_path, 'a', newline='') as evaluation_file:
-            eval_csv_writer = csv.writer(evaluation_file, delimiter=',', quotechar='"',
-                                         quoting=csv.QUOTE_MINIMAL)
-            eval_csv_writer.writerow(row)
+    std_statistics = statistics.groupby('fold').std()
+    std_statistics.to_csv(eval_std_file_path, sep=';')
 
 
-def _gather_individual_results(indiv_eval_file_path, header_row, mean_statistics, std_statistics, all_statistics):
-
-    try:
-        results = pd.read_csv(indiv_eval_file_path, dtype=object, sep=';')
-        #set index, the rest are numbers
-        results = results.set_index('File Number').astype(float)
-    except:
-        logger.error('Could not find %s', indiv_eval_file_path)
-        raise FileNotFoundError('Could not find %s', indiv_eval_file_path)
-
-    if results.size > 0:
-
-        average_results = results.mean().values.tolist()
-        average_results = [indiv_eval_file_path.stem] + average_results
-        mean_statistics.append(average_results)
-
-        std_results = results.std().values.tolist()
-        std_results = [indiv_eval_file_path.stem] + std_results
-        std_statistics.append(std_results)
-
-        # append to all results
-        all_statistics.append(results)
-
-
-def make_boxplot_graphic(experiment_path, eval_files):
+def make_boxplot_graphic(experiment_path, result_file):
     if not os.path.exists(os.path.join(experiment_path, 'plots')):
         os.makedirs(os.path.join(experiment_path, 'plots'))
 
-    if len(eval_files) == 0:
+    if not os.path.exists(result_file):
+        raise FileNotFoundError('Result file not found')
+
+    results = pd.read_csv(result_file, sep=';')
+
+    if results.size == 0:
         logger.info('Eval files empty, no plots are being made')
         return
 
-    linewidth = 2
-    metrics = []
-    metrics += ['Dice', 'Connectivity',
-                'Fragmentation',
-                'Mean Symmetric Surface Distance']
+    metrics = ['Dice', 'Connectivity', 'Fragmentation', 'Mean Symmetric Surface Distance']
 
-    for title in metrics:
-        data = []
-        labels = []
-        path, experiment = os.path.split(experiment_path)
+    for m in metrics:
 
-        for indiv_eval_file_path in eval_files:
-
-            individual_results = pd.read_csv(indiv_eval_file_path, dtype=object,
-                                                usecols=[title], sep=';').values
-            data.append(np.squeeze(np.float32(individual_results)))
-
-            labels.append(indiv_eval_file_path.parent.name)
+        groups = results.groupby('fold')
+        labels = list(groups.groups.keys())
+        data = groups[m].apply(list).values
 
         f = plt.figure(figsize=(2 * len(data) + 5, 10))
         ax = plt.subplot(111)
         [i.set_linewidth(1) for i in ax.spines.values()]
 
-        ax.set_title(f'{experiment_path.name} {title}', pad=20)
+        ax.set_title(f'{experiment_path.name} {m}', pad=20)
         for item in ([ax.title, ax.xaxis.label, ax.yaxis.label] +
                      ax.get_xticklabels() + ax.get_yticklabels()):
             item.set_fontsize(20)
-        '''if any(x in title for x in ['Dice', 'Fragmentation', 'Connectivity']):
-            ax.set_ylim([0, 1])
-        else:
-            ax.set_ylabel('mm')
-            if 'Hausdorff' in title:
-                ax.set_ylim([0, 140])
-            elif 'Mean' in title:
-                ax.set_ylim([0, 40])'''
 
         p = plt.boxplot(data, notch=False, showmeans=True, showfliers=True, vert=True, widths=0.9,
                         patch_artist=True, labels=labels)
 
-        # with warnings.catch_warnings():
-        #     try:
-        #         tight_layout()
-        #     except Exception:
-        #         print(title, y_label, file_path)
-
-        plt.savefig(os.path.join(experiment_path, 'plots', title.replace(' ', '') + '.png'), transparent=False)
+        plt.savefig(os.path.join(experiment_path, 'plots', m.replace(' ', '') + '.png'), transparent=False)
         plt.close()
