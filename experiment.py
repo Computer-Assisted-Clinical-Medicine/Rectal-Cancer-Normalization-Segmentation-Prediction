@@ -25,7 +25,7 @@ logger.setLevel(logging.DEBUG)
 
 class Experiment():
 
-    def __init__(self, name:str, hyper_parameters:dict, data_set:List, external_test_set=None, folds=5, seed=42, num_channels=1,
+    def __init__(self, name:str, hyper_parameters:dict, data_set:List, external_test_set=None, folds=5, seed=None, num_channels=1,
                  output_path_rel=None, restart=False, reinitialize_folds=False, folds_dir_rel=None, preprocessed_dir_rel=None,
                  tensorboard_images=False):
         """Run experiments using a fixed set of hyperparameters
@@ -69,9 +69,9 @@ class Experiment():
         self.num_channels = num_channels
         self.reinitialize_folds = reinitialize_folds
         self.data_set = np.array(data_set)
-        self.external_test_set = external_test_set
-        if self.external_test_set is not None:
-            self.external_test_set = np.array(self.external_test_set)
+        if external_test_set is not None:
+            self.external_test_set = np.array(external_test_set)
+            assert self.external_test_set.size > 0, 'External test set is empty'
 
         # get the environmental variables
         self.data_dir = Path(os.environ['data_dir'])
@@ -144,6 +144,8 @@ class Experiment():
         self.preprocessed_dir = self.experiment_dir / Path(self.preprocessed_dir_rel)
         if not self.preprocessed_dir.exists():
             self.preprocessed_dir.mkdir()
+        # set preprocessing dir
+        cfg.preprocessed_dir = self.preprocessed_dir
 
         self.tensorboard_images = tensorboard_images
 
@@ -572,7 +574,7 @@ class Experiment():
             self.evaluate_fold(folder_name, test_files)
 
         # evaluate the postprocessed files
-        eval_file_path = folddir / f'evaluation-{folder_name}-final_postprocessed_test.csv'
+        eval_file_path = folddir / f'evaluation-{folder_name}-final-postprocessed_test.csv'
         if not eval_file_path.exists():
             self.evaluate_fold(folder_name, test_files, version='final-postprocessed')
 
@@ -581,6 +583,7 @@ class Experiment():
             # add the path
             external_test_set = np.array([self.data_dir / t for t in self.external_test_set])
             ext_eval = folddir / f'evaluation-{folder_name}-final_external_testset.csv'
+            # TODO: determine better if finished
             if ext_eval.exists():
                 tqdm.write('Already evaluated on external set, skip evaluation.')
                 logger.info('Already evaluated on external set, skip evaluation.')
@@ -597,7 +600,7 @@ class Experiment():
                     apply_name='apply_external_testset'
                 )
 
-            ext_eval = folddir / f'evaluation-{folder_name}-final_postprocessed_external_testset.csv'
+            ext_eval = folddir / f'evaluation-{folder_name}-final-postprocessed_external_testset.csv'
             if not ext_eval.exists():
                 self.evaluate_fold(
                     folder_name,
@@ -667,9 +670,10 @@ class Experiment():
             'preprocessed_dir_rel' : self.preprocessed_dir_rel,
             'tensorboard_images' : self.tensorboard_images
         }
-        if self.external_test_set is not None:
-            ext_set = [str(f) for f in self.external_test_set]
-            experiment_dict['external_test_set'] = ext_set
+        if hasattr(self, 'external_test_set'):
+            if self.external_test_set is not None:
+                ext_set = [str(f) for f in self.external_test_set]
+                experiment_dict['external_test_set'] = ext_set
         with open(self.experiment_file, 'w') as f:
             yaml.dump(experiment_dict, f)
 

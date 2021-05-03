@@ -100,15 +100,18 @@ def evaluate_segmentation_prediction(result_metrics, prediction_path, label_path
     return result_metrics
 
 
-def combine_evaluation_results_from_folds(experiment_path, eval_files):
+def combine_evaluation_results_from_folds(results_path, eval_files):
     if len(eval_files) == 0:
         logger.info('Eval files empty, nothing to combine')
         return
 
-    path, experiment = os.path.split(experiment_path)
-    eval_mean_file_path = os.path.join(experiment_path, 'evaluation-mean-' + experiment + '.csv')
-    eval_std_file_path = os.path.join(experiment_path, 'evaluation-std-' + experiment + '.csv')
-    all_statistics_path = os.path.join(experiment_path, 'evaluation-all-files.csv')
+    if not os.path.exists(results_path):
+        os.mkdir(results_path)
+
+    _, experiment = os.path.split(results_path)
+    eval_mean_file_path = os.path.join(results_path, 'evaluation-mean-' + experiment + '.csv')
+    eval_std_file_path = os.path.join(results_path, 'evaluation-std-' + experiment + '.csv')
+    all_statistics_path = os.path.join(results_path, 'evaluation-all-files.csv')
 
     statistics = []
     for e in eval_files:
@@ -128,9 +131,9 @@ def combine_evaluation_results_from_folds(experiment_path, eval_files):
     std_statistics.to_csv(eval_std_file_path, sep=';')
 
 
-def make_boxplot_graphic(experiment_path, result_file):
-    if not os.path.exists(os.path.join(experiment_path, 'plots')):
-        os.makedirs(os.path.join(experiment_path, 'plots'))
+def make_boxplot_graphic(results_path, result_file):
+    if not os.path.exists(os.path.join(results_path, 'plots')):
+        os.makedirs(os.path.join(results_path, 'plots'))
 
     if not os.path.exists(result_file):
         raise FileNotFoundError('Result file not found')
@@ -153,7 +156,7 @@ def make_boxplot_graphic(experiment_path, result_file):
         ax = plt.subplot(111)
         [i.set_linewidth(1) for i in ax.spines.values()]
 
-        ax.set_title(f'{experiment_path.name} {m}', pad=20)
+        ax.set_title(f'{results_path.name} {m}', pad=20)
         for item in ([ax.title, ax.xaxis.label, ax.yaxis.label] +
                      ax.get_xticklabels() + ax.get_yticklabels()):
             item.set_fontsize(20)
@@ -161,5 +164,5 @@ def make_boxplot_graphic(experiment_path, result_file):
         p = plt.boxplot(data, notch=False, showmeans=True, showfliers=True, vert=True, widths=0.9,
                         patch_artist=True, labels=labels)
 
-        plt.savefig(os.path.join(experiment_path, 'plots', m.replace(' ', '') + '.png'), transparent=False)
+        plt.savefig(os.path.join(results_path, 'plots', m.replace(' ', '') + '.png'), transparent=False)
         plt.close()
