@@ -43,7 +43,7 @@ class Experiment():
             folds : int, optional
                 The number of folds to use for validation, by default 5
             seed : int, optional
-                the global seed, by default 42
+                the global seed, by default None
             num_channels: int, optional
                 the number of channels in the data, default 1
             output_path_rel : str, optional
@@ -152,7 +152,13 @@ class Experiment():
         # set postprocessing method
         self.postprocessing_method = postprocessing.keep_big_structures
 
-        #export parameters
+        # set batch size
+        # determine batch size
+        if 'batch_size' not in self.hyper_parameters['train_parameters']:
+            bs = self.estimate_batch_size()
+            self.hyper_parameters['train_parameters']['batch_size'] = int(bs)
+
+        # export parameters
         self.export_experiment()
 
         return
@@ -217,8 +223,7 @@ class Experiment():
         cfg.train_dim = 128 # the resolution in plane
         cfg.num_slices_train = 32 # the resolution in z-direction
 
-        # determine batch size
-        cfg.batch_size_train = self.estimate_batch_size()
+        cfg.batch_size_train = self.hyper_parameters['train_parameters']['batch_size']
         cfg.batch_size_valid = cfg.batch_size_train
 
         # set shape according to the dimension

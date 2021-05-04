@@ -64,6 +64,7 @@ def gather_results(experiment_dir, external=False, postprocessed=False, combined
     results_all['fold'] = pd.Categorical(results_all['fold'])
     results_all['name'] = pd.Categorical(results_all['name'])
     results_all.index = pd.RangeIndex(results_all.shape[0])
+    results_all.sort_values('File Number', inplace=True)
     return results_all
 
 
@@ -104,6 +105,7 @@ data_dir = Path(os.environ['data_dir'])
 experiment_dir = Path(os.environ['experiment_dir'])
 
 results_ex = gather_results(experiment_dir, combined=True, external=True)
+results_ex = results_ex[np.logical_not(results_ex['File Number'].str.startswith('99'))]
 
 sns.catplot(data=results_ex, y='name', x='Dice', kind='box', aspect=2)
 plt.show()
@@ -117,7 +119,32 @@ sns.catplot(data=results_ex, y='fold', x='Dice', kind='box', aspect=2)
 plt.show()
 plt.close()
 
-sns.catplot(data=results_ex, y='File Number', x='Dice', kind='box', aspect=1.4, height=4)
+sns.catplot(data=results_ex, y='File Number', x='Dice', kind='box', aspect=1.4, height=6)
 plt.show()
 plt.close()
-# %%
+# %% [markdown]
+'''
+## Do the analysis for the data from Barbara
+'''
+
+data_dir = Path(os.environ['data_dir'])
+experiment_dir = Path(os.environ['experiment_dir'])
+
+results_ex = gather_results(experiment_dir, combined=True, external=True)
+results_ex = results_ex[results_ex['File Number'].str.startswith('99')]
+
+sns.catplot(data=results_ex, y='name', x='Dice', kind='box', aspect=2)
+plt.show()
+plt.close()
+
+sns.catplot(data=results_ex, y='name', x='Dice', hue='fold', kind='box', aspect=2)
+plt.show()
+plt.close()
+
+sns.catplot(data=results_ex, y='fold', x='Dice', kind='box', aspect=2)
+plt.show()
+plt.close()
+
+sns.catplot(data=results_ex, y='File Number', x='Dice', kind='box', aspect=0.3, height=15)
+plt.show()
+plt.close()

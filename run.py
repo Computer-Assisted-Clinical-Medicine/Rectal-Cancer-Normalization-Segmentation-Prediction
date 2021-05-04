@@ -114,6 +114,10 @@ def plot_hparam_comparison(experiment_dir, metrics = ['Dice'], external=False, p
             results_means.append(pd.Series({m : pd.NA for m in metrics}))
             results_stds.append(pd.Series({m : pd.NA for m in metrics}))
 
+    if len(results_means) == 0:
+        print('No files to evaluate')
+        return
+
     # convert to dataframes
     results_means = pd.DataFrame(results_means)
     results_stds = pd.DataFrame(results_stds)
@@ -352,6 +356,11 @@ if __name__ == '__main__':
                 hyper_parameters['init_parameters']['do_batch_normalization'] = b
                 hyper_parameters['init_parameters']['do_bias'] = not b # bias should be the opposite of batch norm
                 hyper_parameters['data_loader_parameters']['normalizing_method'] = n
+
+                # if d == 3:
+                #     f = 4
+                #     n_filters = [f*8, f*16, f*32, f*64, f*128]
+                #     hyper_parameters['init_parameters']['n_filters'] = n_filters
 
                 #define experiment
                 experiment_name = generate_folder_name(hyper_parameters)
