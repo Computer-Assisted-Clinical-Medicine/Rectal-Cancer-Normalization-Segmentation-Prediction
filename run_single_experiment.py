@@ -100,6 +100,7 @@ else:
 
 try:
     plot_hparam_comparison(experiment_dir)
+    plot_hparam_comparison(experiment_dir, postprocessed=True)
 except FileNotFoundError:
     print('Plotting of hyperparameter comparison failed.')
 else:
@@ -107,6 +108,7 @@ else:
 
 try:
     plot_hparam_comparison(experiment_dir, external=True)
+    plot_hparam_comparison(experiment_dir, external=True, postprocessed=True)
 except FileNotFoundError:
     print('Plotting of hyperparameter comparison on the external testset failed.')
 else:

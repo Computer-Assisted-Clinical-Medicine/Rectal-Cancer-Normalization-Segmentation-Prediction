@@ -152,12 +152,6 @@ class Experiment():
         # set postprocessing method
         self.postprocessing_method = postprocessing.keep_big_structures
 
-        # set batch size
-        # determine batch size
-        if 'batch_size' not in self.hyper_parameters['train_parameters']:
-            bs = self.estimate_batch_size()
-            self.hyper_parameters['train_parameters']['batch_size'] = int(bs)
-
         # export parameters
         self.export_experiment()
 
@@ -214,10 +208,29 @@ class Experiment():
                 np.savetxt(self.datasets[f]['test'], test_files, fmt='%s', header='path')
         return
 
-    def _set_parameters_according_to_dimension(self):
+    def _set_parameters(self):
         """This function will set up the shapes in the cfg module so that they
-        will run on the current GPU.
+        will run on the current GPU and will set the parameters for the
+        augmentation.
         """
+
+        # determine batch size if not set
+        if 'batch_size' not in self.hyper_parameters['train_parameters']:
+            bs = self.estimate_batch_size()
+            self.hyper_parameters['train_parameters']['batch_size'] = int(bs)
+
+        # set noise parameters
+        # noise
+        cfg.add_noise = self.hyper_parameters['train_parameters']['add_noise']
+        if cfg.add_noise:
+            cfg.noise_typ = self.hyper_parameters['train_parameters']['noise_typ']
+            cfg.standard_deviation = self.hyper_parameters['train_parameters']['standard_deviation']
+            cfg.mean_poisson = self.hyper_parameters['train_parameters']['mean_poisson']    
+        # rotation
+        cfg.max_rotation = self.hyper_parameters['train_parameters']['max_rotation']
+        # scale change
+        cfg.min_resolution_augment = self.hyper_parameters['train_parameters']['min_resolution_augment']
+        cfg.max_resolution_augment = self.hyper_parameters['train_parameters']['max_resolution_augment']
 
         cfg.num_channels = self.num_channels
         cfg.train_dim = 128 # the resolution in plane
@@ -552,7 +565,7 @@ class Experiment():
             f, train_files.size, vald_files.size, test_files.size
         )
 
-        self._set_parameters_according_to_dimension()
+        self._set_parameters()
 
         epoch_samples = cfg.samples_per_volume * cfg.num_files
         if not epoch_samples % cfg.batch_size_train == 0:

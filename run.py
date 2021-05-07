@@ -153,10 +153,13 @@ def plot_hparam_comparison(experiment_dir, metrics = ['Dice'], external=False, p
                         label=str(group)
                     )
             # if the label is text, turn it
-            labels = hparams_changed[c]
-            if not pd.api.types.is_numeric_dtype(labels):
-                ax.set_xticks(list(labels))
-                ax.set_xticklabels(list(labels), rotation=45, ha='right')
+            if not pd.api.types.is_numeric_dtype(hparams_changed[c]):
+                plt.setp(
+                    ax.get_xticklabels(),
+                    rotation=45,
+                    ha='right',
+                    rotation_mode='anchor'
+                )
             # ylabel if it is the first image
             if c == changed_params[0]:
                 ax.set_ylabel(m)
@@ -310,11 +313,17 @@ if __name__ == '__main__':
         "l_r" : 0.001,
         "optimizer" : "Adam",
         "epochs" : 100,
+        # scheduling parameters
         "early_stopping" : True,
         "patience_es" : 15,
         "reduce_lr_on_plateau" : True,
         "patience_lr_plat" : 5,
-        "factor_lr_plat" : 0.5
+        "factor_lr_plat" : 0.5,
+        # Augmentation parameters
+        "add_noise" : False,
+        "max_rotation" : 0,
+        "min_resolution_augment" : 1,
+        "max_resolution_augment" : 1
     }
 
     data_loader_parameters = {
@@ -358,16 +367,18 @@ if __name__ == '__main__':
                 }
                 hyper_parameters['init_parameters']['do_batch_normalization'] = b
                 hyper_parameters['init_parameters']['do_bias'] = not b # bias should be the opposite of batch norm
-                hyper_parameters['data_loader_parameters']['normalizing_method'] = n
+                hyper_parameters['data_loader_parameters']['normalizing_method'] = n                 
 
-                if d == 3:
-                    f = 4
-                    n_filters = [f*8, f*16, f*32, f*64, f*128]
-                    hyper_parameters['init_parameters']['n_filters'] = n_filters
-                else:
-                    f = 8
-                    n_filters = [f*8, f*16, f*32, f*64, f*128]
-                    hyper_parameters['init_parameters']['n_filters'] = n_filters                    
+                # use less filters for 3D on local computer
+                if not 'CLUSTER' in os.environ:
+                    if d == 3:
+                        f = 4
+                        n_filters = [f*8, f*16, f*32, f*64, f*128]
+                        hyper_parameters['init_parameters']['n_filters'] = n_filters
+                    else:
+                        f = 8
+                        n_filters = [f*8, f*16, f*32, f*64, f*128]
+                        hyper_parameters['init_parameters']['n_filters'] = n_filters                    
 
                 #define experiment
                 experiment_name = generate_folder_name(hyper_parameters)
