@@ -218,6 +218,9 @@ def compare_hyperparameters(experiments, experiment_dir):
         hparams_changed.loc[:,'n_filters'] = hparams_changed['n_filters'].apply(lambda x: x[0])
     if 'normalizing_method' in hparams_changed:
         hparams_changed.loc[:,'normalizing_method'] = hparams_changed['normalizing_method'].apply(lambda x: x.name)
+    # ignore the batch size (it correlates with the dimension)
+    if 'batch_size' in hparams_changed:
+        hparams_changed.drop(columns='batch_size', inplace=True)
     # ignore do_bias (it is set the opposite to batch_norm)
     if 'do_bias' in hparams_changed and 'do_batch_normalization' in hparams_changed:
         hparams_changed.drop(columns='do_bias', inplace=True)
@@ -357,10 +360,14 @@ if __name__ == '__main__':
                 hyper_parameters['init_parameters']['do_bias'] = not b # bias should be the opposite of batch norm
                 hyper_parameters['data_loader_parameters']['normalizing_method'] = n
 
-                # if d == 3:
-                #     f = 4
-                #     n_filters = [f*8, f*16, f*32, f*64, f*128]
-                #     hyper_parameters['init_parameters']['n_filters'] = n_filters
+                if d == 3:
+                    f = 4
+                    n_filters = [f*8, f*16, f*32, f*64, f*128]
+                    hyper_parameters['init_parameters']['n_filters'] = n_filters
+                else:
+                    f = 8
+                    n_filters = [f*8, f*16, f*32, f*64, f*128]
+                    hyper_parameters['init_parameters']['n_filters'] = n_filters                    
 
                 #define experiment
                 experiment_name = generate_folder_name(hyper_parameters)

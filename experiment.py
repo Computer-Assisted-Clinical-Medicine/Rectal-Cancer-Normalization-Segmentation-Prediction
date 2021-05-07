@@ -353,7 +353,7 @@ class Experiment():
                 **self.hyper_parameters['data_loader_parameters']
             )(
                 [train_files[np.random.randint(len(train_files))]],
-                batch_size=1,
+                batch_size=cfg.batch_size_train,
                 read_threads=1,
                 n_epochs=self.hyper_parameters['train_parameters']['epochs']
             )
@@ -660,7 +660,10 @@ class Experiment():
         """
         self.evaluate(name='external_testset')
 
-    def export_experiment(self):
+    def export_experiment(self, overwrite=False):
+        # do not overwrite it
+        if not overwrite and self.experiment_file.exists():
+            return
         experiment_dict = {
             'name' : self.name,
             'hyper_parameters' : self.hyper_parameters,
@@ -681,6 +684,7 @@ class Experiment():
                 experiment_dict['external_test_set'] = ext_set
         with open(self.experiment_file, 'w') as f:
             yaml.dump(experiment_dict, f)
+        return
 
     def from_file(file):
         with open(file, 'r') as f:

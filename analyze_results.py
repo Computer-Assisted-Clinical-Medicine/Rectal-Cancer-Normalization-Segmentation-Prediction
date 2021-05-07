@@ -96,6 +96,27 @@ sns.catplot(data=results, y='File Number', x='Dice', kind='box', aspect=.3, heig
 plt.show()
 plt.close()
 
+results_mean = results.groupby('File Number').mean()
+plt.scatter(x=results_mean['Volume (L)'],y=results_mean['Dice'])
+plt.xlabel('GT Volume')
+plt.ylabel('Dice')
+plt.show()
+plt.close()
+
+results_mean = results.groupby('File Number').mean()
+plt.scatter(x=results_mean['Volume (L)'],y=results_mean['Hausdorff'])
+plt.xlabel('GT Volume')
+plt.ylabel('Hausdorff')
+plt.show()
+plt.close()
+
+plt.scatter(x=results_mean['Volume (L)'],y=results_mean['Volume (P)'])
+plt.plot([0,140], [0,140])
+plt.xlabel('GT Volume')
+plt.ylabel('Predicted Volume')
+plt.show()
+plt.close()
+
 # %% [markdown]
 '''
 ## Do the analysis for the test-set
@@ -119,9 +140,23 @@ sns.catplot(data=results_ex, y='fold', x='Dice', kind='box', aspect=2)
 plt.show()
 plt.close()
 
-sns.catplot(data=results_ex, y='File Number', x='Dice', kind='box', aspect=1.4, height=6)
+sns.catplot(data=results_ex, y='File Number', x='Dice', hue='name', kind='box', aspect=1.4, height=6)
 plt.show()
 plt.close()
+
+results_ex_mean = results_ex.groupby('File Number').mean()
+plt.scatter(x=results_ex_mean['Volume (L)'],y=results_ex_mean['Dice'])
+plt.xlabel('GT Volume')
+plt.ylabel('Dice')
+plt.show()
+plt.close()
+
+plt.scatter(x=results_ex_mean['Volume (L)'],y=results_ex_mean['Volume (P)'])
+plt.xlabel('GT Volume')
+plt.ylabel('Predicted Volume')
+plt.show()
+plt.close()
+
 # %% [markdown]
 '''
 ## Do the analysis for the data from Barbara
