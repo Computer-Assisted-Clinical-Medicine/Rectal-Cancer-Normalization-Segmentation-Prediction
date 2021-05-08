@@ -357,7 +357,7 @@ class Experiment():
             n_epochs=self.hyper_parameters['train_parameters']['epochs']
         )
 
-        # just use one sample with the foreground class using a random train file
+        # just use one sample with the foreground class using the validation files
         if self.tensorboard_images:
             visualization_dataset = SegLoader(
                 name='visualization',
@@ -365,7 +365,7 @@ class Experiment():
                 samples_per_volume=1,
                 **self.hyper_parameters['data_loader_parameters']
             )(
-                [train_files[np.random.randint(len(train_files))]],
+                vald_files,
                 batch_size=cfg.batch_size_train,
                 read_threads=1,
                 n_epochs=self.hyper_parameters['train_parameters']['epochs']

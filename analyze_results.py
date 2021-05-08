@@ -67,32 +67,49 @@ def gather_results(experiment_dir, external=False, postprocessed=False, combined
     results_all.sort_values('File Number', inplace=True)
     return results_all
 
+# %% [markdown]
+'''
+## Set Paths
+'''
+
+data_dir = Path(os.environ['data_dir'])
+experiment_dir = Path(os.environ['experiment_dir'])
+plot_dir = experiment_dir / 'plots'
+
+if not plot_dir.exists():
+    plot_dir.mkdir()
+
+def save(name):
+    # plt.savefig(plot_dir / f'{name}.pdf', dpi=600, facecolor='w')
+    plt.savefig(plot_dir / f'{name}.png', dpi=600, facecolor='w')
+
 
 # %% [markdown]
 '''
 ## Do the analysis for the training set
 '''
 
-data_dir = Path(os.environ['data_dir'])
-experiment_dir = Path(os.environ['experiment_dir'])
-
 results = gather_results(experiment_dir, combined=True)
 # 1035_1 is with fat supression
 results = results.drop(results.index[results['File Number'] == '1035_1'])
 
 sns.catplot(data=results, y='name', x='Dice', kind='box', aspect=2)
+save('results_dice_models')
 plt.show()
 plt.close()
 
 sns.catplot(data=results, y='name', x='Dice', hue='fold', kind='box', aspect=2)
+save('results_dice_models_folds')
 plt.show()
 plt.close()
 
 sns.catplot(data=results, y='fold', x='Dice', kind='box', aspect=2)
+save('results_dice_folds')
 plt.show()
 plt.close()
 
 sns.catplot(data=results, y='File Number', x='Dice', kind='box', aspect=.3, height=15)
+save('results_dice_files')
 plt.show()
 plt.close()
 
@@ -100,6 +117,7 @@ results_mean = results.groupby('File Number').mean()
 plt.scatter(x=results_mean['Volume (L)'],y=results_mean['Dice'])
 plt.xlabel('GT Volume')
 plt.ylabel('Dice')
+save('results_volume_vs_dice')
 plt.show()
 plt.close()
 
@@ -107,13 +125,17 @@ results_mean = results.groupby('File Number').mean()
 plt.scatter(x=results_mean['Volume (L)'],y=results_mean['Hausdorff'])
 plt.xlabel('GT Volume')
 plt.ylabel('Hausdorff')
+save('results_volume_vs_hausdorff')
 plt.show()
 plt.close()
 
 plt.scatter(x=results_mean['Volume (L)'],y=results_mean['Volume (P)'])
-plt.plot([0,140], [0,140])
+max_l = results_mean['Volume (L)'].max()
+max_p = results_mean['Volume (P)'].max()
+plt.plot([0, max_l], [0, max_p], color='gray')
 plt.xlabel('GT Volume')
 plt.ylabel('Predicted Volume')
+save('results_volume_vs_volume')
 plt.show()
 plt.close()
 
@@ -129,18 +151,22 @@ results_ex = gather_results(experiment_dir, combined=True, external=True)
 results_ex = results_ex[np.logical_not(results_ex['File Number'].str.startswith('99'))]
 
 sns.catplot(data=results_ex, y='name', x='Dice', kind='box', aspect=2)
+save('external_results_dice_models')
 plt.show()
 plt.close()
 
 sns.catplot(data=results_ex, y='name', x='Dice', hue='fold', kind='box', aspect=2)
+save('external_results_dice_models_folds')
 plt.show()
 plt.close()
 
 sns.catplot(data=results_ex, y='fold', x='Dice', kind='box', aspect=2)
+save('external_results_dice_folds')
 plt.show()
 plt.close()
 
 sns.catplot(data=results_ex, y='File Number', x='Dice', hue='name', kind='box', aspect=1.4, height=6)
+save('external_results_dice_files')
 plt.show()
 plt.close()
 
@@ -148,12 +174,17 @@ results_ex_mean = results_ex.groupby('File Number').mean()
 plt.scatter(x=results_ex_mean['Volume (L)'],y=results_ex_mean['Dice'])
 plt.xlabel('GT Volume')
 plt.ylabel('Dice')
+save('external_results_volume_vs_dice')
 plt.show()
 plt.close()
 
 plt.scatter(x=results_ex_mean['Volume (L)'],y=results_ex_mean['Volume (P)'])
+max_l = results_ex_mean['Volume (L)'].max()
+max_p = results_ex_mean['Volume (P)'].max()
+plt.plot([0, max_l], [0, max_p], color='gray')
 plt.xlabel('GT Volume')
 plt.ylabel('Predicted Volume')
+save('external_results_volume_vs_volume')
 plt.show()
 plt.close()
 

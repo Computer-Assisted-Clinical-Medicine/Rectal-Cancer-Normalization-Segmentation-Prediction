@@ -11,4 +11,5 @@ tensorflow-gpu==2.3.0
 tqdm==4.56.1
 PyYAML==5.4.1
 elasticdeform==0.4.7
+seaborn==0.11.1
 tensorboard-plugin-profile==2.4.0
