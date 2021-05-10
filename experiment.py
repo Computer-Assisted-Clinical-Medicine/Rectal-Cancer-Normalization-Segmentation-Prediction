@@ -214,29 +214,37 @@ class Experiment():
         augmentation.
         """
 
+        # use this to write less
+        hp_train = self.hyper_parameters['train_parameters']
+
+        # set sampling parameters
+        cfg.percent_of_object_samples = hp_train['percent_of_object_samples']
+        cfg.samples_per_volume = hp_train['samples_per_volume']
+        cfg.background_label_percentage = hp_train['background_label_percentage']
+
         # determine batch size if not set
-        if 'batch_size' not in self.hyper_parameters['train_parameters']:
+        if 'batch_size' not in hp_train:
             bs = self.estimate_batch_size()
-            self.hyper_parameters['train_parameters']['batch_size'] = int(bs)
+            hp_train['batch_size'] = int(bs)
 
         # set noise parameters
         # noise
-        cfg.add_noise = self.hyper_parameters['train_parameters']['add_noise']
+        cfg.add_noise = hp_train['add_noise']
         if cfg.add_noise:
-            cfg.noise_typ = self.hyper_parameters['train_parameters']['noise_typ']
-            cfg.standard_deviation = self.hyper_parameters['train_parameters']['standard_deviation']
-            cfg.mean_poisson = self.hyper_parameters['train_parameters']['mean_poisson']    
+            cfg.noise_typ = hp_train['noise_typ']
+            cfg.standard_deviation = hp_train['standard_deviation']
+            cfg.mean_poisson = hp_train['mean_poisson']    
         # rotation
-        cfg.max_rotation = self.hyper_parameters['train_parameters']['max_rotation']
+        cfg.max_rotation = hp_train['max_rotation']
         # scale change
-        cfg.min_resolution_augment = self.hyper_parameters['train_parameters']['min_resolution_augment']
-        cfg.max_resolution_augment = self.hyper_parameters['train_parameters']['max_resolution_augment']
+        cfg.min_resolution_augment = hp_train['min_resolution_augment']
+        cfg.max_resolution_augment = hp_train['max_resolution_augment']
 
         cfg.num_channels = self.num_channels
         cfg.train_dim = 128 # the resolution in plane
         cfg.num_slices_train = 32 # the resolution in z-direction
 
-        cfg.batch_size_train = self.hyper_parameters['train_parameters']['batch_size']
+        cfg.batch_size_train = hp_train['batch_size']
         cfg.batch_size_valid = cfg.batch_size_train
 
         # set shape according to the dimension
