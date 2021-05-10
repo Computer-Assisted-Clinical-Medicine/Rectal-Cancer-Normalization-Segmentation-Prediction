@@ -314,11 +314,15 @@ if __name__ == '__main__':
         "optimizer" : "Adam",
         "epochs" : 100,
         # scheduling parameters
-        "early_stopping" : True,
+        "early_stopping" : False,
         "patience_es" : 15,
         "reduce_lr_on_plateau" : True,
         "patience_lr_plat" : 5,
         "factor_lr_plat" : 0.5,
+        # sampling parameters
+        "percent_of_object_samples" : 0.33,
+        "samples_per_volume" : 80,
+        "background_label_percentage" : 0.15,
         # Augmentation parameters
         "add_noise" : False,
         "max_rotation" : 0,
@@ -340,8 +344,8 @@ if __name__ == '__main__':
 
     # normalization method
     normalization_methods = [
-        NORMALIZING.HM_QUANTILE, NORMALIZING.HM_QUANT_MEAN,
-        NORMALIZING.HISTOGRAM_MATCHING, NORMALIZING.Z_SCORE,
+        NORMALIZING.HM_QUANTILE, # NORMALIZING.HM_QUANT_MEAN,
+        # NORMALIZING.HISTOGRAM_MATCHING, NORMALIZING.Z_SCORE,
         NORMALIZING.QUANTILE, NORMALIZING.MEAN_STD
     ]
     # do batch norm
@@ -439,7 +443,7 @@ if __name__ == '__main__':
             logger.addHandler(fh_debug)
 
             try:
-                e.run_fold(f)
+                 e.run_fold(f)
             except Exception as e:
                 print(e)
                 print('Training failed')

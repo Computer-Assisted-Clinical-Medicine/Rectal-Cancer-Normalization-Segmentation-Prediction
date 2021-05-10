@@ -12,6 +12,44 @@ import seg_data_loader
 from SegmentationNetworkBasis import config as cfg
 from SegmentationNetworkBasis.segbasisloader import NORMALIZING
 
+def set_seeds():
+    tf.keras.backend.clear_session()
+    np.random.seed(42)
+    tf.random.set_seed(42)
+
+def get_loader(name, module, normalizing_method=NORMALIZING.QUANTILE):
+    #generate loader
+    if name == 'train':
+        data_loader = module.SegLoader(
+            name='training_loader',
+            normalizing_method=normalizing_method
+        )
+    elif name == 'vald':
+        data_loader = module.SegLoader(
+            mode=module.SegLoader.MODES.VALIDATE,
+            name='validation_loader'
+        )
+    elif name == 'test':
+        data_loader = module.ApplyLoader(
+            mode=module.SegLoader.MODES.APPLY,
+            name='test_loader'
+        )
+    return data_loader
+
+def load_dataset(test_dir):
+    # add data path
+    file_list = create_test_files.create_test_files(test_dir)
+
+    id_tensor = tf.squeeze(tf.convert_to_tensor(file_list, dtype=tf.string))
+    # Create dataset from list of file names
+    file_list_ds = tf.data.Dataset.from_tensor_slices(id_tensor)
+    # convert it back (for the right types)
+    files_list_b = list(file_list_ds.as_numpy_iterator())
+
+    cfg.num_files = len(file_list)
+
+    return file_list, files_list_b
+
 def set_parameters_according_to_dimension(dim, num_channels, preprocessed_dir):
     """This function will set up the shapes in the cfg module so that they
     will run on the current GPU.
@@ -303,7 +341,7 @@ def test_wrapper(dimension, name, module, normalizing_method):
         n_background = np.array(n_background)
 
         # get the fraction of samples containing a label
-        assert np.mean(n_objects.reshape(-1) > 0) > cfg.percent_of_object_samples / 100
+        assert np.mean(n_objects.reshape(-1) > 0) > cfg.percent_of_object_samples
 
 @pytest.mark.parametrize('module', modules)
 @pytest.mark.parametrize('normalizing_method', normalizing_methods)
@@ -333,44 +371,6 @@ def test_apply_loader(module, normalizing_method):
     image_data_stitched = loader.stitch_patches(image_data_windowed)
     image_data_stitched_no_padding = loader.remove_padding(image_data_stitched)
     assert np.allclose(padding_removed, image_data_stitched_no_padding)
-
-def set_seeds():
-    tf.keras.backend.clear_session()
-    np.random.seed(42)
-    tf.random.set_seed(42)
-
-def get_loader(name, module, normalizing_method):
-    #generate loader
-    if name == 'train':
-        data_loader = module.SegLoader(
-            name='training_loader',
-            normalizing_method=normalizing_method
-        )
-    elif name == 'vald':
-        data_loader = module.SegLoader(
-            mode=module.SegLoader.MODES.VALIDATE,
-            name='validation_loader'
-        )
-    elif name == 'test':
-        data_loader = module.ApplyLoader(
-            mode=module.SegLoader.MODES.APPLY,
-            name='test_loader'
-        )
-    return data_loader
-
-def load_dataset(test_dir):
-    # add data path
-    file_list = create_test_files.create_test_files(test_dir)
-
-    id_tensor = tf.squeeze(tf.convert_to_tensor(file_list, dtype=tf.string))
-    # Create dataset from list of file names
-    file_list_ds = tf.data.Dataset.from_tensor_slices(id_tensor)
-    # convert it back (for the right types)
-    files_list_b = list(file_list_ds.as_numpy_iterator())
-
-    cfg.num_files = len(file_list)
-
-    return file_list, files_list_b
 
 if __name__ == '__main__':
     # run functions for better debugging
