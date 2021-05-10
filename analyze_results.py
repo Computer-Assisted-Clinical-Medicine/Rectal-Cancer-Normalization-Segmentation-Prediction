@@ -193,24 +193,47 @@ plt.close()
 ## Do the analysis for the data from Barbara
 '''
 
+
 data_dir = Path(os.environ['data_dir'])
 experiment_dir = Path(os.environ['experiment_dir'])
 
-results_ex = gather_results(experiment_dir, combined=True, external=True)
-results_ex = results_ex[results_ex['File Number'].str.startswith('99')]
+results_ex_b = gather_results(experiment_dir, combined=True, external=True)
+results_ex_b = results_ex_b[results_ex_b['File Number'].str.startswith('99')]
 
-sns.catplot(data=results_ex, y='name', x='Dice', kind='box', aspect=2)
+sns.catplot(data=results_ex_b, y='name', x='Dice', kind='box', aspect=2)
+save('results_barbara_dice_models')
 plt.show()
 plt.close()
 
-sns.catplot(data=results_ex, y='name', x='Dice', hue='fold', kind='box', aspect=2)
+sns.catplot(data=results_ex_b, y='name', x='Dice', hue='fold', kind='box', aspect=2)
+save('results_barbara_dice_models_folds')
 plt.show()
 plt.close()
 
-sns.catplot(data=results_ex, y='fold', x='Dice', kind='box', aspect=2)
+sns.catplot(data=results_ex_b, y='fold', x='Dice', kind='box', aspect=2)
+save('results_barbara_dice_folds')
 plt.show()
 plt.close()
 
-sns.catplot(data=results_ex, y='File Number', x='Dice', kind='box', aspect=0.3, height=15)
+sns.catplot(data=results_ex_b, y='File Number', x='Dice', hue='name', kind='box', aspect=1.4, height=6)
+save('results_barbara_dice_files')
+plt.show()
+plt.close()
+
+results_ex_b_mean = results_ex_b.groupby('File Number').mean()
+plt.scatter(x=results_ex_b_mean['Volume (L)'],y=results_ex_b_mean['Dice'])
+plt.xlabel('GT Volume')
+plt.ylabel('Dice')
+save('results_barbara_volume_vs_dice')
+plt.show()
+plt.close()
+
+plt.scatter(x=results_ex_b_mean['Volume (L)'],y=results_ex_b_mean['Volume (P)'])
+max_l = results_ex_b_mean['Volume (L)'].max()
+max_p = results_ex_b_mean['Volume (P)'].max()
+plt.plot([0, max_l], [0, max_p], color='gray')
+plt.xlabel('GT Volume')
+plt.ylabel('Predicted Volume')
+save('results_barbara_volume_vs_volume')
 plt.show()
 plt.close()
