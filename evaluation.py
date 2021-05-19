@@ -77,7 +77,7 @@ def evaluate_segmentation_prediction(result_metrics, prediction_path, label_path
     try:
         orig_hdd = Metric.hausdorff_metric_sitk(pred_img, label_img)
     except RuntimeError as err:
-        logger.error('Surface evaluation failed! Using infinity: %s', err)
+        logger.exception('Surface evaluation failed! Using infinity: %s', err)
         orig_hdd = np.NAN
     result_metrics['Hausdorff'] = orig_hdd
     logger.info('  Original Hausdorff Distance: %s', orig_hdd)
@@ -85,7 +85,7 @@ def evaluate_segmentation_prediction(result_metrics, prediction_path, label_path
     try:
         orig_mnssd, orig_mdssd, orig_stdssd, orig_maxssd = Metric.symmetric_surface_measures_sitk(pred_img, label_img)
     except RuntimeError as err:
-        logger.error('Surface evaluation failed! Using infinity: %s', err)
+        logger.exception('Surface evaluation failed! Using infinity: %s', err)
         orig_mnssd = np.NAN
         orig_mdssd = np.NAN
         orig_stdssd = np.NAN

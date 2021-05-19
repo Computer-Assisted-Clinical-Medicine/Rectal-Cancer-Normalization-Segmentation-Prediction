@@ -446,6 +446,8 @@ if __name__ == '__main__':
             try:
                  e.run_fold(f)
             except Exception as e:
+                # log the error
+                logging.exception(str(e))
                 print(e)
                 print('Training failed')
                 # remove tensorboard log dir if training failed (to not clutter tensorboard)
@@ -468,4 +470,6 @@ if __name__ == '__main__':
             plot_hparam_comparison(experiment_dir, postprocessed=True)
             plot_hparam_comparison(experiment_dir, external=True, postprocessed=True)
         except Exception as e:
+            # log the error
+            logging.exception(str(e))
             print(f'Failed to to intermediate plots because of {e}.')

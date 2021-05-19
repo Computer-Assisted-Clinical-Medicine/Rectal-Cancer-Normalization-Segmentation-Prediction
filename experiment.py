@@ -517,7 +517,7 @@ class Experiment():
                 results.append(result_metrics)
                 logger.info('        Finished Evaluation for %s', file_number)
             except RuntimeError as err:
-                logger.error("    !!! Evaluation of %s failed for %s, %s", folder_name, f.name, err)
+                logger.exception("    !!! Evaluation of %s failed for %s, %s", folder_name, f.name, err)
 
         # write evaluation results
         results = pd.DataFrame(results)
