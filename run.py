@@ -299,7 +299,7 @@ if __name__ == '__main__':
     #define the parameters that are constant
     f = 8
     init_parameters = {
-        "regularize": [True, 'L2', 0.0000001],
+        "regularize": [True, 'L2', 1e-5],
         "drop_out": [True, 0.01],
         "activation": "elu",
         "do_bias": True,
@@ -314,7 +314,7 @@ if __name__ == '__main__':
         "optimizer" : "Adam",
         "epochs" : 100,
         # scheduling parameters
-        "early_stopping" : False,
+        "early_stopping" : True,
         "patience_es" : 15,
         "reduce_lr_on_plateau" : True,
         "patience_lr_plat" : 5,
@@ -394,6 +394,7 @@ if __name__ == '__main__':
                     data_set=train_list,
                     external_test_set=test_list,
                     folds=k_fold,
+                    seed=42,
                     num_channels=n_channels,
                     folds_dir_rel='folds',
                     preprocessed_dir_rel=preprocessed_dir,
