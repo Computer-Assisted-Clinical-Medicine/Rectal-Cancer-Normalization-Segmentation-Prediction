@@ -79,6 +79,13 @@ fh_debug.setFormatter(formatter)
 #add to loggers
 logger.addHandler(fh_debug)
 
+#create file handlers
+fh_error = logging.FileHandler(log_dir/'log_errors.txt')
+fh_error.setLevel(logging.ERROR)
+fh_error.setFormatter(formatter)
+#add to loggers
+logger.addHandler(fh_error)
+
 # run experiment
 experiment.run_fold(f)
 
@@ -117,3 +124,4 @@ else:
 #remove logger
 logger.removeHandler(fh_info)
 logger.removeHandler(fh_debug)
+logger.removeHandler(fh_error)
