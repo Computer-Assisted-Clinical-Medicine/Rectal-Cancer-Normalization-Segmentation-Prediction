@@ -1,5 +1,10 @@
+'''
+Collection of functions to evaluate and plot the results.
+'''
 import logging
 import os
+from pathlib import Path
+from typing import List
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -15,7 +20,23 @@ logger = logging.getLogger(__name__)
 logging.getLogger('matplotlib.font_manager').disabled = True
 
 
-def evaluate_segmentation_prediction(result_metrics, prediction_path, label_path):
+def evaluate_segmentation_prediction(result_metrics:dict, prediction_path:str, label_path:str)->dict:
+    """Evaluate different metrics for one image
+
+    Parameters
+    ----------
+    result_metrics : dict
+        The dict were the metrics will be written
+    prediction_path : str
+        The path of the predicted image
+    label_path : str
+        The path of the ground truth image
+
+    Returns
+    -------
+    dict
+        The dict with the resulting metrics
+    """
     pred_img = sitk.ReadImage(prediction_path)
     data_info = Image.get_data_info(pred_img)
     result_metrics['Slices'] = data_info['orig_size'][2]
@@ -62,9 +83,9 @@ def evaluate_segmentation_prediction(result_metrics, prediction_path, label_path
     result_metrics['False Positive'] = orig_fp
     logger.info('  Original Overlap Measures: %s %s %s %s', orig_dice, orig_vs, orig_fn, orig_fp)
 
-    cr = Metric.confusion_rate_sitk(pred_img, label_img, 1, 0)
-    result_metrics['Confusion Rate'] = cr
-    logger.info('  Confusion Rate: %s', cr)
+    confusion_rate = Metric.confusion_rate_sitk(pred_img, label_img, 1, 0)
+    result_metrics['Confusion Rate'] = confusion_rate
+    logger.info('  Confusion Rate: %s', confusion_rate)
 
     connect = Metric.get_connectivity_sitk(pred_img)
     result_metrics['Connectivity'] = connect
@@ -92,15 +113,26 @@ def evaluate_segmentation_prediction(result_metrics, prediction_path, label_path
         orig_maxssd = np.NAN
 
     result_metrics['Mean Symmetric Surface Distance'] = orig_mnssd
-    # result_metrics['Median Symmetric Surface Distance'] = orig_mdssd
-    # result_metrics['STD Symmetric Surface Distance'] = orig_stdssd
-    # result_metrics['Max Symmetric Surface Distance'] = orig_maxssd
-    logger.info('  Original Symmetric Surface Distance: %s (mean) %s (median) %s (STD) %s (max)', orig_mnssd, orig_mdssd, orig_stdssd, orig_maxssd)
+
+    logger.info(
+        '   Original Symmetric Surface Distance: %s (mean) %s (median) %s (STD) %s (max)',
+        orig_mnssd, orig_mdssd, orig_stdssd, orig_maxssd
+    )
 
     return result_metrics
 
 
-def combine_evaluation_results_from_folds(results_path, eval_files):
+def combine_evaluation_results_from_folds(results_path, eval_files:List):
+    """Combine the results of the individual folds into one file and calculate
+    the means and standard deviations in separate files
+
+    Parameters
+    ----------
+    results_path : Pathlike
+        The path where the results should be written
+    eval_files : List
+        A list of the eval files
+    """
     if len(eval_files) == 0:
         logger.info('Eval files empty, nothing to combine')
         return
@@ -113,14 +145,14 @@ def combine_evaluation_results_from_folds(results_path, eval_files):
     eval_std_file_path = os.path.join(results_path, 'evaluation-std-' + experiment + '.csv')
     all_statistics_path = os.path.join(results_path, 'evaluation-all-files.csv')
 
-    statistics = []
-    for e in eval_files:
-        data = pd.read_csv(e, sep=';')
-        data['fold'] = e.parent.name
-        statistics.append(data)
+    statistics_list = []
+    for eval_f in eval_files:
+        data = pd.read_csv(eval_f, sep=';')
+        data['fold'] = eval_f.parent.name
+        statistics_list.append(data)
 
     # concatenate to one array
-    statistics = pd.concat(statistics).sort_values('File Number')
+    statistics = pd.concat(statistics_list).sort_values('File Number')
     # write to file
     statistics.to_csv(all_statistics_path, sep=';')
 
@@ -131,11 +163,26 @@ def combine_evaluation_results_from_folds(results_path, eval_files):
     std_statistics.to_csv(eval_std_file_path, sep=';')
 
 
-def make_boxplot_graphic(results_path, result_file):
-    if not os.path.exists(os.path.join(results_path, 'plots')):
-        os.makedirs(os.path.join(results_path, 'plots'))
+def make_boxplot_graphic(results_path:Path, result_file:Path):
+    """Make a boxplot of the resulting metrics
 
-    if not os.path.exists(result_file):
+    Parameters
+    ----------
+    results_path : Path
+        Plots where the plots should be saved (a plot directory is created there)
+    result_file : Path
+        The file where the results were previously exported
+
+    Raises
+    ------
+    FileNotFoundError
+        If the results file does not exist
+    """
+    plot_dir = results_path /  'plots'
+    if not plot_dir.exists():
+        plot_dir.mkdir()
+
+    if not result_file.exists():
         raise FileNotFoundError('Result file not found')
 
     results = pd.read_csv(result_file, sep=';')
@@ -146,23 +193,24 @@ def make_boxplot_graphic(results_path, result_file):
 
     metrics = ['Dice', 'Connectivity', 'Fragmentation', 'Mean Symmetric Surface Distance']
 
-    for m in metrics:
+    for met in metrics:
 
         groups = results.groupby('fold')
         labels = list(groups.groups.keys())
-        data = groups[m].apply(list).values
+        data = groups[met].apply(list).values
 
-        f = plt.figure(figsize=(2 * len(data) + 5, 10))
+        plt.figure(figsize=(2 * len(data) + 5, 10))
         ax = plt.subplot(111)
-        [i.set_linewidth(1) for i in ax.spines.values()]
+        for i in ax.spines.values():
+            i.set_linewidth(1)
 
-        ax.set_title(f'{results_path.name} {m}', pad=20)
+        ax.set_title(f'{results_path.name} {met}', pad=20)
         for item in ([ax.title, ax.xaxis.label, ax.yaxis.label] +
                      ax.get_xticklabels() + ax.get_yticklabels()):
             item.set_fontsize(20)
 
-        p = plt.boxplot(data, notch=False, showmeans=True, showfliers=True, vert=True, widths=0.9,
+        plt.boxplot(data, notch=False, showmeans=True, showfliers=True, vert=True, widths=0.9,
                         patch_artist=True, labels=labels)
 
-        plt.savefig(os.path.join(results_path, 'plots', m.replace(' ', '') + '.png'), transparent=False)
+        plt.savefig(plot_dir / (met.replace(' ', '') + '.png'), transparent=False)
         plt.close()

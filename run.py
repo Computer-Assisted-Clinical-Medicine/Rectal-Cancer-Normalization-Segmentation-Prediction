@@ -1,32 +1,31 @@
+'''
+Run the training and evaluation of the models.
+'''
 import json
 import logging
 import os
 import shutil
 import sys
 from pathlib import Path
+from typing import Any, Dict
 
-import matplotlib
-
-# if on cluster, use other backend
-if 'CLUSTER' in os.environ:
-    matplotlib.use('Agg')
-import matplotlib.pyplot as plt
 import numpy as np
-import pandas as pd
 
 #logger has to be set before tensorflow is imported
 tf_logger = logging.getLogger('tensorflow')
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
-
-# set tf thread mode
-os.environ['TF_GPU_THREAD_MODE'] = 'gpu_private'
+# pylint: disable=wrong-import-position
 
 from experiment import Experiment, export_batch_file
 from SegmentationNetworkBasis.architecture import UNet
 from SegmentationNetworkBasis.segbasisloader import NORMALIZING
+from utils import compare_hyperparameters, plot_hparam_comparison, generate_folder_name
 
-debug = False
-if debug:
+# set tf thread mode
+os.environ['TF_GPU_THREAD_MODE'] = 'gpu_private'
+
+DEBUG = False
+if DEBUG:
     # run everything eagerly
     import tensorflow as tf
     tf.config.experimental_run_functions_eagerly(True)
@@ -34,214 +33,6 @@ if debug:
     tf.debugging.enable_check_numerics(
         stack_height_limit=30, path_length_limit=50
     )
-
-
-def generate_folder_name(hyper_parameters):
-    epochs = hyper_parameters['train_parameters']['epochs']
-
-    params = [
-        hyper_parameters['architecture'].get_name() + str(hyper_parameters['dimensions']) + 'D',
-        hyper_parameters['loss']
-    ]
-
-    # residual connections if it is an attribute
-    if 'res_connect' in hyper_parameters['init_parameters']:
-        if hyper_parameters['init_parameters']['res_connect']:
-            params.append('Res')
-        else:
-            params.append('nRes')
-
-    # filter multiplier
-    params.append('f_'+str(hyper_parameters['init_parameters']['n_filters'][0]//8))
-
-    # batch norm
-    if hyper_parameters['init_parameters']['do_batch_normalization']:
-        params.append('BN')
-    else:
-        params.append('nBN')
-
-    # dropout
-    if hyper_parameters['init_parameters']['drop_out'][0]:
-        params.append('DO')
-    else:
-        params.append('nDO')
-
-    # normalization
-    params.append(str(hyper_parameters['data_loader_parameters']['normalizing_method'].name))
-
-    # add epoch number
-    params.append(str(epochs))
-
-    folder_name = "-".join(params)
-
-    return folder_name
-
-
-def plot_hparam_comparison(experiment_dir, metrics = ['Dice'], external=False, postprocessed=False):
-    hparam_file = experiment_dir / 'hyperparameters.csv'
-    hparam_changed_file = experiment_dir / 'hyperparameters_changed.csv'
-
-    if external:
-        file_field = 'results_file_external_testset'
-        result_name = 'hyperparameter_comparison_external_testset'
-    else:
-        file_field = 'results_file'
-        result_name = 'hyperparameter_comparison'
-
-    if postprocessed:
-        file_field += '_postprocessed'
-        result_name += '_postprocessed'
-
-    # add pdf
-    result_name += '.pdf'
-
-    hparams = pd.read_csv(hparam_file, sep=';')
-    hparams_changed = pd.read_csv(hparam_changed_file, sep=';')
-    changed_params = hparams_changed.columns[1:]
-    # collect all results
-    results_means = []
-    results_stds = []
-    for results_file in hparams[file_field]:
-        if Path(results_file).exists():
-            results = pd.read_csv(results_file, sep=';')
-            # save results
-            results_means.append(results[metrics].mean())
-            results_stds.append(results[metrics].std())
-        else:
-            name = Path(results_file).parent.parent.name
-            print(f'Could not find the evaluation file for {name}'
-                +' (probably not finished with training yet).')
-            results_means.append(pd.Series({m : pd.NA for m in metrics}))
-            results_stds.append(pd.Series({m : pd.NA for m in metrics}))
-
-    if len(results_means) == 0:
-        print('No files to evaluate')
-        return
-
-    # convert to dataframes
-    results_means = pd.DataFrame(results_means)
-    results_stds = pd.DataFrame(results_stds)
-
-    # plot all metrics with all parameters
-    fig, axes = plt.subplots(
-        nrows=len(metrics),
-        ncols=len(changed_params),
-        sharey=True,
-        figsize=(4*len(changed_params),6*len(metrics))
-    )
-    # fix the dimensions
-    axes = np.array(axes).reshape((len(metrics), len(changed_params)))
-
-    for m, ax_row in zip(metrics, axes):
-        for c, ax in zip(changed_params, ax_row):
-            # group by the other values
-            unused_columns = [cn for cn in changed_params if c != cn]
-            # if there are no unused columns, use the changed one
-            if len(unused_columns) == 0:
-                unused_columns = list(changed_params)
-            for group, data in hparams_changed.groupby(unused_columns):
-                # plot them with the same line
-                # get the data
-                m_data = results_means.loc[data.index,m]
-                # sort by values
-                m_data.sort_values()
-                # only plot if not nan
-                if not m_data.isna().all():
-                    ax.plot(
-                        data.loc[m_data.notna(), c], m_data[m_data.notna()],
-                        marker='x',
-                        label=str(group)
-                    )
-            # if the label is text, turn it
-            if not pd.api.types.is_numeric_dtype(hparams_changed[c]):
-                plt.setp(
-                    ax.get_xticklabels(),
-                    rotation=45,
-                    ha='right',
-                    rotation_mode='anchor'
-                )
-            # ylabel if it is the first image
-            if c == changed_params[0]:
-                ax.set_ylabel(m)
-            # xlabel if it is the last row
-            if m == metrics[-1]:
-                ax.set_xlabel(c)
-            # if the class is bool, replace the labels with the boolean values
-            if type(hparams_changed.iloc[0][c]) == np.bool_:
-                ax.set_xticks([0,1])
-                ax.set_xticklabels(['false', 'true'])
-
-            # set the legend with title
-            ax.legend(title = str(tuple(str(c)[:5] for c in unused_columns)))
-
-    fig.suptitle('Hypereparameter Comparison')
-    plt.tight_layout()
-    plt.savefig(experiment_dir / result_name)
-    plt.close()
-
-
-def compare_hyperparameters(experiments, experiment_dir):
-    # export the hyperparameters
-    hyperparameter_file = experiment_dir / 'hyperparameters.csv'
-    hyperparameter_changed_file = experiment_dir / 'hyperparameters_changed.csv'
-    # collect all results
-    hparams = []
-    for e in experiments:
-        res_name = 'evaluation-all-files.csv'
-        results_file = e.output_path / 'results_test_final' / res_name
-        results_file_postprocessed = e.output_path / 'results_test_final-postprocessed' / res_name
-        results_file_external = e.output_path / 'results_external_testset_final' / res_name
-        results_file_external_testset_postprocessed = e.output_path / 'results_external_testset_final-postprocessed' / res_name
-        # and parameters
-        hparams.append({
-            **e.hyper_parameters['init_parameters'],
-            **e.hyper_parameters['train_parameters'],
-            **e.hyper_parameters['data_loader_parameters'],
-            'loss' : e.hyper_parameters['loss'],
-            'architecture' : e.hyper_parameters['architecture'].__name__,
-            'dimensions' : e.hyper_parameters['dimensions'],
-            'path' : e.output_path,
-            'results_file' : results_file,
-            'results_file_postprocessed' : results_file_postprocessed,
-            'results_file_external_testset' : results_file_external,
-            'results_file_external_testset_postprocessed' : results_file_external_testset_postprocessed
-        })
-
-    # convert to dataframes
-    hparams = pd.DataFrame(hparams)
-    # find changed parameters
-    changed_params = []
-    # drop the results file when analyzing the changed hyperparameters
-    for c in hparams.drop(columns='results_file'):
-        if hparams[c].astype(str).unique().size > 1:
-            changed_params.append(c)
-    hparams_changed = hparams[changed_params].copy()
-    # if n_filters, use the first
-    if 'n_filters' in hparams_changed:
-        hparams_changed.loc[:,'n_filters'] = hparams_changed['n_filters'].apply(lambda x: x[0])
-    if 'normalizing_method' in hparams_changed:
-        hparams_changed.loc[:,'normalizing_method'] = hparams_changed['normalizing_method'].apply(lambda x: x.name)
-    # ignore the batch size (it correlates with the dimension)
-    if 'batch_size' in hparams_changed:
-        hparams_changed.drop(columns='batch_size', inplace=True)
-    # ignore do_bias (it is set the opposite to batch_norm)
-    if 'do_bias' in hparams_changed and 'do_batch_normalization' in hparams_changed:
-        hparams_changed.drop(columns='do_bias', inplace=True)
-    # drop column specifying the files
-    if 'path' in hparams_changed:
-        hparams_changed.drop(columns='path', inplace=True)
-    # drop column specifying the files
-    if 'results_file_postprocessed' in hparams_changed:
-        hparams_changed.drop(columns='results_file_postprocessed', inplace=True)
-    # drop column specifying the files
-    if 'results_file_external_testset' in hparams_changed:
-        hparams_changed.drop(columns='results_file_external_testset', inplace=True)
-    # drop column specifying the files
-    if 'results_file_external_testset_postprocessed' in hparams_changed:
-        hparams_changed.drop(columns='results_file_external_testset_postprocessed', inplace=True)
-
-    hparams.to_csv(hyperparameter_file, sep=';')
-    hparams_changed.to_csv(hyperparameter_changed_file, sep=';')
 
 
 if __name__ == '__main__':
@@ -266,7 +57,9 @@ if __name__ == '__main__':
     fh = logging.FileHandler(experiment_dir/'log_errors.txt')
     fh.setLevel(logging.ERROR)
     # create formatter
-    formatter = logging.Formatter('%(levelname)s: %(name)s - %(funcName)s (l.%(lineno)d): %(message)s')
+    formatter = logging.Formatter(
+        '%(levelname)s: %(name)s - %(funcName)s (l.%(lineno)d): %(message)s'
+    )
     # add formatter to fh
     fh.setFormatter(formatter)
     logger.addHandler(fh)
@@ -286,7 +79,7 @@ if __name__ == '__main__':
     test_list = np.loadtxt(data_dir / 'test_IDs.csv', dtype='str')
     test_list = np.array([str(t) for t in test_list])
 
-    k_fold = 5
+    K_FOLD = 5
 
     # get number of channels from database file
     data_dict_file = data_dir / 'dataset.json'
@@ -297,7 +90,7 @@ if __name__ == '__main__':
     n_channels = len(data_dict['modality'])
 
     #define the parameters that are constant
-    f = 8
+    F_BASE = 8
     init_parameters = {
         "regularize": [True, 'L2', 1e-5],
         "drop_out": [True, 0.01],
@@ -306,7 +99,7 @@ if __name__ == '__main__':
         "cross_hair": False,
         "clipping_value" : 50,
         "res_connect" : True,
-        'n_filters' : [f*8, f*16, f*32, f*64, f*128]
+        'n_filters' : [F_BASE*8, F_BASE*16, F_BASE*32, F_BASE*64, F_BASE*128]
     }
 
     train_parameters = {
@@ -358,46 +151,47 @@ if __name__ == '__main__':
     print(f'To see the progress in tensorboard, run:\n{tensorboard_command}')
 
     # set config
-    preprocessed_dir = 'data_preprocessed'
+    PREPROCESSED_DIR = 'data_preprocessed'
 
     #set up all experiments
     experiments = []
-    for n in normalization_methods:
-        for b in batch_norm:
-            for d in dimensions:
-                hyper_parameters = {
+    for d in dimensions:
+        for n in normalization_methods:
+            for b in batch_norm:
+                hyper_parameters : Dict[str, Any] = {
                     **constant_parameters,
                     'dimensions' : d
                 }
                 hyper_parameters['init_parameters']['do_batch_normalization'] = b
-                hyper_parameters['init_parameters']['do_bias'] = not b # bias should be the opposite of batch norm
-                hyper_parameters['data_loader_parameters']['normalizing_method'] = n                 
+                # bias should be the opposite of batch norm
+                hyper_parameters['init_parameters']['do_bias'] = not b
+                hyper_parameters['data_loader_parameters']['normalizing_method'] = n         
 
                 # use less filters for 3D on local computer
                 if not 'CLUSTER' in os.environ:
                     if d == 3:
-                        f = 4
-                        n_filters = [f*8, f*16, f*32, f*64, f*128]
+                        F_BASE = 4
+                        n_filters = [F_BASE*8, F_BASE*16, F_BASE*32, F_BASE*64, F_BASE*128]
                         hyper_parameters['init_parameters']['n_filters'] = n_filters
                     else:
-                        f = 8
-                        n_filters = [f*8, f*16, f*32, f*64, f*128]
-                        hyper_parameters['init_parameters']['n_filters'] = n_filters                    
+                        F_BASE = 8
+                        n_filters = [F_BASE*8, F_BASE*16, F_BASE*32, F_BASE*64, F_BASE*128]
+                        hyper_parameters['init_parameters']['n_filters'] = n_filters
 
                 #define experiment
-                experiment_name = generate_folder_name(hyper_parameters)
-                
+                experiment_name = generate_folder_name(hyper_parameters)  # pylint: disable=invalid-name
+
                 experiment = Experiment(
                     hyper_parameters=hyper_parameters,
                     name=experiment_name,
                     output_path_rel=experiment_name,
                     data_set=train_list,
                     external_test_set=test_list,
-                    folds=k_fold,
+                    folds=K_FOLD,
                     seed=42,
                     num_channels=n_channels,
                     folds_dir_rel='folds',
-                    preprocessed_dir_rel=preprocessed_dir,
+                    preprocessed_dir_rel=PREPROCESSED_DIR,
                     tensorboard_images=True
                 )
                 experiments.append(experiment)
@@ -423,9 +217,9 @@ if __name__ == '__main__':
     # if not on cluster, perform the experiments
     for e in experiments:
         # run all folds
-        for f in range(k_fold):
+        for fold_num in range(K_FOLD):
             #add more detailed logger for each network, when problems arise, use debug
-            fold_dir = e.output_path / e.fold_dir_names[f]
+            fold_dir = e.output_path / e.fold_dir_names[fold_num]
             if not fold_dir.exists():
                 fold_dir.mkdir(parents=True)
 
@@ -444,11 +238,10 @@ if __name__ == '__main__':
             logger.addHandler(fh_debug)
 
             try:
-                 e.run_fold(f)
-            except Exception as e:
-                # log the error
-                logging.exception(str(e))
-                print(e)
+                e.run_fold(fold_num)
+            except Exception as exc: # pylint: disable=broad-except
+                logging.exception(str(exc))
+                print(exc)
                 print('Training failed')
                 # remove tensorboard log dir if training failed (to not clutter tensorboard)
                 tb_log_dir = fold_dir / 'logs'
@@ -469,7 +262,7 @@ if __name__ == '__main__':
             plot_hparam_comparison(experiment_dir, external=True)
             plot_hparam_comparison(experiment_dir, postprocessed=True)
             plot_hparam_comparison(experiment_dir, external=True, postprocessed=True)
-        except Exception as e:
+        except Exception as exc: # pylint: disable=broad-except
             # log the error
-            logging.exception(str(e))
+            logging.exception(str(exc))
             print(f'Failed to to intermediate plots because of {e}.')

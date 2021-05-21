@@ -137,6 +137,9 @@ venv.bak/
 .dmypy.json
 dmypy.json
 
+# pylint settings
+.pylintrc
+
 # Pyre type checker
 .pyre/
 

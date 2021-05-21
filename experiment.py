@@ -1,17 +1,20 @@
+'''
+Class to run an experiment using user-defined hyperparameters.
+'''
 import copy
 import logging
 import os
 import stat
 import sys
 from pathlib import Path, PurePath
-from typing import List
+from typing import Iterable, List
 
 import GPUtil
 import numpy as np
 import pandas as pd
 import tensorflow as tf
 import yaml
-from tqdm import tqdm
+from tqdm.autonotebook import tqdm
 
 import evaluation
 from seg_data_loader import ApplyLoader, SegLoader
@@ -24,10 +27,12 @@ logger = logging.getLogger(__name__)
 logger.setLevel(logging.DEBUG)
 
 class Experiment():
+    """Class to run an experiment using user-defined hyperparameters.
+    """
 
-    def __init__(self, name:str, hyper_parameters:dict, data_set:List, external_test_set=None, folds=5, seed=None, num_channels=1,
-                 output_path_rel=None, restart=False, reinitialize_folds=False, folds_dir_rel=None, preprocessed_dir_rel=None,
-                 tensorboard_images=False):
+    def __init__(self, name:str, hyper_parameters:dict, data_set:List, external_test_set=None, folds=5, seed=None,
+                 num_channels=1, output_path_rel=None, restart=False, reinitialize_folds=False, folds_dir_rel=None,
+                 preprocessed_dir_rel=None, tensorboard_images=False):
         """Run experiments using a fixed set of hyperparameters
 
         Parameters
@@ -35,7 +40,8 @@ class Experiment():
             name : str
                 Name of the experiment, is used for the folder name
             hyper_parameters : dict
-                the hyperparameters that should be used (as soon as something is changed in between experiments, it is a hyperparameter)
+                the hyperparameters that should be used (as soon as something is
+                changed in between experiments, it is a hyperparameter)
             data_set : List
                 The list of images which should be used for training, validation and test
             external_test_set : List, optional
@@ -59,7 +65,7 @@ class Experiment():
             preprocessed_dir_rel : str, optional
                 Where the preprocessed files are saved (relative to the experiment_dir env. variable),
             self.tensorboard_images : bool, optional
-                Wether to write images to tensorboard, this takes a bit, so should only be used for debugging, by default False
+                Wether to write images to tensorboard, takes a bit, so only for debugging, by default False
         """
         # do a deep copy of the parameters, because they contain lists and dicts
         self.hyper_parameters = copy.deepcopy(hyper_parameters)
@@ -83,12 +89,12 @@ class Experiment():
         if cfg.number_of_vald*self.folds > self.data_set.size:
             raise ValueError('Dataset to small for the specified folds.')
 
-        if output_path_rel == None:
+        if output_path_rel is None:
             self.output_path_rel = PurePath('Experiments', self.name)
         else:
             self.output_path_rel = PurePath(output_path_rel)
             if self.output_path_rel.is_absolute():
-                raise ValueError(f'output_path_rel is an absolute path')
+                raise ValueError('output_path_rel is an absolute path')
 
         # set the absolute path (which will not be exported)
         self.output_path = self.experiment_dir / Path(self.output_path_rel)
@@ -105,12 +111,12 @@ class Experiment():
         self.experiment_file = self.output_path / 'parameters.yaml'
 
         # set directory for folds
-        if folds_dir_rel == None:
-            self.folds_dir_rel = self.output_path / 'folds'
+        if folds_dir_rel is None:
+            self.folds_dir_rel = PurePath(self.output_path / 'folds')
         else:
             self.folds_dir_rel = PurePath(folds_dir_rel)
             if self.folds_dir_rel.is_absolute():
-                raise ValueError(f'folds_dir_rel is an absolute path')
+                raise ValueError('folds_dir_rel is an absolute path')
 
         self.folds_dir = self.experiment_dir / Path(self.folds_dir_rel)
 
@@ -121,11 +127,11 @@ class Experiment():
         self.fold_dir_names = [f'fold-{f}' for f in range(self.folds)]
         #set fold split file names
         self.datasets = []
-        for f in range(self.folds):
+        for fold in range(self.folds):
             # set paths
-            train_csv = self.folds_dir/f'train-{f}-{self.folds}.csv'
-            vald_csv = self.folds_dir/f'vald-{f}-{self.folds}.csv'
-            test_csv = self.folds_dir/f'test-{f}-{self.folds}.csv'
+            train_csv = self.folds_dir/f'train-{fold}-{self.folds}.csv'
+            vald_csv = self.folds_dir/f'vald-{fold}-{self.folds}.csv'
+            test_csv = self.folds_dir/f'test-{fold}-{self.folds}.csv'
             self.datasets.append({
                 'train' : train_csv,
                 'vald' : vald_csv,
@@ -139,7 +145,7 @@ class Experiment():
         self.preprocessed_dir_rel = PurePath(preprocessed_dir_rel)
 
         if self.preprocessed_dir_rel.is_absolute():
-            raise ValueError(f'preprocessed_dir_rel is an absolute path')
+            raise ValueError('preprocessed_dir_rel is an absolute path')
 
         self.preprocessed_dir = self.experiment_dir / Path(self.preprocessed_dir_rel)
         if not self.preprocessed_dir.exists():
@@ -163,14 +169,14 @@ class Experiment():
         np.random.seed(self.seed)
         tf.random.set_seed(self.seed)
 
-    def setup_folds(self, data_set:List, overwrite=False):
+    def setup_folds(self, data_set:np.ndarray, overwrite=False):
         """Setup the split of the dataset. This will be done in the output_path
         and can be used by all experiments in that path.
 
         Parameters
         ----------
-        data_set : List
-            The files in the dataset as list
+        data_set : np.ndarray
+            The files in the dataset as np.ndarray
         overwrite : bool, optional
             IF this is true, existing files are overwritten, by default False
         """
@@ -184,10 +190,10 @@ class Experiment():
             #otherwise, us cfg.data_train_split
             test_folds = all_indices[int(all_indices.size*cfg.data_train_split):].reshape(1,-1)
 
-        for f in range(0, self.folds):
+        for fold in range(0, self.folds):
             #test is the section
-            test_indices = test_folds[f]
-            remaining_indices = np.setdiff1d(all_indices, test_folds[f])
+            test_indices = test_folds[fold]
+            remaining_indices = np.setdiff1d(all_indices, test_folds[fold])
             # this orders the indices, so shuffle them again
             remaining_indices=np.random.permutation(remaining_indices)
             #number of validation is set in config
@@ -200,12 +206,12 @@ class Experiment():
             test_files = data_set[test_indices]
 
             # only write files if they do not exist or overwrite is true
-            if not self.datasets[f]['train'].exists() or overwrite:
-                np.savetxt(self.datasets[f]['train'], train_files, fmt='%s', header='path')
-            if not self.datasets[f]['vald'].exists() or overwrite:
-                np.savetxt(self.datasets[f]['vald'], vald_files, fmt='%s', header='path')
-            if not self.datasets[f]['test'].exists() or overwrite:
-                np.savetxt(self.datasets[f]['test'], test_files, fmt='%s', header='path')
+            if not self.datasets[fold]['train'].exists() or overwrite:
+                np.savetxt(self.datasets[fold]['train'], train_files, fmt='%s', header='path')
+            if not self.datasets[fold]['vald'].exists() or overwrite:
+                np.savetxt(self.datasets[fold]['vald'], vald_files, fmt='%s', header='path')
+            if not self.datasets[fold]['test'].exists() or overwrite:
+                np.savetxt(self.datasets[fold]['test'], test_files, fmt='%s', header='path')
         return
 
     def _set_parameters(self):
@@ -224,8 +230,8 @@ class Experiment():
 
         # determine batch size if not set
         if 'batch_size' not in hp_train:
-            bs = self.estimate_batch_size()
-            hp_train['batch_size'] = int(bs)
+            batch_size = self.estimate_batch_size()
+            hp_train['batch_size'] = int(batch_size)
 
         # set noise parameters
         # noise
@@ -405,15 +411,15 @@ class Experiment():
 
         return
 
-    def applying(self, folder_name:str, test_files:List, apply_name='apply'):
+    def applying(self, folder_name:str, test_files:Iterable, apply_name='apply'):
         """Apply the trained network to the test files
 
         Parameters
         ----------
         folder_name : str
             Training output will be in the output path in this subfolder
-        test_files : List
-            List of test files as string
+        test_files : Iterable
+            Iterable of test files as string
         apply_name : str, optional
             The subfolder where the evaluated files are stored, by default apply
         """
@@ -439,13 +445,13 @@ class Experiment():
         logger.info('Started applying %s to test datset.', folder_name)
 
         apply_path = self.output_path/folder_name/apply_name
-        for f in tqdm(test_files, desc=f'{folder_name} (test)', unit='file'):
-            f_name = Path(f).name
+        for file in tqdm(test_files, desc=f'{folder_name} (test)', unit='file'):
+            f_name = Path(file).name
 
             # do inference
             result_image = apply_path/f'prediction-{f_name}-{version}{cfg.file_suffix}'
             if not result_image.exists():
-                net.apply(testloader, f, apply_path=apply_path)
+                net.apply(testloader, file, apply_path=apply_path)
 
             # postprocess the image
             postprocessed_image = apply_path/f'prediction-{f_name}-{version}-postprocessed{cfg.file_suffix}'
@@ -495,14 +501,14 @@ class Experiment():
         # remember the results
         results = []
 
-        for f in test_files:
-            f = Path(f)
-            folder = f.parent
-            file_number = f.name
-            prediction_path = apply_path / f'prediction-{f.name}-{version}{cfg.file_suffix}'
+        for file in test_files:
+            file = Path(file)
+            folder = file.parent
+            file_number = file.name
+            prediction_path = apply_path / f'prediction-{file.name}-{version}{cfg.file_suffix}'
             label_path = folder /  (cfg.label_file_name_prefix + file_number + cfg.file_suffix)
             if not label_path.exists():
-                logger.info(f'Label {label_path} does not exists. It will be skipped')
+                logger.info('Label %s does not exists. It will be skipped', label_path)
                 continue
             try:
                 result_metrics = {'File Number' : file_number}
@@ -517,7 +523,7 @@ class Experiment():
                 results.append(result_metrics)
                 logger.info('        Finished Evaluation for %s', file_number)
             except RuntimeError as err:
-                logger.exception("    !!! Evaluation of %s failed for %s, %s", folder_name, f.name, err)
+                logger.exception("    !!! Evaluation of %s failed for %s, %s", folder_name, file.name, err)
 
         # write evaluation results
         results = pd.DataFrame(results)
@@ -533,29 +539,29 @@ class Experiment():
         self.hyper_parameters["evaluate_on_finetuned"] = False
         self.set_seed()
 
-        for f, in range(0, self.folds):
-            self.run_fold(f)
+        for fold, in range(0, self.folds):
+            self.run_fold(fold)
 
         return
 
-    def run_fold(self, f:int):
+    def run_fold(self, fold:int):
         """Run the training and evaluation for all folds
 
         Parameters
         ----------
-        f : int
+        fold : int
             The number of the fold
         """
 
-        folder_name = self.fold_dir_names[f]
+        folder_name = self.fold_dir_names[fold]
         folddir = self.output_path / folder_name
         logger.info('workingdir is %s', folddir)
 
-        tqdm.write(f'Starting with {self.name} {folder_name} (Fold {f+1} of {self.folds})')
+        tqdm.write(f'Starting with {self.name} {folder_name} (Fold {fold+1} of {self.folds})')
 
-        train_files = np.loadtxt(self.datasets[f]['train'], dtype='str', delimiter=',')
-        vald_files = np.loadtxt(self.datasets[f]['vald'], dtype='str', delimiter=',')
-        test_files = np.loadtxt(self.datasets[f]['test'], dtype='str', delimiter=',')
+        train_files = np.loadtxt(self.datasets[fold]['train'], dtype='str', delimiter=',')
+        vald_files = np.loadtxt(self.datasets[fold]['vald'], dtype='str', delimiter=',')
+        test_files = np.loadtxt(self.datasets[fold]['test'], dtype='str', delimiter=',')
 
         # add the path
         train_files = np.array([str(self.data_dir / t) for t in train_files])
@@ -570,7 +576,7 @@ class Experiment():
 
         logger.info(
             '  Data Set %s: %s  train cases, %s  test cases, %s vald cases',
-            f, train_files.size, vald_files.size, test_files.size
+            fold, train_files.size, vald_files.size, test_files.size
         )
 
         self._set_parameters()
@@ -584,7 +590,7 @@ class Experiment():
 
         #try the actual training
         model_final = folddir / 'models' / 'model-final'
-        if self.restart == False and model_final.exists():
+        if self.restart is False and model_final.exists():
             tqdm.write('Already trained, skip training.')
             logger.info('Already trained, skip training.')
         else:
@@ -636,7 +642,7 @@ class Experiment():
                     version='final-postprocessed'
                 )
 
-        tqdm.write(f'Finished with {self.name} {folder_name} (Fold {f+1} of {self.folds})')
+        tqdm.write(f'Finished with {self.name} {folder_name} (Fold {fold+1} of {self.folds})')
 
         return
 
@@ -682,6 +688,14 @@ class Experiment():
         self.evaluate(name='external_testset')
 
     def export_experiment(self, overwrite=False):
+        """Export the experiment ot disk. This can be used to start it again
+        on a distributed system.
+
+        Parameters
+        ----------
+        overwrite : bool, optional
+            If the existing file should be overwritten, by default False
+        """
         # do not overwrite it
         if not overwrite and self.experiment_file.exists():
             return
@@ -707,12 +721,37 @@ class Experiment():
             yaml.dump(experiment_dict, f)
         return
 
-    def from_file(file):
+    @classmethod
+    def from_file(cls, file):
+        """Open an existing experiment file.
+
+        Parameters
+        ----------
+        file : PathLike
+            The file to open
+
+        Returns
+        -------
+        Experiment
+            The experiment as object
+        """
         with open(file, 'r') as f:
             parameters = yaml.load(f, Loader=yaml.Loader)
-        return Experiment(**parameters)
+        return cls(**parameters)
 
-    def export_slurm_file(self, working_dir):
+    def export_slurm_file(self, working_dir)->Path:
+        """Export the slurm files needed to start the training on the cluster.
+
+        Parameters
+        ----------
+        working_dir : PathLike
+            The current working directory
+
+        Returns
+        -------
+        Path
+            The location of the slurm file
+        """
         run_script = Path(sys.argv[0]).resolve().parent / 'run_single_experiment.py'
         job_dir = Path(os.environ['experiment_dir']) / 'slurm_jobs'
         if not job_dir.exists():
@@ -747,7 +786,7 @@ class Experiment():
 
 def export_slurm_job(filename, command, job_name=None, workingdir=None, venv_dir='venv',
     job_type='CPU', cpus=1, hours=0, minutes=30, log_dir=None, log_file=None, error_file=None,
-    array_job=False, array_range='0-4', singleton=False, variables={}):
+    array_job=False, array_range='0-4', singleton=False, variables=None):
     """Generates a slurm file to run jobs on the cluster
 
     Parameters
@@ -785,6 +824,10 @@ def export_slurm_job(filename, command, job_name=None, workingdir=None, venv_dir
     variables : dict, optional
         environmental variables to write {name : value} $EXPDIR can be used, by default {}
     """
+
+    if variables is None:
+        variables = {}
+
     # this new node dos not work
     exclude_nodes = ['h08c0301', 'h08c0401', 'h08c0501']
     if job_type == 'GPU_no_K80':
@@ -795,11 +838,11 @@ def export_slurm_job(filename, command, job_name=None, workingdir=None, venv_dir
         ]
 
     if job_type == 'CPU':
-        assert(hours==0)
-        assert(minutes <= 30)
+        assert hours==0
+        assert minutes <= 30
     else:
-        assert(minutes < 60)
-        assert(hours <= 48)
+        assert minutes < 60
+        assert hours <= 48
 
     if log_dir is None:
         log_dir = Path('logs/{job_name}/')
@@ -829,7 +872,7 @@ def export_slurm_job(filename, command, job_name=None, workingdir=None, venv_dir
         slurm_file += f"#SBATCH --job-name={job_name}\n"
 
     slurm_file += f'#SBATCH --cpus-per-task={cpus}\n'
-    slurm_file += f'#SBATCH --ntasks-per-node=1\n'
+    slurm_file += '#SBATCH --ntasks-per-node=1\n'
     slurm_file += f'#SBATCH --time={hours:02d}:{minutes:02d}:00\n'
     slurm_file += '#SBATCH --mem=32gb\n'
 
@@ -923,8 +966,8 @@ def export_batch_file(filename, commands):
 
     batch_file = '#!/bin/bash'
 
-    for c in commands:
-        batch_file += f'\n\n{c}'
+    for com in commands:
+        batch_file += f'\n\n{com}'
 
     if not filename.parent.exists():
         filename.parent.mkdir(parents=True)

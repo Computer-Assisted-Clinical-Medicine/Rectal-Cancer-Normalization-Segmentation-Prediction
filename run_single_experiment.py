@@ -1,3 +1,6 @@
+'''
+Run Aa single experiment (this is only used when running on the cluster)
+'''
 import argparse
 import logging
 import os
@@ -6,29 +9,33 @@ from pathlib import Path
 #logger has to be set before tensorflow is imported
 tf_logger = logging.getLogger('tensorflow')
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
+# pylint: disable=wrong-import-position
 
 from experiment import Experiment
 from run import plot_hparam_comparison
 
 def init_argparse():
-    parser = argparse.ArgumentParser(
+    '''
+    initialize the parser
+    '''
+    argpar = argparse.ArgumentParser(
         description='Do the training of one single fold.'
     )
-    parser.add_argument(
+    argpar.add_argument(
         '-f', '--fold',
         metavar='fold',
         type=int,
         nargs='?',
         help='The number of the folds to process.'
     )
-    parser.add_argument(
+    argpar.add_argument(
         '-e', '--experiment_dir',
         metavar='experiment_dir',
         type=str,
         nargs='?',
         help='The directory were the experiment os located at with the parameters.yaml file.'
     )
-    return parser
+    return argpar
 
 parser = init_argparse()
 args = parser.parse_args()
