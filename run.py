@@ -212,6 +212,14 @@ if __name__ == '__main__':
             filename=experiment_dir / 'start_all_jobs.sh',
             commands=[f'sbatch {f}' for f in slurm_files]
         )
+
+        # and create some needed directories (without their log dirs, jobs don't start)
+        plot_dir_slurm = working_dir / 'plots' / 'slurm'
+        if not plot_dir_slurm.exists():
+            plot_dir_slurm.mkdir(parents=True)
+        combined_dir_slurm = working_dir / 'combined_models' / 'slurm'
+        if not combined_dir_slurm.exists():
+            combined_dir_slurm.mkdir(parents=True)
         sys.exit()
 
     # if not on cluster, perform the experiments
