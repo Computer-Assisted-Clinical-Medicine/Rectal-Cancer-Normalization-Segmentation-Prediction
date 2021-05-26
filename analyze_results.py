@@ -44,7 +44,8 @@ def save_and_show(name:str):
     """
     # plt.savefig(plot_dir / f'{name}.pdf', dpi=600, facecolor='w')
     plt.savefig(plot_dir / f'{name}.png', dpi=600, facecolor='w')
-    if sys.flags.interactive:
+    # only show in interactive mode
+    if hasattr(sys, 'ps1'):
         plt.show()
     plt.close()
 
@@ -62,8 +63,10 @@ results = gather_results(experiment_dir, combined=True)
 # 1035_1 is with fat supression
 results = results.drop(results.index[results['File Number'] == '1035_1'])
 # make nicer names
-
 shorten_names(results)
+results.sort_values('name', inplace=True)
+# take the mean over all folds and models
+results_mean = results.groupby('File Number').mean()
 
 sns.catplot(data=results, y='name', x='Dice', kind='box', aspect=2)
 save_and_show('test_set_dice_models')
@@ -74,10 +77,14 @@ save_and_show('test_set_dice_models_folds')
 sns.catplot(data=results, y='fold', x='Dice', kind='box', aspect=2)
 save_and_show('test_set_dice_folds')
 
-sns.catplot(data=results, y='File Number', x='Dice', kind='box', aspect=.3, height=15)
+sns.catplot(data=results.sort_values('File Number'), y='File Number', x='Dice', kind='box', aspect=.3, height=15)
 save_and_show('test_set_dice_files')
 
-results_mean = results.groupby('File Number').mean()
+worst_files = list(results_mean.sort_values('Dice').iloc[:10].index)
+worst_files_results = results[[f in worst_files for f in results['File Number']]]
+sns.catplot(data=worst_files_results, y='File Number', x='Dice', kind='box', order=worst_files)
+save_and_show('test_set_dice_worst_files')
+
 plt.scatter(x=results_mean['Volume (L)'],y=results_mean['Dice'])
 plt.xlabel('GT Volume')
 plt.ylabel('Dice')

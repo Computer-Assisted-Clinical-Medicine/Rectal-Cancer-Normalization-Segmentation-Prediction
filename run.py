@@ -28,10 +28,10 @@ DEBUG = False
 if DEBUG:
     # run everything eagerly
     import tensorflow as tf
-    tf.config.experimental_run_functions_eagerly(True)
+    # tf.config.run_functions_eagerly(True)
     # do numeric checks (for NaNs)
     tf.debugging.enable_check_numerics(
-        stack_height_limit=30, path_length_limit=50
+        stack_height_limit=60, path_length_limit=100
     )
 
 
