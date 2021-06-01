@@ -19,7 +19,7 @@ from SegmentationNetworkBasis.postprocessing import keep_big_structures
 WRITE_PROBABILITIES = False
 OVERWRITE = False
 
-def calculate_ensemble_weights(experiments:List, metric='Dice')->pd.DataFrame:
+def calculate_ensemble_weights(experiments:List, metric='Dice', version='best')->pd.DataFrame:
     """Calculate the weights each individual model and fold should have according
     to the metric (higher is assumed to be better)
 
@@ -29,6 +29,8 @@ def calculate_ensemble_weights(experiments:List, metric='Dice')->pd.DataFrame:
         List of experiments
     metric : str, optional
         The metric to use, by default 'Dice'
+    version : str, optional
+        Which version of the model should be used, by default 'best'
 
     Returns
     -------
@@ -45,8 +47,8 @@ def calculate_ensemble_weights(experiments:List, metric='Dice')->pd.DataFrame:
     # collect all model results
     for exp in experiments:
         out_path = exp.output_path
-        result_path = out_path / 'results_test_final-postprocessed'
-        result_file = result_path / 'evaluation-mean-results_test_final-postprocessed.csv'
+        result_path = out_path / f'results_test_{version}-postprocessed'
+        result_file = result_path / f'evaluation-mean-results_test_{version}-postprocessed.csv'
         if not result_file.exists():
             raise FileNotFoundError('Not all models are finished yet.')
         results = pd.read_csv(result_file, sep=';')
@@ -76,7 +78,7 @@ def calculate_ensemble_weights(experiments:List, metric='Dice')->pd.DataFrame:
     return models
 
 def combine_models(patients:Iterable, weights:pd.DataFrame, result_path:Path,
-        name:str, overwrite:bool, version='final'):
+        name:str, overwrite:bool, version='best'):
     """Combine the models using the provided weights
 
     Parameters
@@ -92,7 +94,7 @@ def combine_models(patients:Iterable, weights:pd.DataFrame, result_path:Path,
     overwrite : bool
         If existing files should be overwritten
     version : str, optional
-        The version of the images to use, by default 'final'
+        The version of the images to use, by default 'best'
     """
 
     # remember the results
@@ -202,7 +204,7 @@ if __name__ == '__main__':
 
     # get the weights
     ensemble_weights = calculate_ensemble_weights(all_experiments, metric='Dice')
-    VERSION = 'final'
+    VERSION = 'best'
 
     work_dir = experiment_dir / 'combined_models'
     if not work_dir.exists():

@@ -17,7 +17,7 @@ os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 # pylint: disable=wrong-import-position
 
 from experiment import Experiment, export_batch_file
-from SegmentationNetworkBasis.architecture import UNet
+from SegmentationNetworkBasis.architecture import UNet, DenseTiramisu
 from SegmentationNetworkBasis.segbasisloader import NORMALIZING
 from utils import compare_hyperparameters, plot_hparam_comparison, generate_folder_name
 
@@ -91,48 +91,59 @@ if __name__ == '__main__':
 
     #define the parameters that are constant
     F_BASE = 8
-    init_parameters = {
-        "regularize": [True, 'L2', 1e-5],
-        "drop_out": [True, 0.01],
-        "activation": "elu",
-        "do_bias": True,
-        "cross_hair": False,
-        "clipping_value" : 50,
-        "res_connect" : True,
-        'n_filters' : [F_BASE*8, F_BASE*16, F_BASE*32, F_BASE*64, F_BASE*128]
+    network_parameters_UNet = {
+        'regularize': [True, 'L2', 1e-5],
+        'drop_out': [True, 0.01],
+        'activation': "elu",
+        'cross_hair': False,
+        'clipping_value' : 1,
+        'res_connect' : True,
+        'n_filters' : [F_BASE*8, F_BASE*16, F_BASE*32, F_BASE*64, F_BASE*128],
+        'do_bias' : True,
+        'do_batch_normalization' : False
+    }
+    network_parameters_DenseTiramisu = {
+        'regularize': [True, 'L2', 1e-5],
+        'drop_out': [True, 0.01],
+        'activation': "elu",
+        'cross_hair': False,
+        'clipping_value' : 1,
+        'layers_per_block' : (4, 5, 7, 10, 12),
+        'bottleneck_layers' : 15,
+        'growth_rate' : 16,
+        'do_bias' : False,
+        'do_batch_normalization' : True
     }
 
     train_parameters = {
-        "l_r" : 0.001,
-        "optimizer" : "Adam",
-        "epochs" : 100,
+        'l_r' : 0.001,
+        'optimizer' : 'Adam',
+        'epochs' : 100,
         # scheduling parameters
-        "early_stopping" : True,
-        "patience_es" : 15,
-        "reduce_lr_on_plateau" : True,
-        "patience_lr_plat" : 5,
-        "factor_lr_plat" : 0.5,
+        'early_stopping' : True,
+        'patience_es' : 15,
+        'reduce_lr_on_plateau' : True,
+        'patience_lr_plat' : 5,
+        'factor_lr_plat' : 0.5,
         # sampling parameters
-        "percent_of_object_samples" : 0.33,
-        "samples_per_volume" : 80,
-        "background_label_percentage" : 0.15,
+        'percent_of_object_samples' : 0.33,
+        'samples_per_volume' : 80,
+        'background_label_percentage' : 0.15,
         # Augmentation parameters
-        "add_noise" : False,
-        "max_rotation" : 0,
-        "min_resolution_augment" : 1,
-        "max_resolution_augment" : 1
+        'add_noise' : False,
+        'max_rotation' : 0,
+        'min_resolution_augment' : 1,
+        'max_resolution_augment' : 1
     }
 
     data_loader_parameters = {
-        "do_resampling" : True
+        'do_resampling' : True
     }
 
     constant_parameters = {
-        "init_parameters" : init_parameters,
-        "train_parameters" : train_parameters,
-        "data_loader_parameters" : data_loader_parameters,
-        "loss" : 'DICE',
-        'architecture' : UNet
+        'train_parameters' : train_parameters,
+        'data_loader_parameters' : data_loader_parameters,
+        'loss' : 'DICE',
     }
 
     # normalization method
@@ -141,9 +152,8 @@ if __name__ == '__main__':
         # NORMALIZING.HISTOGRAM_MATCHING, NORMALIZING.Z_SCORE,
         NORMALIZING.QUANTILE, NORMALIZING.MEAN_STD
     ]
-    # do batch norm
-    batch_norm = [False]
-    # dimensions
+    architectures = [UNet, DenseTiramisu]
+    network_parameters = [network_parameters_UNet, network_parameters_DenseTiramisu]
     dimensions = [2, 3]
 
     #generate tensorflow command
@@ -157,26 +167,26 @@ if __name__ == '__main__':
     experiments = []
     for d in dimensions:
         for n in normalization_methods:
-            for b in batch_norm:
+            for arch, network_params in zip(architectures, network_parameters):
                 hyper_parameters : Dict[str, Any] = {
                     **constant_parameters,
-                    'dimensions' : d
+                    'dimensions' : d,
+                    'architecture' : arch,
+                    'network_parameters' : network_params
                 }
-                hyper_parameters['init_parameters']['do_batch_normalization'] = b
-                # bias should be the opposite of batch norm
-                hyper_parameters['init_parameters']['do_bias'] = not b
                 hyper_parameters['data_loader_parameters']['normalizing_method'] = n         
 
                 # use less filters for 3D on local computer
                 if not 'CLUSTER' in os.environ:
-                    if d == 3:
-                        F_BASE = 4
-                        n_filters = [F_BASE*8, F_BASE*16, F_BASE*32, F_BASE*64, F_BASE*128]
-                        hyper_parameters['init_parameters']['n_filters'] = n_filters
-                    else:
-                        F_BASE = 8
-                        n_filters = [F_BASE*8, F_BASE*16, F_BASE*32, F_BASE*64, F_BASE*128]
-                        hyper_parameters['init_parameters']['n_filters'] = n_filters
+                    if arch is UNet:
+                        if d == 3:
+                            F_BASE = 4
+                            n_filters = [F_BASE*8, F_BASE*16, F_BASE*32, F_BASE*64, F_BASE*128]
+                            hyper_parameters['network_parameters']['n_filters'] = n_filters
+                        else:
+                            F_BASE = 8
+                            n_filters = [F_BASE*8, F_BASE*16, F_BASE*32, F_BASE*64, F_BASE*128]
+                            hyper_parameters['network_parameters']['n_filters'] = n_filters
 
                 #define experiment
                 experiment_name = generate_folder_name(hyper_parameters)  # pylint: disable=invalid-name

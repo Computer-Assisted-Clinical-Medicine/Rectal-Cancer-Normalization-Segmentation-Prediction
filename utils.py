@@ -8,6 +8,8 @@ import matplotlib
 import numpy as np
 import pandas as pd
 
+from SegmentationNetworkBasis.architecture import DenseTiramisu, UNet
+
 # if on cluster, use other backend
 # pylint: disable=wrong-import-position, ungrouped-imports
 if 'CLUSTER' in os.environ:
@@ -84,7 +86,7 @@ def plot_hparam_comparison(hparam_dir, metrics=None, external=False, postprocess
             # if there are no unused columns, use the changed one
             if len(unused_columns) == 0:
                 unused_columns = list(changed_params)
-            for group, data in hparams_changed.groupby(unused_columns):
+            for group, data in hparams_changed.groupby(unused_columns, dropna=False):
                 # plot them with the same line
                 # get the data
                 m_data = results_means.loc[data.index,met]
@@ -125,7 +127,7 @@ def plot_hparam_comparison(hparam_dir, metrics=None, external=False, postprocess
     plt.close()
 
 
-def compare_hyperparameters(experiments, experiment_dir):
+def compare_hyperparameters(experiments, experiment_dir, version='best'):
     '''
     Compare the hyperparameters of all experiments and collect the ones that
     were changed.
@@ -137,13 +139,13 @@ def compare_hyperparameters(experiments, experiment_dir):
     hparams = []
     for exp in experiments:
         res_name = 'evaluation-all-files.csv'
-        res = exp.output_path / 'results_test_final' / res_name
-        res_post = exp.output_path / 'results_test_final-postprocessed' / res_name
-        res_ext = exp.output_path / 'results_external_testset_final' / res_name
-        res_ext_post = exp.output_path / 'results_external_testset_final-postprocessed' / res_name
+        res = exp.output_path / f'results_test_{version}' / res_name
+        res_post = exp.output_path / f'results_test_{version}-postprocessed' / res_name
+        res_ext = exp.output_path / f'results_external_testset_{version}' / res_name
+        res_ext_post = exp.output_path / f'results_external_testset_{version}-postprocessed' / res_name
         # and parameters
         hparams.append({
-            **exp.hyper_parameters['init_parameters'],
+            **exp.hyper_parameters['network_parameters'],
             **exp.hyper_parameters['train_parameters'],
             **exp.hyper_parameters['data_loader_parameters'],
             'loss' : exp.hyper_parameters['loss'],
@@ -167,7 +169,7 @@ def compare_hyperparameters(experiments, experiment_dir):
     hparams_changed = hparams[changed_params].copy()
     # if n_filters, use the first
     if 'n_filters' in hparams_changed:
-        hparams_changed.loc[:,'n_filters'] = hparams_changed['n_filters'].apply(lambda x: x[0])
+        hparams_changed.loc[:,'n_filters'] = hparams_changed['n_filters'].dropna().apply(lambda x: x[0])
     if 'normalizing_method' in hparams_changed:
         n_name = hparams_changed['normalizing_method'].apply(lambda x: x.name)
         hparams_changed.loc[:,'normalizing_method'] = n_name
@@ -189,6 +191,12 @@ def compare_hyperparameters(experiments, experiment_dir):
     # drop column specifying the files
     if 'results_file_external_testset_postprocessed' in hparams_changed:
         hparams_changed.drop(columns='results_file_external_testset_postprocessed', inplace=True)
+    # drop columns only related to architecture
+    arch_params = hparams_changed.groupby('architecture').nunique(dropna=False)
+    for col in arch_params:
+        if np.all(arch_params[col] == 1):
+            hparams_changed.drop(columns=col, inplace=True)
+
 
     hparams.to_csv(hyperparameter_file, sep=';')
     hparams_changed.to_csv(hyperparameter_changed_file, sep=';')
@@ -205,27 +213,35 @@ def generate_folder_name(parameters):
         parameters['loss']
     ]
 
-    # residual connections if it is an attribute
-    if 'res_connect' in parameters['init_parameters']:
-        if parameters['init_parameters']['res_connect']:
-            params.append('Res')
+    # TODO: move this logic into the network
+    if parameters['architecture'] is  UNet:
+        # residual connections if it is an attribute
+        if 'res_connect' in parameters['network_parameters']:
+            if parameters['network_parameters']['res_connect']:
+                params.append('Res')
+            else:
+                params.append('nRes')
+
+        # filter multiplier
+        params.append('f_'+str(parameters['network_parameters']['n_filters'][0]//8))
+
+        # batch norm
+        if parameters['network_parameters']['do_batch_normalization']:
+            params.append('BN')
         else:
-            params.append('nRes')
+            params.append('nBN')
 
-    # filter multiplier
-    params.append('f_'+str(parameters['init_parameters']['n_filters'][0]//8))
+        # dropout
+        if parameters['network_parameters']['drop_out'][0]:
+            params.append('DO')
+        else:
+            params.append('nDO')
+    elif parameters["architecture"] is DenseTiramisu:
+        params.append('gr_'+str(parameters['network_parameters']['growth_rate']))
 
-    # batch norm
-    if parameters['init_parameters']['do_batch_normalization']:
-        params.append('BN')
+        params.append('nl_'+str(len(parameters['network_parameters']['layers_per_block'])))
     else:
-        params.append('nBN')
-
-    # dropout
-    if parameters['init_parameters']['drop_out'][0]:
-        params.append('DO')
-    else:
-        params.append('nDO')
+        raise NotImplementedError(f'{parameters["architecture"]} not implemented')
 
     # normalization
     params.append(str(parameters['data_loader_parameters']['normalizing_method'].name))
@@ -238,7 +254,7 @@ def generate_folder_name(parameters):
     return folder_name
 
 
-def gather_results(experiment_dir, external=False, postprocessed=False, combined=True)->pd.DataFrame:
+def gather_results(experiment_dir, external=False, postprocessed=False, combined=True, version='best')->pd.DataFrame:
     """Collect all result files from all experiments. Only experiments that are
     already finished will be included in the analysis.
 
@@ -252,6 +268,8 @@ def gather_results(experiment_dir, external=False, postprocessed=False, combined
         If the data from the posprocessed should be evaluated, by default False
     combined : bool, optional
         If there is a combined model, which should be analyzed, by default True
+    version : str, optional
+        Which version of the model should be used, by default best
 
     Returns
     -------
@@ -277,10 +295,10 @@ def gather_results(experiment_dir, external=False, postprocessed=False, combined
         loc = hparams.shape[0]
         hparams.loc[loc] = 'Combined'
         hparams.loc[loc, 'results_file'] = c_path
-        hparams.loc[loc, 'results_file'] = c_path / 'results_final_test' / r_file
-        hparams.loc[loc, 'results_file_postprocessed'] = c_path / 'results_final-postprocessed_test' / r_file
-        hparams.loc[loc, 'results_file_external_testset'] = c_path / 'results_final_external_testset' / r_file
-        r_path = c_path / 'results_final-postprocessed_external_testset' / r_file
+        hparams.loc[loc, 'results_file'] = c_path / f'results_{version}_test' / r_file
+        hparams.loc[loc, 'results_file_postprocessed'] = c_path / f'results_{version}-postprocessed_test' / r_file
+        hparams.loc[loc, 'results_file_external_testset'] = c_path / f'results_{version}_external_testset' / r_file
+        r_path = c_path / f'results_{version}-postprocessed_external_testset' / r_file
         hparams.loc[loc, 'results_file_external_testset_postprocessed'] = r_path
 
     results_all_list = []

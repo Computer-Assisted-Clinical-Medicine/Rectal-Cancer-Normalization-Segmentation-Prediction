@@ -30,9 +30,9 @@ class Experiment():
     """Class to run an experiment using user-defined hyperparameters.
     """
 
-    def __init__(self, name:str, hyper_parameters:dict, data_set:List, external_test_set=None, folds=5, seed=None,
-                 num_channels=1, output_path_rel=None, restart=False, reinitialize_folds=False, folds_dir_rel=None,
-                 preprocessed_dir_rel=None, tensorboard_images=False):
+    def __init__(self, name:str, hyper_parameters:dict, data_set:List, external_test_set=None, folds=5, version='best',
+        seed=None, num_channels=1, output_path_rel=None, restart=False, reinitialize_folds=False, folds_dir_rel=None,
+        preprocessed_dir_rel=None, tensorboard_images=False):
         """Run experiments using a fixed set of hyperparameters
 
         Parameters
@@ -48,6 +48,8 @@ class Experiment():
                 The list of images if an external test set should also be used
             folds : int, optional
                 The number of folds to use for validation, by default 5
+            version : str, optional
+                The version of the network to use (final or best), by default best
             seed : int, optional
                 the global seed, by default None
             num_channels: int, optional
@@ -78,6 +80,11 @@ class Experiment():
         if external_test_set is not None:
             self.external_test_set = np.array(external_test_set)
             assert self.external_test_set.size > 0, 'External test set is empty'
+
+        if version in ('final', 'best'):
+            self.version = version
+        else:
+            raise ValueError(f'Version should be final or best, not {version}.')
 
         # get the environmental variables
         self.data_dir = Path(os.environ['data_dir'])
@@ -247,7 +254,12 @@ class Experiment():
         cfg.max_resolution_augment = hp_train['max_resolution_augment']
 
         cfg.num_channels = self.num_channels
-        cfg.train_dim = 128 # the resolution in plane
+        if self.hyper_parameters['architecture'].get_name()=='UNet':
+            cfg.train_dim = 128 # the resolution in plane
+        elif self.hyper_parameters['architecture'].get_name()=='DenseTiramisu':
+            cfg.train_dim = 64 # the resolution in plane
+        else:
+            raise ValueError('Unrecognized network')
         cfg.num_slices_train = 32 # the resolution in z-direction
 
         cfg.batch_size_train = hp_train['batch_size']
@@ -271,7 +283,7 @@ class Experiment():
         elif dim == 3:
             # set shape
             # if batch size too small, decrease z-extent
-            if cfg.batch_size_train < 4:
+            if cfg.batch_size_train < 4 and self.hyper_parameters['architecture'].get_name()=='UNet':
                 cfg.num_slices_train = cfg.num_slices_train // 2
                 cfg.batch_size_train = cfg.batch_size_train * 2
                 # if still to small, decrease patch extent in plane
@@ -319,13 +331,18 @@ class Experiment():
 
         if a_name == 'UNet':
             # filters scale after the first filter, so use that for estimation
-            first_f = self.hyper_parameters['init_parameters']['n_filters'][0]
+            first_f = self.hyper_parameters['network_parameters']['n_filters'][0]
             if dim == 2:
                 # this was determined by trail and error for 128x128x2 patches
                 memory_consumption_guess = 2 * first_f
             elif dim == 3:
                 # this was determined by trail and error for 128x128x32x2 patches
-                memory_consumption_guess = 64 * first_f
+                memory_consumption_guess = 128 * first_f
+        elif a_name == 'DenseTiramisu':
+            if dim == 2:
+                memory_consumption_guess = 512
+            if dim == 3:
+                memory_consumption_guess = 4096
         else:
             raise NotImplementedError('No heuristic implemented for this network.')
         
@@ -350,11 +367,11 @@ class Experiment():
         cfg.preprocessed_dir = self.preprocessed_dir
 
         #generate loader
-        training_loader = SegLoader(
+        training_dataset = SegLoader(
             name='training_loader',
+            frac_obj=self.hyper_parameters['train_parameters']['percent_of_object_samples'],
             **self.hyper_parameters['data_loader_parameters']
-        )
-        training_dataset = training_loader(
+        )(
             train_files,
             batch_size=cfg.batch_size_train,
             n_epochs=self.hyper_parameters['train_parameters']['epochs'],
@@ -363,6 +380,7 @@ class Experiment():
         validation_dataset = SegLoader(
             mode=SegLoader.MODES.VALIDATE,
             name='validation_loader',
+            frac_obj=self.hyper_parameters['train_parameters']['percent_of_object_samples'],
             **self.hyper_parameters['data_loader_parameters']
         )(
             vald_files,
@@ -393,7 +411,7 @@ class Experiment():
         net = self.hyper_parameters['architecture'](
             self.hyper_parameters['loss'],
             #add initialization parameters
-            **self.hyper_parameters["init_parameters"]
+            **self.hyper_parameters["network_parameters"]
         )
         write_configurations(self.output_path, folder_name, net, cfg)
         # Train the network with the dataset iterators
@@ -428,8 +446,6 @@ class Experiment():
         # set preprocessing dir
         cfg.preprocessed_dir = self.preprocessed_dir
 
-        version = 'final'
-
         testloader = ApplyLoader(
             name='test_loader',
             **self.hyper_parameters['data_loader_parameters']
@@ -438,23 +454,23 @@ class Experiment():
         net = self.hyper_parameters['architecture'](
             self.hyper_parameters['loss'],
             is_training=False,
-            model_path=str(self.output_path/folder_name/'models'/'model-final'),
-            **(self.hyper_parameters["init_parameters"])
+            model_path=str(self.output_path/folder_name/'models'/f'model-{self.version}'),
+            **(self.hyper_parameters['network_parameters'])
             )
 
         logger.info('Started applying %s to test datset.', folder_name)
 
         apply_path = self.output_path/folder_name/apply_name
-        for file in tqdm(test_files, desc=f'{folder_name} (test)', unit='file'):
+        for file in tqdm(test_files, desc=f'{folder_name} ({apply_name.replace("_", " ")})', unit='file'):
             f_name = Path(file).name
 
             # do inference
-            result_image = apply_path/f'prediction-{f_name}-{version}{cfg.file_suffix}'
+            result_image = apply_path/f'prediction-{f_name}-{self.version}{cfg.file_suffix}'
             if not result_image.exists():
                 net.apply(testloader, file, apply_path=apply_path)
 
             # postprocess the image
-            postprocessed_image = apply_path/f'prediction-{f_name}-{version}-postprocessed{cfg.file_suffix}'
+            postprocessed_image = apply_path/f'prediction-{f_name}-{self.version}-postprocessed{cfg.file_suffix}'
             if not postprocessed_image.exists():
                 self.postprocess(result_image, postprocessed_image)
 
@@ -473,7 +489,7 @@ class Experiment():
         """
         self.postprocessing_method(unprocessed, processed)
 
-    def evaluate_fold(self, folder_name, test_files, name='test', apply_name='apply', version = 'final'):
+    def evaluate_fold(self, folder_name, test_files, name='test', apply_name='apply', version = 'best'):
         """Evaluate the files generated by the network
 
         Parameters
@@ -487,7 +503,7 @@ class Experiment():
         apply_name : str, optional
             The subfolder where the evaluated files are stored, by default apply
         version : str, optional
-            The version of the results to use, by default final
+            The version of the results to use, by default best
         """
 
         logger.info('Start evaluation of %s.', folder_name)
@@ -589,15 +605,15 @@ class Experiment():
             cfg.batch_size_train = cfg.samples_per_volume * cfg.num_files
 
         #try the actual training
-        model_final = folddir / 'models' / 'model-final'
-        if self.restart is False and model_final.exists():
+        model_result = folddir / 'models' / f'model-{self.version}'
+        if self.restart is False and model_result.exists():
             tqdm.write('Already trained, skip training.')
             logger.info('Already trained, skip training.')
         else:
             self.training(folder_name, train_files, vald_files)
 
         # do the application and evaluation
-        eval_file_path = folddir / f'evaluation-{folder_name}-final_test.csv'
+        eval_file_path = folddir / f'evaluation-{folder_name}-{self.version}_test.csv'
         if eval_file_path.exists():
             tqdm.write('Already evaluated, skip evaluation.')
             logger.info('Already evaluated, skip evaluation.')
@@ -606,15 +622,15 @@ class Experiment():
             self.evaluate_fold(folder_name, test_files)
 
         # evaluate the postprocessed files
-        eval_file_path = folddir / f'evaluation-{folder_name}-final-postprocessed_test.csv'
+        eval_file_path = folddir / f'evaluation-{folder_name}-{self.version}-postprocessed_test.csv'
         if not eval_file_path.exists():
-            self.evaluate_fold(folder_name, test_files, version='final-postprocessed')
+            self.evaluate_fold(folder_name, test_files, version=f'{self.version}-postprocessed')
 
         # evaluate the external set if present
         if self.external_test_set is not None:
             # add the path
             external_test_set = np.array([self.data_dir / t for t in self.external_test_set])
-            ext_eval = folddir / f'evaluation-{folder_name}-final_external_testset.csv'
+            ext_eval = folddir / f'evaluation-{folder_name}-{self.version}_external_testset.csv'
             # TODO: determine better if finished
             if ext_eval.exists():
                 tqdm.write('Already evaluated on external set, skip evaluation.')
@@ -632,14 +648,14 @@ class Experiment():
                     apply_name='apply_external_testset'
                 )
 
-            ext_eval = folddir / f'evaluation-{folder_name}-final-postprocessed_external_testset.csv'
+            ext_eval = folddir / f'evaluation-{folder_name}-{self.version}-postprocessed_external_testset.csv'
             if not ext_eval.exists():
                 self.evaluate_fold(
                     folder_name,
                     external_test_set,
                     name='external_testset',
                     apply_name='apply_external_testset',
-                    version='final-postprocessed'
+                    version=f'{self.version}-postprocessed'
                 )
 
         tqdm.write(f'Finished with {self.name} {folder_name} (Fold {fold+1} of {self.folds})')
@@ -658,7 +674,7 @@ class Experiment():
             If and eval file was not found, most likely because the training failed
             or is not finished yet
         """
-        for version in ['final', 'final-postprocessed']:
+        for version in [self.version, f'{self.version}-postprocessed']:
             #set eval files
             eval_files = []
             for f_name in self.fold_dir_names:
