@@ -14,7 +14,7 @@ from SegmentationNetworkBasis.architecture import DenseTiramisu, UNet
 # pylint: disable=wrong-import-position, ungrouped-imports
 if 'CLUSTER' in os.environ:
     matplotlib.use('Agg')
-import matplotlib.pyplot as plt
+import matplotlib.pyplot as plt # pylint: disable=wrong-import-order
 
 
 def plot_hparam_comparison(hparam_dir, metrics=None, external=False, postprocessed=False):
@@ -245,6 +245,9 @@ def generate_folder_name(parameters):
 
     # normalization
     params.append(str(parameters['data_loader_parameters']['normalizing_method'].name))
+
+    # object fraction
+    params.append(f'obj_{int(parameters["train_parameters"]["percent_of_object_samples"]*100):03d}%')
 
     # add epoch number
     params.append(str(epochs))

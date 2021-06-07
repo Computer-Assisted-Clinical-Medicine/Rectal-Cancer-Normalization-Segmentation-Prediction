@@ -7,11 +7,14 @@ This file is to test the timing of the different data loaders. The functions are
 also profiled.
 '''
 
+# pylint: disable=pointless-string-statement, protected-access
+
 import cProfile
 import os
 import pstats
 import time
 from pathlib import Path
+from typing import Dict
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -19,19 +22,22 @@ import pandas as pd
 import SimpleITK as sitk
 from IPython.display import display
 
-# surpress tensorflow output
-os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
-import tensorflow as tf
-
 import seg_data_loader
 from SegmentationNetworkBasis import config as cfg
 from test_seg_data_loader import (get_loader, load_dataset,
                                   set_parameters_according_to_dimension,
                                   set_seeds)
 
-show_plots = False
+# surpress tensorflow output
+os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
+import tensorflow as tf # pylint: disable=unused-import, wrong-import-order, wrong-import-position
 
-def time_functions(dimension, name, module, timing):
+SHOW_PLOTS = False
+
+def time_functions(dimension, name, module, timing_result):
+    '''
+    Time the individual functions in the data loaders
+    '''
 
     test_dir = Path('test_data')
 
@@ -43,7 +49,7 @@ def time_functions(dimension, name, module, timing):
     data_loader = get_loader(name, module)
 
     # get names from csv
-    file_list, files_list_b = load_dataset(test_dir)
+    _, files_list_b = load_dataset(test_dir)
 
     # time the individual functions
     load_time = []
@@ -79,13 +85,19 @@ def time_functions(dimension, name, module, timing):
             augment_2 = time.perf_counter()
             augmentation_numpy_time.append(augment_2 - converted)
 
-    print(f'\tExecution time for {name} {dimension}D {module.__name__}: load: {np.mean(load_time):.2f}s, sample (incl Augm): {np.mean(sample_time):.2f}s')
+    print(
+        f'\tExecution time for {name} {dimension}D {module.__name__}: load: {np.mean(load_time):.2f}s'
+        + f', sample (incl Augm): {np.mean(sample_time):.2f}s'
+    )
     timing_dict = {
         'load file' : np.mean(load_time),
         'get sample' : np.mean(sample_time),
     }
     if len(augmentation_images_time) > 0:
-        print(f'\tAugm im: {np.mean(augmentation_images_time):.2f}s, Augm. np: {np.mean(augmentation_numpy_time):.2f}s, Conv im: {np.mean(convert_images_time):.2f}')
+        print(
+            f'\tAugm im: {np.mean(augmentation_images_time):.2f}s, Augm. np: {np.mean(augmentation_numpy_time):.2f}s'
+            + f', Conv im: {np.mean(convert_images_time):.2f}'
+        )
         timing_dict = {
             'augment img.' : np.mean(augmentation_images_time),
             'augment np' : np.mean(augmentation_numpy_time),
@@ -93,11 +105,14 @@ def time_functions(dimension, name, module, timing):
             **timing_dict
         }
 
-    timing[f'{name}-{dimension}D-{module.__name__}'] = timing_dict
+    timing_result[f'{name}-{dimension}D-{module.__name__}'] = timing_dict
 
-    return timing
+    return timing_result
 
 def profile_functions(dimension, name, module):
+    '''
+    Generate a profile for the individual functions
+    '''
 
     test_dir = Path('test_data')
 
@@ -114,12 +129,12 @@ def profile_functions(dimension, name, module):
     data_loader = get_loader(name, module)
 
     # get names from csv
-    file_list, files_list_b = load_dataset(test_dir)
+    _, files_list_b = load_dataset(test_dir)
 
     def load_all_files():
         for file_id in files_list_b:
             data, lbl = data_loader._load_file(file_id)
-            samples, labels = data_loader._get_samples_from_volume(data, lbl)
+            _, _ = data_loader._get_samples_from_volume(data, lbl)
 
     # profile the function
     profiler = cProfile.Profile()
@@ -128,13 +143,16 @@ def profile_functions(dimension, name, module):
     profiler.disable()
     # dump stats file
     profiler.dump_stats(profile_file)
-    ps = pstats.Stats(profiler)
-    ps.sort_stats(pstats.SortKey.CUMULATIVE)
-    ps.print_stats(15)
+    profiler_stats = pstats.Stats(profiler)
+    profiler_stats.sort_stats(pstats.SortKey.CUMULATIVE)
+    profiler_stats.print_stats(15)
 
     return profile_file
 
-def time_wrapper(dimension, name, module, timing):
+def time_wrapper(dimension, name, module, timing_result):
+    '''
+    Wrapper used to time the different loaders
+    '''
     n_epochs = 1
 
     test_dir = Path('test_data')
@@ -149,8 +167,7 @@ def time_wrapper(dimension, name, module, timing):
     # get names from csv
     file_list, _ = load_dataset(test_dir)
 
-    data_file, _ = data_loader._get_filenames(str(file_list[0]))
-    first_image = sitk.GetArrayFromImage(sitk.ReadImage(data_file))
+    data_loader._get_filenames(str(file_list[0]))
 
     # call the loader
     if name == 'train':
@@ -184,7 +201,7 @@ def time_wrapper(dimension, name, module, timing):
         else:
             load_time.append(time.perf_counter() - start_time)
         
-        if show_plots:
+        if SHOW_PLOTS:
             if name == 'train':
                 if module.__name__ == 'seg_data_loader_new':
                     # convert to numpy
@@ -200,7 +217,7 @@ def time_wrapper(dimension, name, module, timing):
     assert counter != 0
 
     if name != 'test':
-        assert(counter == cfg.samples_per_volume * cfg.num_files // cfg.batch_size_train)
+        assert counter == cfg.samples_per_volume * cfg.num_files // cfg.batch_size_train
 
     if len(load_time) == 0:
         load_time = [setup_time]
@@ -208,14 +225,17 @@ def time_wrapper(dimension, name, module, timing):
     print(f'\tExecution time for one step: {np.mean(load_time):.2f}s ({np.sum(load_time):.2f}s total)')
     print(f'\tSetup time: {setup_time:.2f}s')
     # add to dict
-    t_name = f'{name}-{dimension}D-{module.__name__}'
-    timing[t_name]['step'] = np.mean(load_time)
-    timing[t_name]['setup'] = setup_time
-    timing[t_name]['total'] = np.sum(load_time)
+    time_name = f'{name}-{dimension}D-{module.__name__}'
+    timing_result[time_name]['step'] = np.mean(load_time)
+    timing_result[time_name]['setup'] = setup_time
+    timing_result[time_name]['total'] = np.sum(load_time)
 
-    return timing
+    return timing_result
 
 def plot(dimension, samples_lbl, labels_lbl, samples_bkr=None, labels_bkr=None):
+    '''
+    Plot a histogram of the foreground samples and labels
+    '''
     plt.hist(samples_lbl.reshape(-1))
     plt.title('Histogram of foreground samples')
     plt.show()
@@ -230,7 +250,7 @@ def plot(dimension, samples_lbl, labels_lbl, samples_bkr=None, labels_bkr=None):
     ncols = samples_lbl.shape[-1] + 1
     nrows = nsamples
     indices = np.sort(np.random.choice(np.arange(samples_lbl.shape[0]), nsamples))
-    fig, axes = plt.subplots(nrows, ncols, figsize=(11,9))
+    _, axes = plt.subplots(nrows, ncols, figsize=(11,9))
 
     for ax_r, sample_r, label in zip(axes, samples_lbl[indices], labels_lbl[indices]):
         index = np.random.choice(np.arange(sample_r.shape[0]))
@@ -253,19 +273,19 @@ def plot(dimension, samples_lbl, labels_lbl, samples_bkr=None, labels_bkr=None):
 ## Evaluate the timing
 '''
 
-timing = {}
+timing:Dict[str, float] = {}
 
 dimensions = [2,3]
 names = ['train', 'vald']
 modules = [seg_data_loader]
 
 # call functions and time them
-for dimension in dimensions:
-    for name in names:
-        for module in modules:
-            print(f'{name} {dimension}D {module.__name__}:')
-            time_functions(dimension, name, module, timing)
-            time_wrapper(dimension, name, module, timing)
+for dim in dimensions:
+    for NAME in names:
+        for mod in modules:
+            print(f'{NAME} {dim}D {mod.__name__}:')
+            time_functions(dim, NAME, mod, timing)
+            time_wrapper(dim, NAME, mod, timing)
 
 timing_pd = pd.DataFrame(timing).T
 # set index
@@ -279,18 +299,18 @@ display(timing_pd.round(3))
 
 profile_files = {}
 
-name = 'train'
+NAME = 'train'
 
 # call functions and time them
-for dimension in dimensions:
-    for module in modules:
-        print(f'{name} {dimension}D {module.__name__}:')
+for dim in dimensions:
+    for mod in modules:
+        print(f'{NAME} {dim}D {mod.__name__}:')
 
         # profile the individual functions
-        t_name = f'{name}-{dimension}D-{module.__name__}'
-        profile_files[t_name] = (profile_functions(dimension, name, module))
+        t_name = f'{NAME}-{dim}D-{mod.__name__}'
+        profile_files[t_name] = (profile_functions(dim, NAME, mod))
 
 print('For a graphical profile call:')
-for name, path in profile_files.items():
-    print(name)
+for NAME, path in profile_files.items():
+    print(NAME)
     print(f'\tsnakeviz {path}')

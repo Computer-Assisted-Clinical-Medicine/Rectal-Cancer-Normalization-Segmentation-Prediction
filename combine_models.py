@@ -101,7 +101,7 @@ def combine_models(patients:Iterable, weights:pd.DataFrame, result_path:Path,
     results_list = []
     results_post_list = []
 
-    for pat in tqdm(patients, unit='image'):
+    for pat in tqdm(patients, unit='patient'):
 
         if not result_path.exists():
             result_path.mkdir(parents=True)
@@ -229,6 +229,7 @@ if __name__ == '__main__':
     eval_files = []
     eval_files_post = []
     for f, w in ensemble_weights.groupby('fold'):
+        tqdm.write(f)
         combine_models(data_set, w, work_dir / f / 'apply', 'test', overwrite=OVERWRITE)
         eval_files.append(work_dir / f / f'evaluation-{f}-{VERSION}_test.csv')
         eval_files_post.append(work_dir / f / f'evaluation-{f}-{VERSION}-postprocessed_test.csv')
@@ -238,15 +239,18 @@ if __name__ == '__main__':
     # and also for the external set
     if external_test_set.size > 0:
         NAME = 'external_testset'
+        tqdm.write(NAME)
         eval_files = []
         eval_files_post = []
         for f, w in ensemble_weights.groupby('fold'):
+            tqdm.write(f)
             applied = work_dir / f / 'apply_external_testset'
             combine_models(external_test_set, w, applied, NAME, overwrite=OVERWRITE)
             eval_files.append(work_dir / f / f'evaluation-{f}-{VERSION}_{NAME}.csv')
             eval_files_post.append(work_dir / f / f'evaluation-{f}-{VERSION}-postprocessed_{NAME}.csv')
         # combine all folds
         f = 'all-folds'
+        tqdm.write(f)
         w = ensemble_weights
         applied = work_dir / f / 'apply_external_testset'
         combine_models(external_test_set, w, applied, NAME, overwrite=OVERWRITE)

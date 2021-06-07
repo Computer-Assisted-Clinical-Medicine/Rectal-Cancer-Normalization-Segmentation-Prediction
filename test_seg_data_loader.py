@@ -1,4 +1,7 @@
-import os
+'''
+Test the different data loaders using different settings
+'''
+
 from pathlib import Path
 
 import GPUtil
@@ -12,21 +15,29 @@ import seg_data_loader
 from SegmentationNetworkBasis import config as cfg
 from SegmentationNetworkBasis.segbasisloader import NORMALIZING
 
+# pylint: disable=protected-access,duplicate-code
+
 def set_seeds():
     tf.keras.backend.clear_session()
     np.random.seed(42)
     tf.random.set_seed(42)
 
-def get_loader(name, module, normalizing_method=NORMALIZING.QUANTILE):
+def get_loader(name, module, normalizing_method=NORMALIZING.QUANTILE, precent_obj=0.33):
+    '''
+    Get the data loader using the specified module, normalization method and
+    object percentage.
+    '''
     #generate loader
     if name == 'train':
         data_loader = module.SegLoader(
             name='training_loader',
+            frac_obj=precent_obj,
             normalizing_method=normalizing_method
         )
     elif name == 'vald':
         data_loader = module.SegLoader(
             mode=module.SegLoader.MODES.VALIDATE,
+            frac_obj=precent_obj,
             name='validation_loader'
         )
     elif name == 'test':
@@ -37,6 +48,10 @@ def get_loader(name, module, normalizing_method=NORMALIZING.QUANTILE):
     return data_loader
 
 def load_dataset(test_dir):
+    '''
+    Load the dataset from the test directory and convert the file lists to the
+    right types
+    '''
     # add data path
     file_list = create_test_files.create_test_files(test_dir)
 
@@ -50,7 +65,7 @@ def load_dataset(test_dir):
 
     return file_list, files_list_b
 
-def set_parameters_according_to_dimension(dim, num_channels, preprocessed_dir):
+def set_parameters_according_to_dimension(dimension, num_channels, preprocessed_dir):
     """This function will set up the shapes in the cfg module so that they
     will run on the current GPU.
     """
@@ -62,11 +77,11 @@ def set_parameters_according_to_dimension(dim, num_channels, preprocessed_dir):
     cfg.num_slices_train = 32 # the resolution in z-direction
 
     # determine batch size
-    cfg.batch_size_train = estimate_batch_size(dim)
+    cfg.batch_size_train = estimate_batch_size(dimension)
     cfg.batch_size_valid = cfg.batch_size_train
 
     # set shape according to the dimension
-    if dim == 2:
+    if dimension == 2:
         # set shape
         cfg.train_input_shape = [cfg.train_dim, cfg.train_dim, cfg.num_channels]
         cfg.train_label_shape = [cfg.train_dim, cfg.train_dim, cfg.num_classes_seg]
@@ -78,7 +93,7 @@ def set_parameters_according_to_dimension(dim, num_channels, preprocessed_dir):
         cfg.samples_per_volume = 64
         cfg.batch_capacity_train = 4*cfg.samples_per_volume # chosen as multiple of samples per volume
 
-    elif dim == 3:
+    elif dimension == 3:
         # set shape
         # if batch size too small, decrease z-extent
         if cfg.batch_size_train < 4:
@@ -107,10 +122,10 @@ def set_parameters_according_to_dimension(dim, num_channels, preprocessed_dir):
     if not preprocessed_dir.exists():
         preprocessed_dir.mkdir(parents=True)
     cfg.preprocessed_dir = str(preprocessed_dir)
-    cfg.normalizing_method == cfg.NORMALIZING.QUANTILE
+    cfg.normalizing_method = cfg.NORMALIZING.QUANTILE
 
 
-def estimate_batch_size(dim):
+def estimate_batch_size(dimension):
     """The batch size estimation is basically trail and error. So far tested
     with 128x128x2 patches in 2D and 128x128x32x2 in 3D, if using different
     values, guesstimate the relation to the memory.
@@ -130,10 +145,10 @@ def estimate_batch_size(dim):
     if a_name == 'UNet':
         # filters scale after the first filter, so use that for estimation
         first_f = 8
-        if dim == 2:
+        if dimension == 2:
             # this was determined by trail and error for 128x128x2 patches
             memory_consumption_guess = 2 * first_f
-        elif dim == 3:
+        elif dimension == 3:
             # this was determined by trail and error for 128x128x32x2 patches
             memory_consumption_guess = 64 * first_f
     else:
@@ -149,13 +164,15 @@ modules = [seg_data_loader]
 normalizing_methods = [NORMALIZING.HM_QUANTILE, NORMALIZING.HM_QUANT_MEAN,
     NORMALIZING.QUANTILE, NORMALIZING.WINDOW, NORMALIZING.MEAN_STD,
     NORMALIZING.HISTOGRAM_MATCHING, NORMALIZING.Z_SCORE]
+frac_objects = [0, 0.3, 1]
 
 
 @pytest.mark.parametrize('dimension', dimensions)
 @pytest.mark.parametrize('name', names)
 @pytest.mark.parametrize('module', modules)
 @pytest.mark.parametrize('normalizing_method', normalizing_methods)
-def test_functions(dimension, name, module, normalizing_method):
+@pytest.mark.parametrize('frac_obj', frac_objects)
+def test_functions(dimension, name, module, normalizing_method, frac_obj=0.5):
     """Test the individual functions contained in the wrapper.
 
     Parameters
@@ -175,7 +192,7 @@ def test_functions(dimension, name, module, normalizing_method):
     set_seeds()
 
     #generate loader
-    data_loader = get_loader(name, module, normalizing_method)
+    data_loader = get_loader(name, module, normalizing_method, frac_obj)
 
     # get names from csv
     file_list, files_list_b = load_dataset(test_dir)
@@ -183,8 +200,8 @@ def test_functions(dimension, name, module, normalizing_method):
     print(f'Loading Dataset {name}.')
 
     # execute the callbacks
-    for m in data_loader.normalization_callbacks:
-        m([sitk.ReadImage(data_loader._get_filenames(f)[0]) for f in file_list])
+    for callback in data_loader.normalization_callbacks:
+        callback([sitk.ReadImage(data_loader._get_filenames(f)[0]) for f in file_list])
 
     print('\tLoad a numpy sample')
     data_read = data_loader._read_file_and_return_numpy_samples(files_list_b[0])
@@ -202,7 +219,7 @@ def test_functions(dimension, name, module, normalizing_method):
         print(f'\tSamples from foreground shape: {samples.shape}')
         print(f'\tLabels from foreground shape: {labels.shape}')
 
-        assert(samples.shape[:-1] == labels.shape[:-1])
+        assert samples.shape[:-1] == labels.shape[:-1]
 
         nan_slices = np.all(np.isnan(samples), axis=(1,2,3))
         assert not np.any(nan_slices), f'{nan_slices.sum()} sample slices contain NANs'
@@ -218,7 +235,8 @@ def test_functions(dimension, name, module, normalizing_method):
 @pytest.mark.parametrize('name', names)
 @pytest.mark.parametrize('module', modules)
 @pytest.mark.parametrize('normalizing_method', normalizing_methods)
-def test_wrapper(dimension, name, module, normalizing_method):
+@pytest.mark.parametrize('frac_obj', frac_objects)
+def test_wrapper(dimension, name, module, normalizing_method, frac_obj=0.5):
     """Test the complete wrapper and check shapes
 
     Parameters
@@ -244,7 +262,7 @@ def test_wrapper(dimension, name, module, normalizing_method):
     set_seeds()
 
     #generate loader
-    data_loader = get_loader(name, module, normalizing_method)
+    data_loader = get_loader(name, module, normalizing_method, frac_obj)
 
     # get names from csv
     file_list, _ = load_dataset(test_dir)
@@ -291,12 +309,12 @@ def test_wrapper(dimension, name, module, normalizing_method):
 
         # check shape
         if name != 'test':
-            assert(cfg.batch_size_train == x_t.shape[0])
-            assert(cfg.num_channels == x_t.shape[-1])
-            assert(cfg.batch_size_train == y_t.shape[0])
+            assert cfg.batch_size_train == x_t.shape[0]
+            assert cfg.num_channels == x_t.shape[-1]
+            assert cfg.batch_size_train == y_t.shape[0]
         else:
             if dimension == 2:
-                assert(first_image.shape[0] == x_t.numpy().shape[0])
+                assert first_image.shape[0] == x_t.numpy().shape[0]
 
         # look for nans
         nan_slices = np.all(np.isnan(x_t.numpy()), axis=(1,2,3))
@@ -321,7 +339,10 @@ def test_wrapper(dimension, name, module, normalizing_method):
                 n_bkr_per_sample = np.sum(y_t.numpy()[...,0], axis=(1,2)).astype(int)
                 n_object_per_sample = np.sum(y_t.numpy()[...,1], axis=(1,2)).astype(int)
             if np.all(n_object_per_sample == 0):
-                raise Exception('All labels are zero, no objects were found, either the labels are incorrect or there was a problem processing the image.')
+                raise Exception(
+                    'All labels are zero, no objects were found, either the labels are incorrect '
+                    + 'or there was a problem processing the image.'
+                )
         
             n_objects.append(n_object_per_sample)
             n_background.append(n_bkr_per_sample)
@@ -334,18 +355,21 @@ def test_wrapper(dimension, name, module, normalizing_method):
 
     # test that the number of samples per epoch is correct
     if name != 'test':
-        assert(counter == cfg.samples_per_volume * cfg.num_files // cfg.batch_size_train)
+        assert counter == cfg.samples_per_volume * cfg.num_files // cfg.batch_size_train
 
         # check the fraction of objects per sample
         n_objects = np.array(n_objects)
         n_background = np.array(n_background)
 
         # get the fraction of samples containing a label
-        assert np.mean(n_objects.reshape(-1) > 0) > cfg.percent_of_object_samples
+        assert np.mean(n_objects.reshape(-1) > 0) >= frac_obj
 
 @pytest.mark.parametrize('module', modules)
 @pytest.mark.parametrize('normalizing_method', normalizing_methods)
 def test_apply_loader(module, normalizing_method):
+    '''
+    Test the apply loader by loading a few images and verify the padding
+    '''
 
     test_dir = Path('test_data')
 
@@ -362,7 +386,7 @@ def test_apply_loader(module, normalizing_method):
     # make sure the processed image and the image without padding are the same (except the batch dimension)
     processed_image = sitk.GetArrayFromImage(loader.get_processed_image(filename))
     padding_removed = loader.remove_padding(image_data)
-    assert np.allclose(processed_image, padding_removed[0]), 'padded image with padding removed is not the same as the original image'
+    assert np.allclose(processed_image, padding_removed[0]), 'image with padding removed is not the same as original'
 
     # test the stitching
     window_shape = np.array(cfg.train_input_shape[:3])+4
@@ -374,8 +398,8 @@ def test_apply_loader(module, normalizing_method):
 
 if __name__ == '__main__':
     # run functions for better debugging
-    for dimension in dimensions:
-        for name in names:
-            for normalizing_method in normalizing_methods:
-                test_functions(dimension, name, seg_data_loader, normalizing_method)
-                test_wrapper(dimension, name, seg_data_loader, normalizing_method)
+    for dim in dimensions:
+        for mod_name in names:
+            for norm_meth in normalizing_methods:
+                test_functions(dim, mod_name, seg_data_loader, norm_meth)
+                test_wrapper(dim, mod_name, seg_data_loader, norm_meth)

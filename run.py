@@ -1,13 +1,14 @@
 '''
 Run the training and evaluation of the models.
 '''
+import copy
 import json
 import logging
 import os
 import shutil
 import sys
 from pathlib import Path
-from typing import Any, Dict
+from typing import Any, Dict, List
 
 import numpy as np
 
@@ -34,6 +35,38 @@ if DEBUG:
         stack_height_limit=60, path_length_limit=100
     )
 
+def vary_hyperparameters(parameters, keys:tuple, values:list)->List[Dict[str, Any]]:
+    """Vary the hyperparameter given by the keys by the values given. A list of
+    parameters as a dict is taken as input and the returned list will be 
+    len(values) times bigger than the input list. The hyperparameter will be added
+    for each existing entry.
+
+    Parameters
+    ----------
+    parameters : List[Dict[str, Any]]
+        The current hyperparameters
+    keys : tuple
+        The parameter to vary with the dict keys as tuple, this is then used to
+        write to a nested dict, with the first value as key for the first dict.
+        All keys besides the last have to already exist
+    values : list
+        list of values to set as parameter
+
+    Returns
+    -------
+    List[Dict[str, Any]]
+        The new hyperparameter list with increased size
+    """
+    params_new = []
+    for param_set in parameters:
+        for val in values:
+            param_set_new = copy.deepcopy(param_set)
+            to_vary = param_set_new
+            for k in keys[:-1]:
+                to_vary = to_vary[k]
+            to_vary[keys[-1]] = val
+            params_new.append(param_set_new)
+    return params_new
 
 if __name__ == '__main__':
 
@@ -90,6 +123,41 @@ if __name__ == '__main__':
     n_channels = len(data_dict['modality'])
 
     #define the parameters that are constant
+    train_parameters = {
+        'l_r' : 0.001,
+        'optimizer' : 'Adam',
+        'epochs' : 100,
+        # scheduling parameters
+        'early_stopping' : True,
+        'patience_es' : 15,
+        'reduce_lr_on_plateau' : True,
+        'patience_lr_plat' : 5,
+        'factor_lr_plat' : 0.5,
+        # sampling parameters
+        'samples_per_volume' : 80,
+        'background_label_percentage' : 0.15,
+        # Augmentation parameters
+        'add_noise' : False,
+        'max_rotation' : 0,
+        'min_resolution_augment' : 1,
+        'max_resolution_augment' : 1
+    }
+
+    data_loader_parameters = {
+        'do_resampling' : True
+    }
+
+    constant_parameters = {
+        'train_parameters' : train_parameters,
+        'data_loader_parameters' : data_loader_parameters,
+        'loss' : 'DICE',
+    }
+    # define constant parameters
+    hyper_parameters : List[Dict[str, Any]] = [{
+        **constant_parameters,
+    }]
+
+    ### architecture ###
     F_BASE = 8
     network_parameters_UNet = {
         'regularize': [True, 'L2', 1e-5],
@@ -114,47 +182,43 @@ if __name__ == '__main__':
         'do_bias' : False,
         'do_batch_normalization' : True
     }
-
-    train_parameters = {
-        'l_r' : 0.001,
-        'optimizer' : 'Adam',
-        'epochs' : 100,
-        # scheduling parameters
-        'early_stopping' : True,
-        'patience_es' : 15,
-        'reduce_lr_on_plateau' : True,
-        'patience_lr_plat' : 5,
-        'factor_lr_plat' : 0.5,
-        # sampling parameters
-        'percent_of_object_samples' : 0.33,
-        'samples_per_volume' : 80,
-        'background_label_percentage' : 0.15,
-        # Augmentation parameters
-        'add_noise' : False,
-        'max_rotation' : 0,
-        'min_resolution_augment' : 1,
-        'max_resolution_augment' : 1
-    }
-
-    data_loader_parameters = {
-        'do_resampling' : True
-    }
-
-    constant_parameters = {
-        'train_parameters' : train_parameters,
-        'data_loader_parameters' : data_loader_parameters,
-        'loss' : 'DICE',
-    }
-
-    # normalization method
-    normalization_methods = [
-        NORMALIZING.HM_QUANTILE, # NORMALIZING.HM_QUANT_MEAN,
-        # NORMALIZING.HISTOGRAM_MATCHING, NORMALIZING.Z_SCORE,
-        NORMALIZING.QUANTILE, NORMALIZING.MEAN_STD
-    ]
-    architectures = [UNet, DenseTiramisu]
     network_parameters = [network_parameters_UNet, network_parameters_DenseTiramisu]
-    dimensions = [2, 3]
+    architectures = [UNet, DenseTiramisu]
+
+    hyper_parameters_new = []
+    for hyp in hyper_parameters:
+        for arch, network_params in zip(architectures, network_parameters):
+            hyp_new = copy.deepcopy(hyp)
+            hyp_new['architecture'] = arch
+            hyp_new['network_parameters'] = network_params
+            hyper_parameters_new.append(hyp_new)
+    hyper_parameters = hyper_parameters_new
+
+    ### normalization method ###
+    normalization_methods = [
+        NORMALIZING.QUANTILE, #NORMALIZING.HM_QUANTILE, NORMALIZING.MEAN_STD
+    ]
+    hyper_parameters = vary_hyperparameters(
+        hyper_parameters,
+        ('data_loader_parameters', 'normalizing_method'),
+        normalization_methods
+    )
+
+    ### dimension ###
+    dimensions = [2]
+    hyper_parameters = vary_hyperparameters(
+        hyper_parameters,
+        ('dimensions',),
+        dimensions
+    )
+
+    ### percent_of_object_samples ###
+    pos_values = [0, 0.1, 0.33, 0.4, 0.5, 0.6, 0.8, 1]
+    hyper_parameters = vary_hyperparameters(
+        hyper_parameters,
+        ('train_parameters', 'percent_of_object_samples'),
+        pos_values
+    )
 
     #generate tensorflow command
     tensorboard_command = f'tensorboard --logdir="{experiment_dir.resolve()}"'
@@ -165,46 +229,36 @@ if __name__ == '__main__':
 
     #set up all experiments
     experiments = []
-    for d in dimensions:
-        for n in normalization_methods:
-            for arch, network_params in zip(architectures, network_parameters):
-                hyper_parameters : Dict[str, Any] = {
-                    **constant_parameters,
-                    'dimensions' : d,
-                    'architecture' : arch,
-                    'network_parameters' : network_params
-                }
-                hyper_parameters['data_loader_parameters']['normalizing_method'] = n         
+    for hyp in hyper_parameters:
+        # use less filters for 3D on local computer
+        if not 'CLUSTER' in os.environ:
+            if hyp['architecture'] is UNet:
+                if hyp['dimensions'] == 3:
+                    F_BASE = 4
+                    n_filters = [F_BASE*8, F_BASE*16, F_BASE*32, F_BASE*64, F_BASE*128]
+                    hyp['network_parameters']['n_filters'] = n_filters
+                else:
+                    F_BASE = 8
+                    n_filters = [F_BASE*8, F_BASE*16, F_BASE*32, F_BASE*64, F_BASE*128]
+                    hyp['network_parameters']['n_filters'] = n_filters
 
-                # use less filters for 3D on local computer
-                if not 'CLUSTER' in os.environ:
-                    if arch is UNet:
-                        if d == 3:
-                            F_BASE = 4
-                            n_filters = [F_BASE*8, F_BASE*16, F_BASE*32, F_BASE*64, F_BASE*128]
-                            hyper_parameters['network_parameters']['n_filters'] = n_filters
-                        else:
-                            F_BASE = 8
-                            n_filters = [F_BASE*8, F_BASE*16, F_BASE*32, F_BASE*64, F_BASE*128]
-                            hyper_parameters['network_parameters']['n_filters'] = n_filters
+        #define experiment
+        experiment_name = generate_folder_name(hyp)  # pylint: disable=invalid-name
 
-                #define experiment
-                experiment_name = generate_folder_name(hyper_parameters)  # pylint: disable=invalid-name
-
-                experiment = Experiment(
-                    hyper_parameters=hyper_parameters,
-                    name=experiment_name,
-                    output_path_rel=experiment_name,
-                    data_set=train_list,
-                    external_test_set=test_list,
-                    folds=K_FOLD,
-                    seed=42,
-                    num_channels=n_channels,
-                    folds_dir_rel='folds',
-                    preprocessed_dir_rel=PREPROCESSED_DIR,
-                    tensorboard_images=True
-                )
-                experiments.append(experiment)
+        experiment = Experiment(
+            hyper_parameters=hyp,
+            name=experiment_name,
+            output_path_rel=experiment_name,
+            data_set=train_list,
+            external_test_set=test_list,
+            folds=K_FOLD,
+            seed=42,
+            num_channels=n_channels,
+            folds_dir_rel='folds',
+            preprocessed_dir_rel=PREPROCESSED_DIR,
+            tensorboard_images=True
+        )
+        experiments.append(experiment)
 
     # export all hyperparameters
     compare_hyperparameters(experiments, experiment_dir)

@@ -168,8 +168,6 @@ class Experiment():
         # export parameters
         self.export_experiment()
 
-        return
-
     def set_seed(self):
         """Set the seed in tensorflow and numpy
         """
@@ -219,7 +217,6 @@ class Experiment():
                 np.savetxt(self.datasets[fold]['vald'], vald_files, fmt='%s', header='path')
             if not self.datasets[fold]['test'].exists() or overwrite:
                 np.savetxt(self.datasets[fold]['test'], test_files, fmt='%s', header='path')
-        return
 
     def _set_parameters(self):
         """This function will set up the shapes in the cfg module so that they
@@ -334,7 +331,7 @@ class Experiment():
             first_f = self.hyper_parameters['network_parameters']['n_filters'][0]
             if dim == 2:
                 # this was determined by trail and error for 128x128x2 patches
-                memory_consumption_guess = 2 * first_f
+                memory_consumption_guess = 4 * first_f
             elif dim == 3:
                 # this was determined by trail and error for 128x128x32x2 patches
                 memory_consumption_guess = 128 * first_f
@@ -426,8 +423,6 @@ class Experiment():
             #add training parameters
             **(self.hyper_parameters["train_parameters"])
         )
-
-        return
 
     def applying(self, folder_name:str, test_files:Iterable, apply_name='apply'):
         """Apply the trained network to the test files
@@ -546,8 +541,6 @@ class Experiment():
         results.set_index('File Number', inplace=True)
         results.to_csv(eval_file_path, sep=';')
 
-        return
-
 
     def run_all_folds(self):
         """This is just a wrapper for run_fold and runs it for all folds
@@ -557,8 +550,6 @@ class Experiment():
 
         for fold, in range(0, self.folds):
             self.run_fold(fold)
-
-        return
 
     def run_fold(self, fold:int):
         """Run the training and evaluation for all folds
@@ -659,8 +650,6 @@ class Experiment():
                 )
 
         tqdm.write(f'Finished with {self.name} {folder_name} (Fold {fold+1} of {self.folds})')
-
-        return
 
     def evaluate(self, name='test'):
         """Evaluate the training over all folds
@@ -892,7 +881,7 @@ def export_slurm_job(filename, command, job_name=None, workingdir=None, venv_dir
     slurm_file += f'#SBATCH --time={hours:02d}:{minutes:02d}:00\n'
     slurm_file += '#SBATCH --mem=32gb\n'
 
-    if job_type == 'GPU' or job_type == 'GPU_no_K80':
+    if job_type in ('GPU', 'GPU_no_K80'):
         slurm_file += '\n#SBATCH --partition=gpu-single\n'
         slurm_file += '#SBATCH --gres=gpu:1\n'
 
@@ -965,8 +954,6 @@ nvidia-smi
     with open(filename, 'w+') as f:
         f.write(slurm_file)
 
-    return
-
 def export_batch_file(filename, commands):
     """Exports a list of commands (one per line) as batch script
 
@@ -993,5 +980,3 @@ def export_batch_file(filename, commands):
 
     # set permission
     os.chmod(filename, stat.S_IRWXU)
-
-    return

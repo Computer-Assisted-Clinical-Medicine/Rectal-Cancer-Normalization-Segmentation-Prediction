@@ -122,7 +122,9 @@ experiment_dir = Path(os.environ['experiment_dir'])
 
 results_ex = gather_results(experiment_dir, combined=True, external=True)
 results_ex = results_ex[np.logical_not(results_ex['File Number'].str.startswith('99'))]
+# make nicer names
 shorten_names(results_ex)
+results_ex.sort_values('name', inplace=True)
 
 sns.catplot(data=results_ex, y='name', x='Dice', kind='box', aspect=2)
 save_and_show('external_test_set_dice_models')
