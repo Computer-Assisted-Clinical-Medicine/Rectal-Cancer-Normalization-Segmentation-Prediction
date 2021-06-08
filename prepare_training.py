@@ -272,6 +272,7 @@ if __name__ == "__main__":
         script_dir = Path(sys.argv[0]).resolve().parent
         ps_script = experiment_dir / "start.ps1"
         ps_script_tb = experiment_dir / "start_tensorboard.ps1"
+        ps_script_analysis = experiment_dir / "start_analysis.ps1"
 
         # make a powershell command
         command = f'$script_dir="{script_dir}"\n'
@@ -295,7 +296,15 @@ if __name__ == "__main__":
         command_tb += "Invoke-Expression ${start}\n"
         command_tb += 'read-host "Finished, press ENTER to close."'
 
+        # run analysis
+        command_analysis = command
+        command_analysis += '$script=${script_dir} + "\\analyze_results.py"\n'
+        command_analysis += '$command="python " + ${script}\n'
+        command_analysis += "Invoke-Expression ${command}\n"
+        command_analysis += 'read-host "Finished, press ENTER to close."'
+
         # add the experiments
+        command += '$script=${script_dir} + "\\run_single_experiment.py"\n'
         for exp in experiments:
             command += f'echo "starting with {exp.name}"\n'
             command += (
@@ -313,5 +322,10 @@ if __name__ == "__main__":
         with open(ps_script_tb, "w+") as powershell_file_tb:
             powershell_file_tb.write(command_tb)
 
+        # create analysis file
+        with open(ps_script_analysis, "w+") as powershell_file_analysis:
+            powershell_file_analysis.write(command_analysis)
+
         print(f"To run the training, execute {ps_script}")
         print(f"To run tensorboard, execute {ps_script_tb}")
+        print(f"To analyse the results, execute {ps_script_analysis}")
