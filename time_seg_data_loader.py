@@ -1,11 +1,11 @@
 # %% [markdown]
-'''
+"""
 # Profile Seg_data_loader
 ## Imports and Definitions
 
 This file is to test the timing of the different data loaders. The functions are
 also profiled.
-'''
+"""
 
 # pylint: disable=pointless-string-statement, protected-access
 
@@ -24,28 +24,32 @@ from IPython.display import display
 
 import seg_data_loader
 from SegmentationNetworkBasis import config as cfg
-from test_seg_data_loader import (get_loader, load_dataset,
-                                  set_parameters_according_to_dimension,
-                                  set_seeds)
+from test_seg_data_loader import (
+    get_loader,
+    load_dataset,
+    set_parameters_according_to_dimension,
+    set_seeds,
+)
 
 # surpress tensorflow output
-os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
-import tensorflow as tf # pylint: disable=unused-import, wrong-import-order, wrong-import-position
+os.environ["TF_CPP_MIN_LOG_LEVEL"] = "3"
+import tensorflow as tf  # pylint: disable=unused-import, wrong-import-order, wrong-import-position
 
 SHOW_PLOTS = False
 
+
 def time_functions(dimension, name, module, timing_result):
-    '''
+    """
     Time the individual functions in the data loaders
-    '''
+    """
 
-    test_dir = Path('test_data')
+    test_dir = Path("test_data")
 
-    set_parameters_according_to_dimension(dimension, 2, test_dir/'data_preprocessed')
+    set_parameters_according_to_dimension(dimension, 2, test_dir / "data_preprocessed")
 
     set_seeds()
 
-    #generate loader
+    # generate loader
     data_loader = get_loader(name, module)
 
     # get names from csv
@@ -69,7 +73,7 @@ def time_functions(dimension, name, module, timing_result):
         sample_time.append(get_samples - load)
 
         # time augmentation
-        if hasattr(data_loader, '_augment_numpy'):
+        if hasattr(data_loader, "_augment_numpy"):
             # augment whole images
             _, _ = data_loader._augment_images(data, lbl)
 
@@ -86,46 +90,47 @@ def time_functions(dimension, name, module, timing_result):
             augmentation_numpy_time.append(augment_2 - converted)
 
     print(
-        f'\tExecution time for {name} {dimension}D {module.__name__}: load: {np.mean(load_time):.2f}s'
-        + f', sample (incl Augm): {np.mean(sample_time):.2f}s'
+        f"\tExecution time for {name} {dimension}D {module.__name__}: load: {np.mean(load_time):.2f}s"
+        + f", sample (incl Augm): {np.mean(sample_time):.2f}s"
     )
     timing_dict = {
-        'load file' : np.mean(load_time),
-        'get sample' : np.mean(sample_time),
+        "load file": np.mean(load_time),
+        "get sample": np.mean(sample_time),
     }
     if len(augmentation_images_time) > 0:
         print(
-            f'\tAugm im: {np.mean(augmentation_images_time):.2f}s, Augm. np: {np.mean(augmentation_numpy_time):.2f}s'
-            + f', Conv im: {np.mean(convert_images_time):.2f}'
+            f"\tAugm im: {np.mean(augmentation_images_time):.2f}s, Augm. np: {np.mean(augmentation_numpy_time):.2f}s"
+            + f", Conv im: {np.mean(convert_images_time):.2f}"
         )
         timing_dict = {
-            'augment img.' : np.mean(augmentation_images_time),
-            'augment np' : np.mean(augmentation_numpy_time),
-            'conv. img.' : np.mean(convert_images_time),
-            **timing_dict
+            "augment img.": np.mean(augmentation_images_time),
+            "augment np": np.mean(augmentation_numpy_time),
+            "conv. img.": np.mean(convert_images_time),
+            **timing_dict,
         }
 
-    timing_result[f'{name}-{dimension}D-{module.__name__}'] = timing_dict
+    timing_result[f"{name}-{dimension}D-{module.__name__}"] = timing_dict
 
     return timing_result
 
+
 def profile_functions(dimension, name, module):
-    '''
+    """
     Generate a profile for the individual functions
-    '''
+    """
 
-    test_dir = Path('test_data')
+    test_dir = Path("test_data")
 
-    set_parameters_according_to_dimension(dimension, 2, test_dir/'data_preprocessed')
+    set_parameters_according_to_dimension(dimension, 2, test_dir / "data_preprocessed")
 
-    profile_dir = test_dir / 'profiles'
+    profile_dir = test_dir / "profiles"
     if not profile_dir.exists():
         profile_dir.mkdir()
-    profile_file = profile_dir / f'{name}-{dimension}D-{module.__name__}.prof'
+    profile_file = profile_dir / f"{name}-{dimension}D-{module.__name__}.prof"
 
     set_seeds()
 
-    #generate loader
+    # generate loader
     data_loader = get_loader(name, module)
 
     # get names from csv
@@ -149,45 +154,46 @@ def profile_functions(dimension, name, module):
 
     return profile_file
 
+
 def time_wrapper(dimension, name, module, timing_result):
-    '''
+    """
     Wrapper used to time the different loaders
-    '''
+    """
     n_epochs = 1
 
-    test_dir = Path('test_data')
+    test_dir = Path("test_data")
 
-    set_parameters_according_to_dimension(dimension, 2, test_dir/'data_preprocessed')
+    set_parameters_according_to_dimension(dimension, 2, test_dir / "data_preprocessed")
 
     set_seeds()
 
-    #generate loader
+    # generate loader
     data_loader = get_loader(name, module)
 
     # get names from csv
     file_list, _ = load_dataset(test_dir)
 
-    data_loader._get_filenames(str(file_list[0]))
+    data_loader.get_filenames(str(file_list[0]))
 
     # call the loader
-    if name == 'train':
+    if name == "train":
         dataset = data_loader(
             file_list,
             batch_size=cfg.batch_size_train,
             n_epochs=n_epochs,
-            read_threads=cfg.train_reader_instances
+            read_threads=cfg.train_reader_instances,
         )
-    elif name == 'test':
+    elif name == "test":
         dataset = data_loader(
-            file_list[0], # only pass one file to the test loader
+            file_list[0],  # only pass one file to the test loader
             batch_size=cfg.batch_size_train,
-            read_threads=cfg.vald_reader_instances
+            read_threads=cfg.vald_reader_instances,
         )
     else:
         dataset = data_loader(
             file_list,
             batch_size=cfg.batch_size_train,
-            read_threads=cfg.vald_reader_instances
+            read_threads=cfg.vald_reader_instances,
         )
 
     counter = 0
@@ -200,10 +206,10 @@ def time_wrapper(dimension, name, module, timing_result):
             setup_time = time.perf_counter() - start_time
         else:
             load_time.append(time.perf_counter() - start_time)
-        
+
         if SHOW_PLOTS:
-            if name == 'train':
-                if module.__name__ == 'seg_data_loader_new':
+            if name == "train":
+                if module.__name__ == "seg_data_loader_new":
                     # convert to numpy
                     x_t, y_t = sample[0].numpy(), sample[1].numpy()
                     plot(dimension, samples_lbl=x_t, labels_lbl=y_t)
@@ -216,33 +222,36 @@ def time_wrapper(dimension, name, module, timing_result):
 
     assert counter != 0
 
-    if name != 'test':
+    if name != "test":
         assert counter == cfg.samples_per_volume * cfg.num_files // cfg.batch_size_train
 
     if len(load_time) == 0:
         load_time = [setup_time]
 
-    print(f'\tExecution time for one step: {np.mean(load_time):.2f}s ({np.sum(load_time):.2f}s total)')
-    print(f'\tSetup time: {setup_time:.2f}s')
+    print(
+        f"\tExecution time for one step: {np.mean(load_time):.2f}s ({np.sum(load_time):.2f}s total)"
+    )
+    print(f"\tSetup time: {setup_time:.2f}s")
     # add to dict
-    time_name = f'{name}-{dimension}D-{module.__name__}'
-    timing_result[time_name]['step'] = np.mean(load_time)
-    timing_result[time_name]['setup'] = setup_time
-    timing_result[time_name]['total'] = np.sum(load_time)
+    time_name = f"{name}-{dimension}D-{module.__name__}"
+    timing_result[time_name]["step"] = np.mean(load_time)
+    timing_result[time_name]["setup"] = setup_time
+    timing_result[time_name]["total"] = np.sum(load_time)
 
     return timing_result
 
+
 def plot(dimension, samples_lbl, labels_lbl, samples_bkr=None, labels_bkr=None):
-    '''
+    """
     Plot a histogram of the foreground samples and labels
-    '''
+    """
     plt.hist(samples_lbl.reshape(-1))
-    plt.title('Histogram of foreground samples')
+    plt.title("Histogram of foreground samples")
     plt.show()
     plt.close()
 
     plt.hist(labels_lbl.reshape(-1))
-    plt.title('Histogram of foreground labels')
+    plt.title("Histogram of foreground labels")
     plt.show()
     plt.close()
 
@@ -250,67 +259,70 @@ def plot(dimension, samples_lbl, labels_lbl, samples_bkr=None, labels_bkr=None):
     ncols = samples_lbl.shape[-1] + 1
     nrows = nsamples
     indices = np.sort(np.random.choice(np.arange(samples_lbl.shape[0]), nsamples))
-    _, axes = plt.subplots(nrows, ncols, figsize=(11,9))
+    _, axes = plt.subplots(nrows, ncols, figsize=(11, 9))
 
     for ax_r, sample_r, label in zip(axes, samples_lbl[indices], labels_lbl[indices]):
         index = np.random.choice(np.arange(sample_r.shape[0]))
-        for ax, sample in zip(ax_r[:-1], np.moveaxis(sample_r, -1 ,0)):
+        for ax, sample in zip(ax_r[:-1], np.moveaxis(sample_r, -1, 0)):
             if dimension == 3:
                 ax.imshow(sample[index])
             else:
                 ax.imshow(sample)
         if dimension == 3:
-            ax_r[-1].imshow(label[index,...,:-1], vmin=0, vmax=1)
+            ax_r[-1].imshow(label[index, ..., :-1], vmin=0, vmax=1)
         else:
-            ax_r[-1].imshow(label[...,:-1], vmin=0, vmax=1)
+            ax_r[-1].imshow(label[..., :-1], vmin=0, vmax=1)
 
     plt.tight_layout()
     plt.show()
     plt.close()
 
+
 # %% [markdown]
-'''
+"""
 ## Evaluate the timing
-'''
+"""
 
-timing:Dict[str, float] = {}
+timing: Dict[str, float] = {}
 
-dimensions = [2,3]
-names = ['train', 'vald']
+dimensions = [2, 3]
+names = ["train", "vald"]
 modules = [seg_data_loader]
 
 # call functions and time them
 for dim in dimensions:
     for NAME in names:
         for mod in modules:
-            print(f'{NAME} {dim}D {mod.__name__}:')
+            print(f"{NAME} {dim}D {mod.__name__}:")
             time_functions(dim, NAME, mod, timing)
             time_wrapper(dim, NAME, mod, timing)
 
 timing_pd = pd.DataFrame(timing).T
 # set index
-timing_pd.set_index(pd.MultiIndex.from_tuples(tuple(timing_pd.index.str.split('-'))), inplace=True)
+timing_pd.set_index(
+    pd.MultiIndex.from_tuples(tuple(timing_pd.index.str.split("-"))), inplace=True
+)
 display(timing_pd.round(3))
 
 # %% [markdown]
-'''
+"""
 ## Analyze the profiles
-'''
+"""
 
 profile_files = {}
 
-NAME = 'train'
+NAME = "train"
 
 # call functions and time them
 for dim in dimensions:
     for mod in modules:
-        print(f'{NAME} {dim}D {mod.__name__}:')
+        print(f"{NAME} {dim}D {mod.__name__}:")
 
         # profile the individual functions
-        t_name = f'{NAME}-{dim}D-{mod.__name__}'
-        profile_files[t_name] = (profile_functions(dim, NAME, mod))
+        t_name = f"{NAME}-{dim}D-{mod.__name__}"
+        profile_files[t_name] = profile_functions(dim, NAME, mod)
 
-print('For a graphical profile call:')
+print("For a graphical profile call:")
 for NAME, path in profile_files.items():
     print(NAME)
-    print(f'\tsnakeviz {path}')
+    print(f"\tsnakeviz {path}")

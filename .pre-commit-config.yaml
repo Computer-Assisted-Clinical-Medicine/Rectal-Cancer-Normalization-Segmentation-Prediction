@@ -1,21 +1,20 @@
 repos:
   - repo: https://github.com/ambv/black
-    rev: stable
+    rev: 21.5b2
     hooks:
     - id: black
       language_version: python3.8
       args: [
-        "-l 92",
-        "-t py38"
+        "-l", "92",
+        "--target-version", "py38"
       ]
   - repo: https://github.com/pre-commit/pre-commit-hooks
-    rev: v2.3.0
+    rev: v4.0.1
     hooks:
-    - id: check-yaml
     - id: requirements-txt-fixer
     - id: mixed-line-ending
   - repo: https://github.com/pycqa/pylint
-    rev: pylint-2.6.0
+    rev: v2.8.3
     hooks:
     - id: pylint
       args: [
