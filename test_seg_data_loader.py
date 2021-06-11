@@ -68,7 +68,7 @@ def load_dataset(test_dir):
     return file_list, files_list_b
 
 
-def set_parameters_according_to_dimension(dimension, num_channels, preprocessed_dir):
+def set_parameters_according_to_dimension(dimension, num_channels, preprocessed_dir, a_name='UNet'):
     """This function will set up the shapes in the cfg module so that they
     will run on the current GPU.
     """
@@ -80,7 +80,7 @@ def set_parameters_according_to_dimension(dimension, num_channels, preprocessed_
     cfg.num_slices_train = 32  # the resolution in z-direction
 
     # determine batch size
-    cfg.batch_size_train = estimate_batch_size(dimension)
+    cfg.batch_size_train = estimate_batch_size(dimension, a_name)
     cfg.batch_size_valid = cfg.batch_size_train
 
     # set shape according to the dimension
@@ -129,11 +129,11 @@ def set_parameters_according_to_dimension(dimension, num_channels, preprocessed_
             4 * cfg.samples_per_volume
         )  # chosen as multiple of samples per volume
 
-        # set the valid batch size
-        cfg.batch_size_valid = cfg.batch_size_train
-        # see if the batch size is bigger than the validation set
-        if cfg.samples_per_volume * cfg.number_of_vald <= cfg.batch_size_valid:
-            cfg.batch_size_valid = cfg.samples_per_volume * cfg.number_of_vald
+    # set the valid batch size
+    cfg.batch_size_valid = cfg.batch_size_train
+    # see if the batch size is bigger than the validation set
+    if cfg.samples_per_volume * cfg.number_of_vald <= cfg.batch_size_valid:
+        cfg.batch_size_valid = cfg.samples_per_volume * cfg.number_of_vald
 
     # set config
     if not preprocessed_dir.exists():
@@ -142,7 +142,7 @@ def set_parameters_according_to_dimension(dimension, num_channels, preprocessed_
     cfg.normalizing_method = cfg.NORMALIZING.QUANTILE
 
 
-def estimate_batch_size(dimension):
+def estimate_batch_size(dimension, a_name):
     """The batch size estimation is basically trail and error. So far tested
     with 128x128x2 patches in 2D and 128x128x32x2 in 3D, if using different
     values, guesstimate the relation to the memory.
@@ -157,19 +157,27 @@ def estimate_batch_size(dimension):
     gpu_number = int(tf.test.gpu_device_name()[-1])
     gpu_memory = int(np.round(GPUtil.getGPUs()[gpu_number].memoryTotal))
 
-    a_name = "UNet"  # name is irrelevant
-
     if a_name == "UNet":
         # filters scale after the first filter, so use that for estimation
         first_f = 8
         if dimension == 2:
             # this was determined by trail and error for 128x128x2 patches
-            memory_consumption_guess = 2 * first_f
+            memory_consumption_guess = 4 * first_f
         elif dimension == 3:
             # this was determined by trail and error for 128x128x32x2 patches
-            memory_consumption_guess = 64 * first_f
+            memory_consumption_guess = 128 * first_f
+    elif a_name == "DenseTiramisu":
+        if dimension == 2:
+            memory_consumption_guess = 1024
+        if dimension == 3:
+            memory_consumption_guess = 4096
+    elif a_name == "DeepLabv3plus":
+        if dimension == 2:
+            memory_consumption_guess = 1024
+        if dimension == 3:
+            raise NotImplementedError(f"3D not implemented for {a_name}.")
     else:
-        raise NotImplementedError("No heuristic implemented for this network.")
+        raise NotImplementedError(f"No heuristic implemented for {a_name}.")
 
     # return estimated recommended batch number
     return np.round(gpu_memory // memory_consumption_guess)

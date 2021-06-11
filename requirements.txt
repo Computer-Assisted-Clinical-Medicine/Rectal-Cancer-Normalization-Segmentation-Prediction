@@ -14,3 +14,4 @@ tensorboard==2.4.1
 tensorboard-plugin-profile==2.4.0
 tensorflow-gpu==2.3.0
 tqdm==4.56.1
+pytest==6.2.4
