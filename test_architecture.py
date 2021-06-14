@@ -1,5 +1,5 @@
 """
-Test an archtitecture, it is only checked for errors and dimensions. The
+Test an architecture, it is only checked for errors and dimensions. The
 functionality is not evaluated.
 """
 import tempfile
@@ -12,20 +12,27 @@ import seg_data_loader
 from SegmentationNetworkBasis import architecture
 from SegmentationNetworkBasis import config as cfg
 from SegmentationNetworkBasis.segbasisloader import NORMALIZING
-from test_seg_data_loader import (get_loader, load_dataset,
-                                  set_parameters_according_to_dimension,
-                                  set_seeds)
+from test_seg_data_loader import (
+    get_loader,
+    load_dataset,
+    set_parameters_according_to_dimension,
+    set_seeds,
+)
 
 if __name__ == "__main__":
     test_dir = Path("test_data")
 
+    DEBUG = True  # some behavior might change
     DIMENSION = 2
     N_EPOCHS = 5
     NETWORK = architecture.DeepLabv3plus
-    PREPROCESSED_DIR = "data_preprocessed"
+    PREPROCESSED_DIR = test_dir / f"{cfg.num_channels}_channels" / "data_preprocessed"
     NUM_CHANNELS = 3
 
     cfg.num_channels = NUM_CHANNELS
+
+    if DEBUG:
+        tf.debugging.enable_check_numerics(stack_height_limit=60, path_length_limit=100)
 
     F_BASE = 8
     # define the parameters that are constant
@@ -57,10 +64,9 @@ if __name__ == "__main__":
         "loss": "DICE",
     }
     # define constant parameters
-    hyper_parameters: Dict[str, Any] =        {
-            **constant_parameters,
-        }
-
+    hyper_parameters: Dict[str, Any] = {
+        **constant_parameters,
+    }
 
     network_parameters_UNet = {
         "regularize": [True, "L2", 1e-5],
@@ -87,17 +93,19 @@ if __name__ == "__main__":
     }
 
     hyper_parameters["network_parameters"] = network_parameters_DenseTiramisu
-    hyper_parameters['dimesnions'] = DIMENSION
+    hyper_parameters["dimensions"] = DIMENSION
 
-    hyper_parameters['data_loader_parameters']['normalizing_method'] = NORMALIZING.QUANTILE
-    hyper_parameters['train_parameters']['percent_of_object_samples'] = 0.4
+    hyper_parameters["data_loader_parameters"]["normalizing_method"] = NORMALIZING.QUANTILE
+    hyper_parameters["train_parameters"]["percent_of_object_samples"] = 0.4
 
-    set_parameters_according_to_dimension(DIMENSION, NUM_CHANNELS, test_dir / "data_preprocessed", NETWORK.get_name())
+    set_parameters_according_to_dimension(
+        DIMENSION, NUM_CHANNELS, PREPROCESSED_DIR, NETWORK.get_name()
+    )
 
     set_seeds()
 
     # generate loader
-    data_loader = get_loader('train', seg_data_loader)
+    data_loader = get_loader("train", seg_data_loader)
 
     file_list, _ = load_dataset(test_dir)
 
@@ -109,22 +117,26 @@ if __name__ == "__main__":
     )
 
     # do training
-    with tempfile.TemporaryDirectory() as tempdir, tf.device('/device:GPU:0'):
+    with tempfile.TemporaryDirectory() as tempdir, tf.device(
+        "/device:CPU:0"
+    ):  # TODO: change back to GPU
 
-        fold_dir = Path(tempdir) / 'fold-0'
+        fold_dir = Path(tempdir) / "fold-0"
         if not (fold_dir).exists():
             fold_dir.mkdir()
 
+        net = NETWORK(
+            hyper_parameters["loss"],
+            debug=DEBUG,
+            # add initialization parameters
+            **hyper_parameters["network_parameters"],
+        )
+
+        net.model.summary(line_length=150)
 
         # generate tensorflow command
         tensorboard_command = f'tensorboard --logdir="{tempdir}"'
         print(f"To see the progress in tensorboard, run:\n{tensorboard_command}")
-
-        net = NETWORK(
-            hyper_parameters["loss"],
-            # add initialization parameters
-            **hyper_parameters["network_parameters"],
-        )
 
         net.train(
             logs_path=tempdir,
@@ -133,6 +145,7 @@ if __name__ == "__main__":
             validation_dataset=dataset,
             visualization_dataset=dataset,
             write_graph=True,
+            debug=DEBUG,
             # add training parameters
             **(hyper_parameters["train_parameters"]),
         )

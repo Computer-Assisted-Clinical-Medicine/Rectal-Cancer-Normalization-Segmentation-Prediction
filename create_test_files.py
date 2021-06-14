@@ -29,6 +29,10 @@ def create_test_files(test_path=Path("test_data"), n_files=20) -> list:
     if not test_path.exists():
         test_path.mkdir()
 
+    test_path = test_path / f"{cfg.num_channels}_channels"
+    if not test_path.exists():
+        test_path.mkdir()
+
     # write random data to file
     training_files = []
     for i in range(n_files):
@@ -67,7 +71,10 @@ def create_test_files(test_path=Path("test_data"), n_files=20) -> list:
         sitk.WriteImage(label_image, str(labelfile))
 
         # use sphere
-        image_data = np.repeat(np.expand_dims(labels, axis=3), repeats=2, axis=3) * 128
+        image_data = (
+            np.repeat(np.expand_dims(labels, axis=3), repeats=cfg.num_channels, axis=3)
+            * 128
+        )
         # add noise
         image_data = image_data + np.abs(np.random.normal(size=shape, scale=128))
         image = sitk.GetImageFromArray(image_data)

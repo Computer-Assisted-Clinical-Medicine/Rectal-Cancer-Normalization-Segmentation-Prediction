@@ -28,15 +28,6 @@ from utils import (
 # set tf thread mode
 os.environ["TF_GPU_THREAD_MODE"] = "gpu_private"
 
-DEBUG = False
-if DEBUG:
-    # run everything eagerly
-    import tensorflow as tf
-
-    # tf.config.run_functions_eagerly(True)
-    # do numeric checks (for NaNs)
-    tf.debugging.enable_check_numerics(stack_height_limit=60, path_length_limit=100)
-
 
 def vary_hyperparameters(parameters, keys: tuple, values: list) -> List[Dict[str, Any]]:
     """Vary the hyperparameter given by the keys by the values given. A list of
