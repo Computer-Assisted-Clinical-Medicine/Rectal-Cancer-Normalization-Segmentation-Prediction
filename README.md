@@ -16,7 +16,10 @@ To try something out, different experiments can be created, which can be trained
 
 ### Installing
 
-It is best to use conda to create a virtual environment
+It is best to use virtualenv to create a virtual environment
+
+There is a conflict in the numpy version between tensorflow and the version needed for slicing, so numpy has to be installed with:
+python -m pip install --no-warn-conflicts numpy==1.20.0
 
 ## Running the tests
 

@@ -22,9 +22,9 @@ from test_seg_data_loader import (
 if __name__ == "__main__":
     test_dir = Path("test_data")
 
-    DEBUG = True  # some behavior might change
+    DEBUG = False  # some behavior might change
     DIMENSION = 2
-    N_EPOCHS = 5
+    N_EPOCHS = 100
     NETWORK = architecture.DeepLabv3plus
     PREPROCESSED_DIR = test_dir / f"{cfg.num_channels}_channels" / "data_preprocessed"
     NUM_CHANNELS = 3
@@ -39,7 +39,7 @@ if __name__ == "__main__":
     train_parameters = {
         "l_r": 0.001,
         "optimizer": "Adam",
-        "epochs": 100,
+        "epochs": N_EPOCHS,
         # scheduling parameters
         "early_stopping": True,
         "patience_es": 15,
@@ -109,17 +109,29 @@ if __name__ == "__main__":
 
     file_list, _ = load_dataset(test_dir)
 
-    dataset = data_loader(
-        file_list,
+    cfg.num_files = len(file_list) - cfg.number_of_vald
+
+    train_dataset = data_loader(
+        file_list[:-cfg.number_of_vald],
+        batch_size=cfg.batch_size_train,
+        n_epochs=N_EPOCHS,
+        read_threads=cfg.train_reader_instances,
+    )
+    valid_dataset = data_loader(
+        file_list[-cfg.number_of_vald:],
+        batch_size=cfg.batch_size_train,
+        n_epochs=N_EPOCHS,
+        read_threads=cfg.train_reader_instances,
+    )
+    visualization_dataset = data_loader(
+        file_list[:1],
         batch_size=cfg.batch_size_train,
         n_epochs=N_EPOCHS,
         read_threads=cfg.train_reader_instances,
     )
 
     # do training
-    with tempfile.TemporaryDirectory() as tempdir, tf.device(
-        "/device:CPU:0"
-    ):  # TODO: change back to GPU
+    with tempfile.TemporaryDirectory() as tempdir, tf.device("/device:GPU:0"):
 
         fold_dir = Path(tempdir) / "fold-0"
         if not (fold_dir).exists():
@@ -141,11 +153,13 @@ if __name__ == "__main__":
         net.train(
             logs_path=tempdir,
             folder_name=fold_dir.name,
-            training_dataset=dataset,
-            validation_dataset=dataset,
-            visualization_dataset=dataset,
+            training_dataset=train_dataset,
+            validation_dataset=valid_dataset,
+            visualization_dataset=visualization_dataset,
             write_graph=True,
             debug=DEBUG,
             # add training parameters
             **(hyper_parameters["train_parameters"]),
         )
+
+        pass

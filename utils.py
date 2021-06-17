@@ -10,7 +10,7 @@ import matplotlib
 import numpy as np
 import pandas as pd
 
-from SegmentationNetworkBasis.architecture import DenseTiramisu, UNet
+from SegmentationNetworkBasis.architecture import DenseTiramisu, UNet, DeepLabv3plus
 
 # if on cluster, use other backend
 # pylint: disable=wrong-import-position, ungrouped-imports
@@ -197,6 +197,9 @@ def compare_hyperparameters(experiments, experiment_dir, version="best"):
     for col in hparams.drop(columns="results_file"):
         if hparams[col].astype(str).unique().size > 1:
             changed_params.append(col)
+    # have at least one changed parameters (for the plots)
+    if len(changed_params) == 0:
+        changed_params = ['architecture']
     hparams_changed = hparams[changed_params].copy()
     # if n_filters, use the first
     if "n_filters" in hparams_changed:
@@ -227,10 +230,12 @@ def compare_hyperparameters(experiments, experiment_dir, version="best"):
             columns="results_file_external_testset_postprocessed", inplace=True
         )
     # drop columns only related to architecture
-    arch_params = hparams_changed.groupby("architecture").nunique(dropna=False)
-    for col in arch_params:
-        if np.all(arch_params[col] == 1):
-            hparams_changed.drop(columns=col, inplace=True)
+    arch_groups = hparams_changed.groupby("architecture")
+    if arch_groups.ngroups > 1:
+        arch_params = arch_groups.nunique(dropna=False)
+        for col in arch_params:
+            if np.all(arch_params[col] == 1):
+                hparams_changed.drop(columns=col, inplace=True)
 
     hparams.to_csv(hyperparameter_file, sep=";")
     hparams_changed.to_csv(hyperparameter_changed_file, sep=";")
@@ -275,6 +280,12 @@ def generate_folder_name(parameters):
 
         params.append(
             "nl_" + str(len(parameters["network_parameters"]["layers_per_block"]))
+        )
+    elif parameters["architecture"] is DeepLabv3plus:
+        params.append(str(parameters["network_parameters"]["backbone"]))
+
+        params.append(
+            "aspp_" + "_".join([str(n) for n in parameters["network_parameters"]["aspp_rates"]])
         )
     else:
         raise NotImplementedError(f'{parameters["architecture"]} not implemented')

@@ -17,7 +17,7 @@ os.environ["TF_CPP_MIN_LOG_LEVEL"] = "3"
 # pylint: disable=wrong-import-position
 
 from experiment import Experiment
-from SegmentationNetworkBasis.architecture import UNet, DenseTiramisu
+from SegmentationNetworkBasis.architecture import UNet, DenseTiramisu, DeepLabv3plus
 from SegmentationNetworkBasis.segbasisloader import NORMALIZING
 from utils import (
     compare_hyperparameters,
@@ -148,8 +148,13 @@ if __name__ == "__main__":
         "do_bias": False,
         "do_batch_normalization": True,
     }
-    network_parameters = [network_parameters_UNet, network_parameters_DenseTiramisu]
-    architectures = [UNet, DenseTiramisu]
+    network_parameters_DeepLabv3plus = {
+        "backbone" : 'resnet50',
+        "aspp_rates" : (2,4,6),
+        "clipping_value": 50,
+    }
+    network_parameters = [network_parameters_DeepLabv3plus]
+    architectures = [DeepLabv3plus]
 
     hyper_parameters_new = []
     for hyp in hyper_parameters:
@@ -162,7 +167,7 @@ if __name__ == "__main__":
 
     ### normalization method ###
     normalization_methods = [
-        NORMALIZING.QUANTILE,  # NORMALIZING.HM_QUANTILE, NORMALIZING.MEAN_STD
+        NORMALIZING.QUANTILE,
     ]
     hyper_parameters = vary_hyperparameters(
         hyper_parameters,
@@ -175,7 +180,7 @@ if __name__ == "__main__":
     hyper_parameters = vary_hyperparameters(hyper_parameters, ("dimensions",), dimensions)
 
     ### percent_of_object_samples ###
-    pos_values = [0, 0.1, 0.33, 0.4, 0.5, 0.6, 0.8, 1]
+    pos_values = [0.4]
     hyper_parameters = vary_hyperparameters(
         hyper_parameters, ("train_parameters", "percent_of_object_samples"), pos_values
     )

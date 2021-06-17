@@ -266,6 +266,8 @@ class Experiment:
             cfg.train_dim = 128  # the resolution in plane
         elif self.hyper_parameters["architecture"].get_name() == "DenseTiramisu":
             cfg.train_dim = 64  # the resolution in plane
+        elif self.hyper_parameters["architecture"].get_name() == "DeepLabv3plus":
+            cfg.train_dim = 256  # the resolution in plane
         else:
             raise ValueError("Unrecognized network")
         cfg.num_slices_train = 32  # the resolution in z-direction
@@ -373,11 +375,16 @@ class Experiment:
                 memory_consumption_guess = 512
             if dim == 3:
                 memory_consumption_guess = 4096
+        elif a_name == "DeepLabv3plus":
+            if dim == 2:
+                memory_consumption_guess = 512
+            if dim == 3:
+                raise NotImplementedError("3D Deeplab not implemented")
         else:
             raise NotImplementedError("No heuristic implemented for this network.")
 
         # return estimated recommended batch number
-        return np.round(gpu_memory // memory_consumption_guess)
+        return int(np.ceil(gpu_memory / memory_consumption_guess))
 
     def training(self, folder_name: str, train_files: List, vald_files: List):
         """Do the actual training

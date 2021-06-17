@@ -4,7 +4,6 @@ Run Aa single experiment (this is only used when running on the cluster)
 import argparse
 import logging
 import os
-import shutil
 from pathlib import Path
 
 # logger has to be set before tensorflow is imported
@@ -12,9 +11,10 @@ tf_logger = logging.getLogger("tensorflow")
 os.environ["TF_CPP_MIN_LOG_LEVEL"] = "3"
 # pylint: disable=wrong-import-position
 
+import tensorflow as tf
+
 from experiment import Experiment
 from utils import configure_logging, plot_hparam_comparison
-
 
 def init_argparse():
     """
@@ -80,12 +80,7 @@ def run_experiment_fold(experiment: Experiment, fold: int, base_logger: logging.
         experiment.run_fold(fold)
     except Exception as exc:  # pylint: disable=broad-except
         logging.exception(str(exc))
-        print(exc)
-        print("Training failed")
-        # remove tensorboard log dir if training failed (to not clutter tensorboard)
-        tb_log_dir = fold_dir / "logs"
-        if tb_log_dir.exists():
-            shutil.rmtree(tb_log_dir)
+        raise exc
 
     # remove logger
     base_logger.removeHandler(fh_info)
@@ -117,7 +112,8 @@ log_dir = exp.output_path / exp.fold_dir_names[f]
 if not log_dir.exists():
     log_dir.mkdir(parents=True)
 
-run_experiment_fold(exp, f, logger)
+with tf.device("/device:GPU:0"):
+    run_experiment_fold(exp, f, logger)
 
 # try to evaluate it (this will only work if this is the last fold)
 try:
