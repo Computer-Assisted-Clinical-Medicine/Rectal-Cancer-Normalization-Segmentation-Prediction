@@ -199,7 +199,7 @@ def compare_hyperparameters(experiments, experiment_dir, version="best"):
             changed_params.append(col)
     # have at least one changed parameters (for the plots)
     if len(changed_params) == 0:
-        changed_params = ['architecture']
+        changed_params = ["architecture"]
     hparams_changed = hparams[changed_params].copy()
     # if n_filters, use the first
     if "n_filters" in hparams_changed:
@@ -285,7 +285,8 @@ def generate_folder_name(parameters):
         params.append(str(parameters["network_parameters"]["backbone"]))
 
         params.append(
-            "aspp_" + "_".join([str(n) for n in parameters["network_parameters"]["aspp_rates"]])
+            "aspp_"
+            + "_".join([str(n) for n in parameters["network_parameters"]["aspp_rates"]])
         )
     else:
         raise NotImplementedError(f'{parameters["architecture"]} not implemented')

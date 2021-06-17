@@ -68,7 +68,9 @@ def load_dataset(test_dir):
     return file_list, files_list_b
 
 
-def set_parameters_according_to_dimension(dimension, num_channels, preprocessed_dir, a_name='UNet'):
+def set_parameters_according_to_dimension(
+    dimension, num_channels, preprocessed_dir, a_name="UNet"
+):
     """This function will set up the shapes in the cfg module so that they
     will run on the current GPU.
     """

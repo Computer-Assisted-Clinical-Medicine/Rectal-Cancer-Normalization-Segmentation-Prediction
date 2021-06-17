@@ -16,6 +16,7 @@ import tensorflow as tf
 from experiment import Experiment
 from utils import configure_logging, plot_hparam_comparison
 
+
 def init_argparse():
     """
     initialize the parser

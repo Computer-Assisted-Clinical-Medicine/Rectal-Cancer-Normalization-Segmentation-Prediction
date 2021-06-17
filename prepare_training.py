@@ -14,10 +14,14 @@ import numpy as np
 # logger has to be set before tensorflow is imported
 tf_logger = logging.getLogger("tensorflow")
 os.environ["TF_CPP_MIN_LOG_LEVEL"] = "3"
-# pylint: disable=wrong-import-position
+# pylint: disable=wrong-import-position, unused-import
 
 from experiment import Experiment
-from SegmentationNetworkBasis.architecture import UNet, DenseTiramisu, DeepLabv3plus
+from SegmentationNetworkBasis.architecture import (
+    UNet,
+    DenseTiramisu,
+    DeepLabv3plus,
+)
 from SegmentationNetworkBasis.segbasisloader import NORMALIZING
 from utils import (
     compare_hyperparameters,
@@ -149,8 +153,8 @@ if __name__ == "__main__":
         "do_batch_normalization": True,
     }
     network_parameters_DeepLabv3plus = {
-        "backbone" : 'resnet50',
-        "aspp_rates" : (2,4,6),
+        "backbone": "resnet50",
+        "aspp_rates": (2, 4, 6),
         "clipping_value": 50,
     }
     network_parameters = [network_parameters_DeepLabv3plus]

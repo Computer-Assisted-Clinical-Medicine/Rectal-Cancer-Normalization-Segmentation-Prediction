@@ -112,13 +112,13 @@ if __name__ == "__main__":
     cfg.num_files = len(file_list) - cfg.number_of_vald
 
     train_dataset = data_loader(
-        file_list[:-cfg.number_of_vald],
+        file_list[: -cfg.number_of_vald],
         batch_size=cfg.batch_size_train,
         n_epochs=N_EPOCHS,
         read_threads=cfg.train_reader_instances,
     )
     valid_dataset = data_loader(
-        file_list[-cfg.number_of_vald:],
+        file_list[-cfg.number_of_vald :],
         batch_size=cfg.batch_size_train,
         n_epochs=N_EPOCHS,
         read_threads=cfg.train_reader_instances,
