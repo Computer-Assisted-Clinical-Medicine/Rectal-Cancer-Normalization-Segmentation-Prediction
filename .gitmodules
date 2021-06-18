@@ -1,6 +1,6 @@
 [submodule "SegmentationNetworkBasis"]
 	path = SegmentationNetworkBasis
 	url = http://ckmsrv/Bonobo.Git.Server/SegmentationNetworkBasis.git
-[submodule "BodyContourSegmentation"]
-	path = BodyContourSegmentation
-	url = http://ckmsrv/Bonobo.Git.Server/BodyContourSegmentation.git
+[submodule "SegmentationArchitectures"]
+	path = SegmentationArchitectures
+	url = http://sa37%40medma.ad.uni-heidelberg.de@ckmsrv/Bonobo.Git.Server/SegmentationArchitectures.git

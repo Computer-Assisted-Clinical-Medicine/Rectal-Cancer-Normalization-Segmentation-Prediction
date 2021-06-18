@@ -103,6 +103,10 @@ if __name__ == "__main__":
         "reduce_lr_on_plateau": True,
         "patience_lr_plat": 5,
         "factor_lr_plat": 0.5,
+        # finetuning parameters
+        "finetune_epoch": 10,
+        "finetune_layers": "all",
+        "finetune_lr": 0.0001,
         # sampling parameters
         "samples_per_volume": 80,
         "background_label_percentage": 0.15,
