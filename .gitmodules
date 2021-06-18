@@ -3,4 +3,4 @@
 	url = http://ckmsrv/Bonobo.Git.Server/SegmentationNetworkBasis.git
 [submodule "SegmentationArchitectures"]
 	path = SegmentationArchitectures
-	url = http://sa37%40medma.ad.uni-heidelberg.de@ckmsrv/Bonobo.Git.Server/SegmentationArchitectures.git
+	url = http://ckmsrv/Bonobo.Git.Server/SegmentationArchitectures.git
