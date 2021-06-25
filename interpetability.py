@@ -10,20 +10,30 @@ import tensorflow.keras.backend as K
 from scipy import ndimage
 
 
+def resize_image(width, height, cam):
+    return ndimage.zoom(
+        input=cam, zoom=(width / cam.shape[0], height / cam.shape[1]), order=2
+    )
+
+
 def grad_cam(
-    input_model: tf.keras.Model,
+    model: tf.keras.Model,
     images: np.ndarray,
     layer_name: str,
     cls=1,
     pixel_weights=None,
+    apply_relu=False,
+    smooth=False,
 ) -> Tuple[np.ndarray, np.ndarray]:
     """Generate a GRAD-CAM activation map for a batch of input images. To get the
     maps, all probabilities aver averaged over the image dimensions.
     See also https://arxiv.org/pdf/2002.11434.pdf
+    If the result is very noisy, smoothing can also be applied, the gradient
+    is then calculated 50 times with added noise to the input.
 
     Parameters
     ----------
-    input_model : tf.keras.Model
+    model : tf.keras.Model
         The model to use
     images : np.ndarray
         An array of input images with shape (batch, width, height, channels)
@@ -34,6 +44,11 @@ def grad_cam(
     pixel_weights : np.array, optional
         If weights should be apply to the pixels when averaging the label. The
         array should have the same spatial dimensions as the input, by default None
+    apply_relu : bool, optional
+        If a ReLU should be applied to the outbut of the conv layer, by default False
+    smooth : bool, optional
+        Smooth the gradients by running it 50 times with gaussian noise with
+        15% of the input magnitude, by default False
 
     Returns
     -------
@@ -47,34 +62,36 @@ def grad_cam(
     # make sure the function is not running in eager mode
     assert not tf.executing_eagerly(), "This does not work in eager mode."
 
-    y: tf.Tensor = input_model.output
+    y: tf.Tensor = model.output
 
-    conv_output = input_model.get_layer(layer_name).output
+    conv_output = model.get_layer(layer_name).output
 
-    if pixel_weights is not None:
-        # norm the weights
-        pixel_weights = pixel_weights / np.mean(pixel_weights)
-
-    # the value for the class is the y^c from the paper
-    # to get an average over all pixels, just take the average
-    if len(y.shape) == 4:
-        if pixel_weights is None:
-            y_c = tf.reduce_mean(y[..., cls], axis=(1, 2))
-        else:
-            y_c = tf.reduce_mean(y[..., cls] * pixel_weights, axis=(1, 2))
-    else:
-        # otherwise, this is a classification task with two dimensions
-        assert len(y.shape) == 2
-        y_c = y[:, cls]
+    y_c = get_mean_prediction(pixel_weights, y, cls)
 
     # calculate the gradients with respect to the feature map of the layer
     # this is the partial derivativ from the paper (the list has dim. 1)
     grads = K.gradients(y_c, conv_output)[0]
 
     # make it a function to be able to get actual values
-    model_function = K.function([input_model.input], [conv_output, grads, y])
+    model_function = K.function([model.input], [conv_output, grads, y])
 
     output, grads_fm, y = model_function([images])
+
+    if smooth:
+        noise_scale = (images.max() - images.min()) * 0.15
+        grad_function = K.function(model.input, grads)
+        grads_fm = np.zeros_like(grads_fm)
+        for _ in range(50):
+            noise = np.random.normal(loc=0, scale=noise_scale, size=images.shape)
+            grads_fm += grad_function(images + noise)
+
+    if np.any(output < 0) and not apply_relu:
+        raise Warning(
+            "There are some values below 0 in the layer output. "
+            + "You should use conv. feature maps after activation."
+        )
+    if apply_relu:
+        output = np.maximum(0, output)
 
     results = np.zeros(images.shape[:3])
     width, height = images.shape[1:3]
@@ -101,26 +118,27 @@ def grad_cam(
     return y, results
 
 
-def resize_image(width, height, cam):
-    return ndimage.zoom(
-        input=cam, zoom=(width / cam.shape[0], height / cam.shape[1]), order=2
-    )
-
-
 def grad_cam_plus_plus(
-    input_model: tf.keras.Model,
+    model: tf.keras.Model,
     images: np.ndarray,
     layer_name: str,
     cls=1,
     pixel_weights=None,
+    apply_relu=False,
+    smooth=False,
 ) -> Tuple[np.ndarray, np.ndarray]:
     """Generate a GRAD-CAM activation map for a batch of input images. To get the
     maps, all probabilities aver averaged over the image dimensions.
     See also https://arxiv.org/pdf/1710.11063.pdf
+    The gradients are normed to a maximum of 1 to prevent numerical instabilities.
+    This is done for the whole batch and should only affect the scale of the
+    output (which is arbitrary anyway.)
+    If the result is very noisy, smoothing can also be applied, the gradients
+    are then calculated 50 times with added noise to the input.
 
     Parameters
     ----------
-    input_model : tf.keras.Model
+    model : tf.keras.Model
         The model to use
     images : np.ndarray
         An array of input images with shape (batch, width, height, channels)
@@ -132,6 +150,11 @@ def grad_cam_plus_plus(
     pixel_weights : np.array, optional
         If weights should be apply to the pixels when averaging the label. The
         array should have the same spatial dimensions as the input, by default None
+    apply_relu : bool, optional
+        If a ReLU should be applied to the outbut of the conv layer, by default False
+    smooth : bool, optional
+        Smooth the gradients by running it 50 times with gaussian noise with
+        15% of the input magnitude, by default False
 
     Returns
     -------
@@ -148,25 +171,11 @@ def grad_cam_plus_plus(
     # make sure the function is not running in eager mode
     assert not tf.executing_eagerly(), "This does not work in eager mode."
 
-    y = input_model.output
+    y = model.output
 
-    conv_output = input_model.get_layer(layer_name).output
+    conv_output = model.get_layer(layer_name).output
 
-    if pixel_weights is not None:
-        # norm the weights
-        pixel_weights = pixel_weights / np.mean(pixel_weights)
-
-    # the value for the class is the y^c from the paper
-    # to get an average over all pixels, just take the average
-    if len(y.shape) == 4:
-        if pixel_weights is None:
-            y_c = tf.reduce_mean(y[..., cls], axis=(1, 2))
-        else:
-            y_c = tf.reduce_mean(y[..., cls] * pixel_weights, axis=(1, 2))
-    else:
-        # otherwise, this is a classification task with two dimensions
-        assert len(y.shape) == 2
-        y_c = y[:, cls]
+    y_c = get_mean_prediction(pixel_weights, y, cls)
 
     # calculate the gradients with respect to the feature map of the layer
     # this is the partial derivativ from the paper
@@ -185,15 +194,30 @@ def grad_cam_plus_plus(
     third = second * grads
 
     # make it a function to be able to get actual values
-    model_function = K.function([input_model.input], [conv_output, grads, second, third, y])
+    model_function = K.function([model.input], [conv_output, grads, second, third, y])
 
     output, grads_val, second_grad, third_grad, y = model_function([images])
 
-    if np.any(output < 0):
+    if smooth:
+        noise_scale = (images.max() - images.min()) * 0.15
+        grad_function = K.function(model.input, [grads, second, third])
+        grads_val = np.zeros_like(grads_val)
+        second_grad = np.zeros_like(second_grad)
+        third_grad = np.zeros_like(third_grad)
+        for _ in range(50):
+            noise = np.random.normal(loc=0, scale=noise_scale, size=images.shape)
+            grad_result = grad_function(images + noise)
+            grads_val += grad_result[0]
+            second_grad += grad_result[1]
+            third_grad += grad_result[2]
+
+    if np.any(output < 0) and not apply_relu:
         raise Warning(
             "There are some values below 0 in the layer output. "
             + "You should use conv. feature maps after activation."
         )
+    if apply_relu:
+        output = np.maximum(0, output)
 
     results = np.zeros(images.shape[:3])
     width, height = images.shape[1:3]
@@ -231,6 +255,104 @@ def grad_cam_plus_plus(
     return y, results
 
 
+def gradients(
+    model: tf.keras.Model, images: np.ndarray, cls=1, pixel_weights=None, smooth=False
+) -> Tuple[np.ndarray, np.ndarray]:
+    """Generate input gradients for a batch of input images. To get the
+    maps, all probabilities aver averaged over the image dimensions.
+    Gradients can be noisy, so enabling smoothing is a good idea.
+    See also https://arxiv.org/pdf/1706.03825.pdf for the smooth gradients
+
+    Parameters
+    ----------
+    model : tf.keras.Model
+        The model to use
+    images : np.ndarray
+        An array of input images with shape (batch, width, height, channels)
+    cls : int, optional
+        The class to use, by default 1
+    pixel_weights : np.array, optional
+        If weights should be apply to the pixels when averaging the label. The
+        array should have the same spatial dimensions as the input, by default None
+    smooth : bool, optional
+        Smooth the gradients by running it 50 times with gaussian noise with
+        15% of the input magnitude, by default False
+
+    Returns
+    -------
+    np.ndarray
+        The output of the network (as comparison)
+    np.ndarray
+        The activation maps for all images with shape (batch, width, height)
+        They are upsampled if necessary.
+    """
+
+    # make sure the function is not running in eager mode
+    assert not tf.executing_eagerly(), "This does not work in eager mode."
+
+    y: tf.Tensor = model.output
+
+    y_c = get_mean_prediction(pixel_weights, y, cls)
+
+    # calculate the gradients with respect to the input
+    grads = K.gradients(y_c, model.input)[0]
+
+    # make it a function to be able to get actual values
+    model_function = K.function([model.input], [grads, y])
+
+    input_grads, y = model_function([images])
+
+    if smooth:
+        noise_scale = (images.max() - images.min()) * 0.15
+        grad_function = K.function(model.input, grads)
+        input_grads = np.zeros_like(input_grads)
+        for _ in range(50):
+            noise = np.random.normal(loc=0, scale=noise_scale, size=images.shape)
+            input_grads += grad_function(images + noise)
+
+    # norm gradients
+    input_grads = input_grads / np.max(input_grads)
+
+    return y, input_grads
+
+
+def get_mean_prediction(pixel_weights: np.ndarray, y: tf.Tensor, cls: int) -> tf.Tensor:
+    """Get the mean prediction of the classification pixels if there is a 2D map
+    of pixels. Otherwise, just the classification pixel is returned. An array
+    of weights of all pixels can also be provided.
+
+    Parameters
+    ----------
+    pixel_weights : np.ndarray
+        The weights of the pixels (doesn't have to be normed)
+    y : tf.Tensor
+        The labels as a 4D or 2D Tensor (batch, width, height, classes)
+    cls : int
+        The class to use
+
+    Returns
+    -------
+    tf.Tensor
+        A 1D Tensor which represents the average class of all pixels.
+    """
+    if pixel_weights is not None:
+        # norm the weights
+        pixel_weights = pixel_weights / np.mean(pixel_weights)
+
+    # the value for the class is the y^c from the paper
+    # to get an average over all pixels, just take the average
+    if len(y.shape) == 4:
+        if pixel_weights is None:
+            y_c = tf.reduce_mean(y[..., cls], axis=(1, 2))
+        else:
+            y_c = tf.reduce_mean(y[..., cls] * pixel_weights, axis=(1, 2))
+    else:
+        # otherwise, this is a classification task with two dimensions
+        assert len(y.shape) == 2
+        y_c = y[:, cls]
+    return y_c
+
+
 def visualize_map(
     map_img: np.ndarray, img: np.ndarray, label: np.ndarray, pred: np.ndarray
 ):
@@ -265,6 +387,50 @@ def visualize_map(
     disable_ticks(axes[1])
 
 
+def visualize_gradients(grad_img: np.ndarray, input_img: np.ndarray):
+    """Visualize the gradients, there are two color images generated for the
+    rectified and absolute gradients. Then, for each channel, the gradients and
+    the gradients overlayed over the input image are plotted.
+
+    Parameters
+    ----------
+    grad_img : np.ndarray
+        The gradients as 3D array (width, height, channels)
+    input_img : np.ndarray
+        The input images as 3D array (width, height, channels)
+    """
+    # norm the gradients
+    maximum = np.quantile(np.abs(grad_img), 0.95)
+    grad_img = np.clip(grad_img, a_min=-maximum, a_max=maximum)
+    grad_img = grad_img / maximum
+
+    grad_img_relu = np.maximum(0, grad_img)
+
+    nrows = 1 + grad_img.shape[-1]
+    _, axes = plt.subplots(nrows=nrows, ncols=2, figsize=(8 * 2, 8 * nrows))
+
+    axes[0, 0].imshow(grad_img_relu / grad_img_relu.max())
+    axes[0, 0].set_title("Rectified Gradients")
+
+    grad_img_abs = np.abs(grad_img)
+    axes[0, 1].imshow(grad_img_abs / grad_img_abs.max())
+    axes[0, 1].set_title("Absolute Gradients")
+
+    for i, ax in zip(range(grad_img.shape[-1]), axes[1:]):
+        ax[0].imshow(grad_img[..., i], vmin=-1, vmax=1, cmap="bwr")
+        ax[0].set_title(f"Channel {i}, normalized gradient")
+        # plt.colorbar()
+
+        ax[1].imshow(input_img[..., i], vmin=0, vmax=1, cmap="gray")
+        ax[1].imshow(
+            grad_img[..., i], vmin=-1, vmax=1, cmap="bwr", alpha=np.abs(grad_img[..., i])
+        )
+        ax[1].set_title(f"Channel {i}, normalized gradient with input")
+
+    for ax in axes.flat:
+        disable_ticks(ax)
+
+
 def find_contour(image: np.ndarray) -> np.ndarray:
     """Find the contour of an image
 
@@ -281,7 +447,8 @@ def find_contour(image: np.ndarray) -> np.ndarray:
     edge_filter = np.array([[-1, -1, -1], [-1, 8, -1], [-1, -1, -1]])
     contour_image = ndimage.convolve(image, edge_filter)
     # norm it
-    contour_image = contour_image / contour_image.max()
+    if np.any(contour_image > 0):
+        contour_image = contour_image / contour_image.max()
     return contour_image
 
 

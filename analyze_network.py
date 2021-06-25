@@ -19,7 +19,7 @@ import SimpleITK as sitk
 import tensorflow as tf
 import tensorflow.keras.backend as K
 
-from interpetability import grad_cam, grad_cam_plus_plus, visualize_map
+import interpetability
 from SegmentationNetworkBasis.NetworkBasis import loss
 from SegmentationNetworkBasis.NetworkBasis.metric import Dice
 
@@ -30,14 +30,13 @@ tf.python.framework.ops.disable_eager_execution()
 ## load network
 """
 
-EXP = 0
+EXP = 3
 FOLD = 0
 FOREGROUND = 1
 
-LAYER = "pred-conv1/act"
-
 data_dir = Path(os.environ["data_dir"])
 experiment_dir = Path(os.environ["experiment_dir"])
+experiment_dir = experiment_dir.parent / "RCS_T2_B800_ADC_frac_obj"  # TODO: remove
 
 hparam_file = experiment_dir / "hyperparameters.csv"
 hparams = pd.read_csv(hparam_file, sep=";")
@@ -46,6 +45,11 @@ model_path = experiment_path / f"fold-{FOLD}" / "models" / "model-best"
 
 custom = {"Dice": Dice, "dice_loss": loss.dice_loss}
 model = tf.keras.models.load_model(model_path, compile=False, custom_objects=custom)
+
+if model.name == "deeplab":
+    LAYER = "pred-conv1/act"
+elif model.name == "UNet":
+    LAYER = "UNet2D/last/Conn2D"
 
 # %% [markdown]
 """
@@ -110,15 +114,66 @@ plt.close()
 # %% [markdown]
 """
 ## Do Grad-CAM
+### Average over all pixels
 """
 
-pred, gradcam = grad_cam(model, input_image_np, LAYER)
+pred, gradcam = interpetability.grad_cam(model, input_image_np, LAYER, apply_relu=True)
 
 for gradcam_img, input_img, label_img, pred_img in zip(
     gradcam, input_image_np, input_labels_np, pred[..., 1]
 ):
 
-    visualize_map(gradcam_img, input_img, label_img, pred_img)
+    interpetability.visualize_map(gradcam_img, input_img, label_img, pred_img)
+    plt.show()
+    plt.close()
+
+
+# %% [markdown]
+"""
+## Do smooth Grad-CAM
+### Average over all pixels
+"""
+
+_, gradcam_smooth = interpetability.grad_cam(
+    model, input_image_np, LAYER, apply_relu=True, smooth=True
+)
+
+for gradcam_img, input_img, label_img, pred_img in zip(
+    gradcam_smooth, input_image_np, input_labels_np, pred[..., 1]
+):
+
+    interpetability.visualize_map(gradcam_img, input_img, label_img, pred_img)
+    plt.show()
+    plt.close()
+
+# %% [markdown]
+"""
+### Average over wrongly classified images
+"""
+
+pixel_weights = np.abs(input_labels_np - (pred[..., 1] > 0.5).astype(float))
+
+_, gradcam_f = interpetability.grad_cam(
+    model=model,
+    images=input_image_np,
+    layer_name=LAYER,
+    pixel_weights=pixel_weights,
+    apply_relu=True,
+)
+
+
+for gradcam_img, gradcam_orig, input_img, label_img, pred_img in zip(
+    gradcam_f, gradcam, input_image_np, input_labels_np, pred[..., 1]
+):
+
+    interpetability.visualize_map(gradcam_img, input_img, label_img, pred_img)
+    plt.show()
+    plt.close()
+
+    plt.figure(figsize=(8, 8))
+    plt.imshow(gradcam_img - gradcam_orig)
+    plt.title("Difference to original Grad-CAM with all pixels.")
+    plt.colorbar()
     plt.show()
     plt.close()
 
@@ -128,16 +183,51 @@ for gradcam_img, input_img, label_img, pred_img in zip(
 ## Do Grad-CAM++
 """
 
-pred, gradcam = grad_cam_plus_plus(model, input_image_np, LAYER)
+pred_plus, gradcam_plus = interpetability.grad_cam_plus_plus(
+    model, input_image_np, LAYER, apply_relu=True
+)
 
 for gradcam_img, input_img, label_img, pred_img in zip(
-    gradcam, input_image_np, input_labels_np, pred[..., 1]
+    gradcam_plus, input_image_np, input_labels_np, pred_plus[..., 1]
 ):
 
-    visualize_map(gradcam_img, input_img, label_img, pred_img)
+    interpetability.visualize_map(gradcam_img, input_img, label_img, pred_img)
     plt.show()
     plt.close()
 
+
+# %% [markdown]
+"""
+## Do Smooth Grad-CAM++
+"""
+
+pred_plus, gradcam_plus = interpetability.grad_cam_plus_plus(
+    model, input_image_np, LAYER, apply_relu=True, smooth=True
+)
+
+for gradcam_img, input_img, label_img, pred_img in zip(
+    gradcam_plus, input_image_np, input_labels_np, pred_plus[..., 1]
+):
+
+    interpetability.visualize_map(gradcam_img, input_img, label_img, pred_img)
+    plt.show()
+    plt.close()
+
+
+# %% [markdown]
+"""
+## Make Smooth Gradients
+The gradients are normalized for each image, one image will dominate the whole
+batch otherwise.
+"""
+
+_, smooth_grads = interpetability.gradients(model, input_image_np, smooth=True)
+
+for grad_img, input_img in zip(smooth_grads, input_image_np):
+
+    interpetability.visualize_gradients(grad_img, input_img)
+    plt.show()
+    plt.close()
 
 # %% [markdown]
 """
