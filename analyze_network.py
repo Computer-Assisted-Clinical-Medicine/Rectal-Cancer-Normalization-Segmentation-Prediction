@@ -151,13 +151,13 @@ for gradcam_img, input_img, label_img, pred_img in zip(
 ### Average over wrongly classified images
 """
 
-pixel_weights = np.abs(input_labels_np - (pred[..., 1] > 0.5).astype(float))
+pixel_weights_fp = np.abs(input_labels_np - (pred[..., 1] > 0.5).astype(float))
 
 _, gradcam_f = interpetability.grad_cam(
     model=model,
     images=input_image_np,
     layer_name=LAYER,
-    pixel_weights=pixel_weights,
+    pixel_weights=pixel_weights_fp,
     apply_relu=True,
 )
 
@@ -198,34 +198,104 @@ for gradcam_img, input_img, label_img, pred_img in zip(
 
 # %% [markdown]
 """
-## Do Smooth Grad-CAM++
-"""
-
-pred_plus, gradcam_plus = interpetability.grad_cam_plus_plus(
-    model, input_image_np, LAYER, apply_relu=True, smooth=True
-)
-
-for gradcam_img, input_img, label_img, pred_img in zip(
-    gradcam_plus, input_image_np, input_labels_np, pred_plus[..., 1]
-):
-
-    interpetability.visualize_map(gradcam_img, input_img, label_img, pred_img)
-    plt.show()
-    plt.close()
-
-
-# %% [markdown]
-"""
-## Make Smooth Gradients
-The gradients are normalized for each image, one image will dominate the whole
-batch otherwise.
+## Do Gradients
+### Make Smooth Gradients
+The gradients are normalized for each image when generating the visualization,
+one image will dominate the whole batch otherwise.
 """
 
 _, smooth_grads = interpetability.gradients(model, input_image_np, smooth=True)
 
-for grad_img, input_img in zip(smooth_grads, input_image_np):
+for num, (grad_img, input_img) in enumerate(zip(smooth_grads, input_image_np)):
 
-    interpetability.visualize_gradients(grad_img, input_img)
+    print(f"\nSlice {num}:\n")
+
+    print("Mean Absolute values:")
+    mean_abs = np.mean(np.abs(grad_img), axis=(0, 1))
+    mean_abs_norm = mean_abs / mean_abs.sum()
+    for i in range(grad_img.shape[-1]):
+        print(f"Channel {i}: {mean_abs[i]:.3f} ({mean_abs_norm[i]*100:4.1f} %)")
+    print("Mean Rectified values:")
+    mean_relu = np.mean(np.maximum(0, grad_img), axis=(0, 1))
+    mean_relu_norm = mean_relu / mean_relu.sum()
+    for i in range(grad_img.shape[-1]):
+        print(f"Channel {i}: {mean_relu[i]:.3f} ({mean_relu_norm[i]*100:4.1f} %)")
+
+    interpetability.visualize_gradients(grad_img, input_img, normalize=True)
+    plt.show()
+    plt.close()
+
+print("\nAll Slices:\n")
+
+print("Mean Absolute values:")
+mean_abs = np.mean(np.abs(smooth_grads), axis=(0, 1, 2))
+mean_abs_norm = mean_abs / mean_abs.sum()
+for i in range(smooth_grads.shape[-1]):
+    print(f"Channel {i}: {mean_abs[i]:.3f} ({mean_abs_norm[i]*100:4.1f} %)")
+print("Mean Rectified values:")
+mean_relu = np.mean(np.maximum(0, smooth_grads), axis=(0, 1, 2))
+mean_relu_norm = mean_relu / mean_relu.sum()
+for i in range(smooth_grads.shape[-1]):
+    print(f"Channel {i}: {mean_relu[i]:.3f} ({mean_relu_norm[i]*100:4.1f} %)")
+
+# %% [markdown]
+"""
+### Gradients for false positives
+"""
+
+_, smooth_grads_fp = interpetability.gradients(
+    model=model, images=input_image_np, smooth=True, pixel_weights=pixel_weights_fp
+)
+
+for num, (grad_img_fp, grad_img, input_img, pix_weights) in enumerate(
+    zip(smooth_grads_fp, smooth_grads, input_image_np, pixel_weights_fp)
+):
+
+    # skip slices without false positives
+    if np.all(np.isclose(pix_weights, 0)):
+        print(f"\nSlice {num} does not contains FPs\n")
+        continue
+
+    print(f"\nSlice {num}:\n")
+
+    # normalize using the original gradients
+    maximum = np.quantile(np.abs(grad_img), 0.95)
+    grad_img_fp = np.clip(grad_img_fp, a_min=-maximum, a_max=maximum)
+    grad_img_fp = grad_img_fp / maximum
+
+    fig, axes = interpetability.visualize_gradients(grad_img_fp, input_img)
+    for ax in axes.flat:
+        ax.imshow(pix_weights, alpha=pix_weights * 0.7, cmap="gray")
+    fig.suptitle("Gradients of False Positives")
+    plt.show()
+    plt.close()
+
+    print()
+    print()
+
+print("Mean Absolute values:")
+mean_abs = np.mean(np.abs(smooth_grads_fp), axis=(0, 1, 2))
+mean_abs_norm = mean_abs / mean_abs.sum()
+for i in range(smooth_grads_fp.shape[-1]):
+    print(f"Channel {i}: {mean_abs[i]:.3f} ({mean_abs_norm[i]*100:4.1f} %)")
+print("Mean Rectified values:")
+mean_relu = np.mean(np.maximum(0, smooth_grads_fp), axis=(0, 1, 2))
+mean_relu_norm = mean_relu / mean_relu.sum()
+for i in range(smooth_grads_fp.shape[-1]):
+    print(f"Channel {i}: {mean_relu[i]:.3f} ({mean_relu_norm[i]*100:4.1f} %)")
+
+# %% [markdown]
+"""
+### Combination of smooth gradients with grad-CAM
+Gradients are combined with grad-CAM by using elementwise multiplication.
+"""
+
+for grad_img, gradcam_img, input_img in zip(smooth_grads, gradcam_plus, input_image_np):
+
+    interpetability.visualize_gradients(
+        (grad_img.T * gradcam_img.T).T, input_img, normalize=True
+    )
+    plt.tight_layout()
     plt.show()
     plt.close()
 
@@ -233,8 +303,6 @@ for grad_img, input_img in zip(smooth_grads, input_image_np):
 """
 ## Run the model with the images as input
 """
-
-tf.config.run_functions_eagerly(True)
 
 input_tf = tf.convert_to_tensor(input_image_np)
 labels_one_hot = np.squeeze(np.eye(2)[input_labels_np.flat]).reshape(

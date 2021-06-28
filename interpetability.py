@@ -355,7 +355,7 @@ def get_mean_prediction(pixel_weights: np.ndarray, y: tf.Tensor, cls: int) -> tf
 
 def visualize_map(
     map_img: np.ndarray, img: np.ndarray, label: np.ndarray, pred: np.ndarray
-):
+) -> Tuple[plt.Figure, np.ndarray]:
     """Visualize the cam images with overlays with and without the input image
     and with outlines of the prediction and ground truth. All input arrays should
     have the same dimensions.
@@ -374,7 +374,7 @@ def visualize_map(
     label_contour = find_contour(label.astype(float))
     pred_contour = find_contour(pred)
 
-    _, axes = plt.subplots(1, 2, figsize=(16, 8))
+    fig, axes = plt.subplots(1, 2, figsize=(16, 8))
 
     axes[0].imshow(img[..., 0], cmap="gray")
     axes[0].imshow(np.ones(map_img.shape), cmap="bwr", vmin=0, vmax=1, alpha=map_img)
@@ -386,8 +386,12 @@ def visualize_map(
     axes[1].imshow(label_contour, cmap="Wistia", alpha=(label_contour > 0.1).astype(float))
     disable_ticks(axes[1])
 
+    return fig, axes
 
-def visualize_gradients(grad_img: np.ndarray, input_img: np.ndarray):
+
+def visualize_gradients(
+    grad_img: np.ndarray, input_img: np.ndarray, normalize=False
+) -> Tuple[plt.Figure, np.ndarray]:
     """Visualize the gradients, there are two color images generated for the
     rectified and absolute gradients. Then, for each channel, the gradients and
     the gradients overlayed over the input image are plotted.
@@ -398,16 +402,19 @@ def visualize_gradients(grad_img: np.ndarray, input_img: np.ndarray):
         The gradients as 3D array (width, height, channels)
     input_img : np.ndarray
         The input images as 3D array (width, height, channels)
+    normalize : bool, optional
+        If the input should be normalized per image, by default False
     """
-    # norm the gradients
-    maximum = np.quantile(np.abs(grad_img), 0.95)
-    grad_img = np.clip(grad_img, a_min=-maximum, a_max=maximum)
-    grad_img = grad_img / maximum
+    if normalize:
+        # norm the gradients
+        maximum = np.quantile(np.abs(grad_img), 0.95)
+        grad_img = np.clip(grad_img, a_min=-maximum, a_max=maximum)
+        grad_img = grad_img / maximum
 
     grad_img_relu = np.maximum(0, grad_img)
 
     nrows = 1 + grad_img.shape[-1]
-    _, axes = plt.subplots(nrows=nrows, ncols=2, figsize=(8 * 2, 8 * nrows))
+    fig, axes = plt.subplots(nrows=nrows, ncols=2, figsize=(8 * 2, 8 * nrows))
 
     axes[0, 0].imshow(grad_img_relu / grad_img_relu.max())
     axes[0, 0].set_title("Rectified Gradients")
@@ -417,18 +424,20 @@ def visualize_gradients(grad_img: np.ndarray, input_img: np.ndarray):
     axes[0, 1].set_title("Absolute Gradients")
 
     for i, ax in zip(range(grad_img.shape[-1]), axes[1:]):
-        ax[0].imshow(grad_img[..., i], vmin=-1, vmax=1, cmap="bwr")
-        ax[0].set_title(f"Channel {i}, normalized gradient")
-        # plt.colorbar()
-
-        ax[1].imshow(input_img[..., i], vmin=0, vmax=1, cmap="gray")
-        ax[1].imshow(
+        ax[0].imshow(input_img[..., i], vmin=0, vmax=1, cmap="gray")
+        ax[0].imshow(
             grad_img[..., i], vmin=-1, vmax=1, cmap="bwr", alpha=np.abs(grad_img[..., i])
         )
-        ax[1].set_title(f"Channel {i}, normalized gradient with input")
+        ax[0].set_title(f"Channel {i}, normalized gradient with input")
+
+        cbar_im = ax[1].imshow(grad_img[..., i], vmin=-1, vmax=1, cmap="bwr")
+        ax[1].set_title(f"Channel {i}, normalized gradient")
+        fig.colorbar(cbar_im, ax=ax[1])
 
     for ax in axes.flat:
         disable_ticks(ax)
+
+    return fig, axes
 
 
 def find_contour(image: np.ndarray) -> np.ndarray:
