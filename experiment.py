@@ -287,9 +287,6 @@ class Experiment:
             # samples are taken from the foreground, so take about 64 samples
             # to cover all the foreground pixels at least once on average, but
             cfg.samples_per_volume = 64
-            cfg.batch_capacity_train = (
-                4 * cfg.samples_per_volume
-            )  # chosen as multiple of samples per volume
             logger.debug(
                 "   Train Shapes: %s (input), %s (labels)",
                 cfg.train_input_shape,
@@ -324,9 +321,6 @@ class Experiment:
 
             # set sample numbers
             cfg.samples_per_volume = 8
-            cfg.batch_capacity_train = (
-                4 * cfg.samples_per_volume
-            )  # chosen as multiple of samples per volume
             logger.debug(
                 "   Train Shapes: %s (input), %s (labels)",
                 cfg.train_input_shape,
@@ -338,6 +332,10 @@ class Experiment:
         # see if the batch size is bigger than the validation set
         if cfg.samples_per_volume * cfg.number_of_vald <= cfg.batch_size_valid:
             cfg.batch_size_valid = cfg.samples_per_volume * cfg.number_of_vald
+
+        cfg.batch_capacity_train = (
+            4 * cfg.samples_per_volume
+        )  # chosen as multiple of samples per volume
 
     def estimate_batch_size(self):
         """The batch size estimation is basically trail and error. So far tested
@@ -432,6 +430,7 @@ class Experiment:
                 name="visualization",
                 frac_obj=1,
                 samples_per_volume=1,
+                shuffle=False,
                 **self.hyper_parameters["data_loader_parameters"],
             )(
                 vald_files,
