@@ -96,25 +96,27 @@ if __name__ == "__main__":
     train_parameters = {
         "l_r": 0.001,
         "optimizer": "Adam",
-        "epochs": 100,
+        "epochs": 10,
+        # parameters for saving the best model
+        "best_model_decay": 0.3,
         # scheduling parameters
-        "early_stopping": True,
+        "early_stopping": False,
         "patience_es": 15,
-        "reduce_lr_on_plateau": True,
+        "reduce_lr_on_plateau": False,
         "patience_lr_plat": 5,
         "factor_lr_plat": 0.5,
         # finetuning parameters
-        "finetune_epoch": 10,
+        "finetune_epoch": 0,
         "finetune_layers": "all",
-        "finetune_lr": 0.0001,
+        "finetune_lr": 0.0005,
         # sampling parameters
         "samples_per_volume": 80,
         "background_label_percentage": 0.15,
         # Augmentation parameters
         "add_noise": False,
         "max_rotation": 0,
-        "min_resolution_augment": 1,
-        "max_resolution_augment": 1,
+        "min_resolution_augment": 1.2,
+        "max_resolution_augment": 0.9,
     }
 
     data_loader_parameters = {"do_resampling": True}
@@ -157,8 +159,7 @@ if __name__ == "__main__":
         "do_batch_normalization": True,
     }
     network_parameters_DeepLabv3plus = {
-        "backbone": "resnet50",
-        "aspp_rates": (2, 4, 6),
+        "aspp_rates": (3, 6, 9),  # half because input is half the size
         "clipping_value": 50,
     }
     network_parameters = [network_parameters_DeepLabv3plus]
@@ -191,6 +192,21 @@ if __name__ == "__main__":
     pos_values = [0.4]
     hyper_parameters = vary_hyperparameters(
         hyper_parameters, ("train_parameters", "percent_of_object_samples"), pos_values
+    )
+
+    ### backbone ###
+    backbones = [
+        "mobilenet_v2",
+        "densenet121",
+        # "densenet169",
+        # "densenet201"
+        "efficientnetB0",
+        "resnet50",
+        # "resnet101",
+        # "resnet152",
+    ]
+    hyper_parameters = vary_hyperparameters(
+        hyper_parameters, ("network_parameters", "backbone"), backbones
     )
 
     # generate tensorflow command
@@ -276,6 +292,7 @@ if __name__ == "__main__":
         script_dir = Path(sys.argv[0]).resolve().parent
         ps_script = experiment_dir / "start.ps1"
         ps_script_tb = experiment_dir / "start_tensorboard.ps1"
+        ps_script_combine = experiment_dir / "start_combine.ps1"
         ps_script_analysis = experiment_dir / "start_analysis.ps1"
 
         # make a powershell command
@@ -283,7 +300,6 @@ if __name__ == "__main__":
         # add paths
         command += f'$env:data_dir="{data_dir}"\n'
         command += f'$env:experiment_dir="{experiment_dir}"\n'
-        command += '$script=${script_dir} + "\\run_single_experiment.py"\n'
         command += 'echo "Data dir: $env:data_dir"\n'
         command += 'echo "Experiment dir: $env:experiment_dir"\n'
         command += 'echo "Script path: $script"\n'
@@ -299,6 +315,13 @@ if __name__ == "__main__":
         command_tb += "echo $start\n"
         command_tb += "Invoke-Expression ${start}\n"
         command_tb += 'read-host "Finished, press ENTER to close."'
+
+        # run combine
+        command_combine = command
+        command_combine += '$script=${script_dir} + "\\combine_models.py"\n'
+        command_combine += '$command="python " + ${script}\n'
+        command_combine += "Invoke-Expression ${command}\n"
+        command_combine += 'read-host "Finished, press ENTER to close."'
 
         # run analysis
         command_analysis = command
@@ -325,6 +348,10 @@ if __name__ == "__main__":
         # create tensorboard file
         with open(ps_script_tb, "w+") as powershell_file_tb:
             powershell_file_tb.write(command_tb)
+
+        # create combine file
+        with open(ps_script_combine, "w+") as powershell_file_combine:
+            powershell_file_combine.write(command_combine)
 
         # create analysis file
         with open(ps_script_analysis, "w+") as powershell_file_analysis:

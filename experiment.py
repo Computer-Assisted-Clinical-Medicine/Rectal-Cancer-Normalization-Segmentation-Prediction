@@ -347,6 +347,9 @@ class Experiment:
         int
             The recommended batch size
         """
+
+        # TODO: this should be moved into the individual models.
+
         # set batch size
         # determine GPU memory (in MB)
         if len(tf.test.gpu_device_name()) > 0:
@@ -374,8 +377,28 @@ class Experiment:
             if dim == 3:
                 memory_consumption_guess = 4096
         elif a_name == "DeepLabv3plus":
+            backbone = self.hyper_parameters["network_parameters"]["backbone"]
             if dim == 2:
-                memory_consumption_guess = 512
+                if backbone == "resnet50":
+                    memory_consumption_guess = 1024
+                elif backbone == "resnet101":
+                    memory_consumption_guess = 1024
+                elif backbone == "resnet152":
+                    memory_consumption_guess = 1024
+                elif backbone == "mobilenet_v2":
+                    memory_consumption_guess = 512
+                elif backbone == "densenet121":
+                    memory_consumption_guess = 1024
+                elif backbone == "densenet169":
+                    memory_consumption_guess = 1024
+                elif backbone == "densenet201":
+                    memory_consumption_guess = 1024
+                elif backbone == "efficientnetB0":
+                    memory_consumption_guess = 1024
+                else:
+                    raise NotImplementedError(
+                        f"No heuristic implemented for backbone {backbone}."
+                    )
             if dim == 3:
                 raise NotImplementedError("3D Deeplab not implemented")
         else:

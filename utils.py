@@ -69,8 +69,8 @@ def plot_hparam_comparison(hparam_dir, metrics=None, external=False, postprocess
     # add pdf
     result_name += ".pdf"
 
-    hparams = pd.read_csv(hparam_file, sep=";")
-    hparams_changed = pd.read_csv(hparam_changed_file, sep=";")
+    hparams: pd.DataFrame = pd.read_csv(hparam_file, sep=";")
+    hparams_changed: pd.DataFrame = pd.read_csv(hparam_changed_file, sep=";")
     changed_params = hparams_changed.columns[1:]
     # collect all results
     results_means = []
@@ -230,12 +230,13 @@ def compare_hyperparameters(experiments, experiment_dir, version="best"):
             columns="results_file_external_testset_postprocessed", inplace=True
         )
     # drop columns only related to architecture
-    arch_groups = hparams_changed.groupby("architecture")
-    if arch_groups.ngroups > 1:
-        arch_params = arch_groups.nunique(dropna=False)
-        for col in arch_params:
-            if np.all(arch_params[col] == 1):
-                hparams_changed.drop(columns=col, inplace=True)
+    if "architecture" in hparams_changed:
+        arch_groups = hparams_changed.groupby("architecture")
+        if arch_groups.ngroups > 1:
+            arch_params = arch_groups.nunique(dropna=False)
+            for col in arch_params:
+                if np.all(arch_params[col] == 1):
+                    hparams_changed.drop(columns=col, inplace=True)
 
     hparams.to_csv(hyperparameter_file, sep=";")
     hparams_changed.to_csv(hyperparameter_changed_file, sep=";")

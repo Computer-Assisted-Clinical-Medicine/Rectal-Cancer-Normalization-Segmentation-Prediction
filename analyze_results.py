@@ -70,12 +70,22 @@ shorten_names(results)
 results.sort_values("name", inplace=True)
 # take the mean over all folds and models
 results_mean = results.groupby("File Number").mean()
+# take only the results from the study (without extra Mannheim data)
+results_study_only = results.drop(
+    results.index[results["File Number"].str.startswith("99")]
+)
 
 sns.catplot(data=results, y="name", x="Dice", kind="box", aspect=2)
 save_and_show("test_set_dice_models")
 
+sns.catplot(data=results_study_only, y="name", x="Dice", kind="box", aspect=2)
+save_and_show("test_set_dice_models_study_only")
+
 sns.catplot(data=results, y="name", x="Dice", hue="fold", kind="box", aspect=2)
 save_and_show("test_set_dice_models_folds")
+
+sns.catplot(data=results_study_only, y="name", x="Dice", hue="fold", kind="box", aspect=2)
+save_and_show("test_set_dice_models_folds_study_only")
 
 sns.catplot(data=results, y="fold", x="Dice", kind="box", aspect=2)
 save_and_show("test_set_dice_folds")
@@ -123,6 +133,13 @@ save_and_show("test_set_volume_vs_volume")
 
 sns.pairplot(results[["name", "Dice", "Hausdorff", "Volume (P)"]], hue="name")
 save_and_show("test_model_pairplot")
+
+results.groupby("name").describe().transpose().to_csv(
+    plot_dir / "summary_test_set.csv", sep=";"
+)
+results_study_only.groupby("name").describe().transpose().to_csv(
+    plot_dir / "summary_test_set_study_only.csv", sep=";"
+)
 
 # %% [markdown]
 """

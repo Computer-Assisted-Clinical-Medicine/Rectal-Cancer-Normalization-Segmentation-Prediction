@@ -33,7 +33,7 @@ def calculate_ensemble_weights(
     metric : str, optional
         The metric to use, by default 'Dice'
     version : str, optional
-        Which version of the model should be used, by default 'best'
+        Which version of the model should be used, by default "best"
 
     Returns
     -------
@@ -108,7 +108,7 @@ def combine_models(
     overwrite : bool
         If existing files should be overwritten
     version : str, optional
-        The version of the images to use, by default 'best'
+        The version of the images to use, by default "best"
     """
 
     # remember the results

@@ -301,6 +301,9 @@ ignore-docstrings=yes
 # Ignore imports when computing similarities.
 ignore-imports=no
 
+# Ignore the signatures of functions
+ignore-signatures=yes
+
 # Minimum lines number of a similarity.
 min-similarity-lines=4
 
