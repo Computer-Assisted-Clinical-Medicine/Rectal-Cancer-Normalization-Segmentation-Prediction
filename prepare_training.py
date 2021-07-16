@@ -136,19 +136,19 @@ if __name__ == "__main__":
     ### architecture ###
     F_BASE = 8
     network_parameters_UNet = {
-        "regularize": [True, "L2", 1e-5],
-        "drop_out": [True, 0.01],
+        "regularize": (True, "L2", 1e-5),
+        "drop_out": (True, 0.01),
         "activation": "elu",
         "cross_hair": False,
         "clipping_value": 1,
         "res_connect": True,
-        "n_filters": [F_BASE * 8, F_BASE * 16, F_BASE * 32, F_BASE * 64, F_BASE * 128],
+        "n_filters": (F_BASE * 8, F_BASE * 16, F_BASE * 32, F_BASE * 64, F_BASE * 128),
         "do_bias": True,
         "do_batch_normalization": False,
     }
     network_parameters_DenseTiramisu = {
-        "regularize": [True, "L2", 1e-5],
-        "drop_out": [True, 0.01],
+        "regularize": (True, "L2", 1e-5),
+        "drop_out": (True, 0.01),
         "activation": "elu",
         "cross_hair": False,
         "clipping_value": 1,
@@ -224,23 +224,23 @@ if __name__ == "__main__":
             if hyp["architecture"] is UNet:
                 if hyp["dimensions"] == 3:
                     F_BASE = 4
-                    n_filters = [
+                    n_filters = (
                         F_BASE * 8,
                         F_BASE * 16,
                         F_BASE * 32,
                         F_BASE * 64,
                         F_BASE * 128,
-                    ]
+                    )
                     hyp["network_parameters"]["n_filters"] = n_filters
                 else:
                     F_BASE = 8
-                    n_filters = [
+                    n_filters = (
                         F_BASE * 8,
                         F_BASE * 16,
                         F_BASE * 32,
                         F_BASE * 64,
                         F_BASE * 128,
-                    ]
+                    )
                     hyp["network_parameters"]["n_filters"] = n_filters
 
         # define experiment
@@ -333,7 +333,7 @@ if __name__ == "__main__":
         # add the experiments
         command += '$script=${script_dir} + "\\run_single_experiment.py"\n'
         for exp in experiments:
-            command += f'echo "starting with {exp.name}"\n'
+            command += f'\n\necho "starting with {exp.name}"\n'
             command += (
                 f'$output_path=${{env:experiment_dir}} + "\\{exp.output_path.name}"\n'
             )

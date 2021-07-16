@@ -30,24 +30,25 @@ tf.python.framework.ops.disable_eager_execution()
 ## load network
 """
 
-EXP = 3
+EXP = 0
 FOLD = 0
 FOREGROUND = 1
 
 data_dir = Path(os.environ["data_dir"])
 experiment_dir = Path(os.environ["experiment_dir"])
-experiment_dir = experiment_dir.parent / "RCS_T2_B800_ADC_frac_obj"  # TODO: remove
+experiment_dir = experiment_dir.parent / "Good_Models"  # TODO: remove
 
 hparam_file = experiment_dir / "hyperparameters.csv"
 hparams = pd.read_csv(hparam_file, sep=";")
 experiment_path = Path(hparams.loc[EXP, "path"])
-model_path = experiment_path / f"fold-{FOLD}" / "models" / "model-best"
+model_path = experiment_dir / experiment_path / f"fold-{FOLD}" / "models" / "model-best"
 
 custom = {"Dice": Dice, "dice_loss": loss.dice_loss}
 model = tf.keras.models.load_model(model_path, compile=False, custom_objects=custom)
 
-if model.name == "deeplab":
+if model.name == "DeepLabv3plus":
     LAYER = "pred-conv1/act"
+    backbone = hparams.loc[EXP, "backbone"]
 elif model.name == "UNet":
     LAYER = "UNet2D/last/Conn2D"
 
@@ -127,6 +128,72 @@ for gradcam_img, input_img, label_img, pred_img in zip(
     plt.show()
     plt.close()
 
+# %% [markdown]
+"""
+### Do Grad-CAM over the block output layers
+"""
+
+layers = []
+if model.name == "DeepLabv3plus":
+    if backbone == "densenet121":
+        layers += ["conv1/relu", "conv2_block1_concat"]
+        layers += [f"pool{i}_conv" for i in range(2, 5)]
+    elif backbone == "mobilenet_v2":
+        layers += [
+            "Conv1",
+            "block_1_project_BN",
+            "block_2_add",
+            "block_4_add",
+            "block_7_add",
+            "block_11_add",
+            "block_13_project_BN",
+        ]
+    elif backbone == "resnet50":
+        layers += [
+            "conv1_conv",
+            "conv2_block1_out",
+            "conv3_block1_preact_bn",
+            "conv4_block1_preact_bn",
+            "conv5_block1_out",
+        ]
+    else:
+        raise ValueError(f"BAckbone {backbone} not recognized.")
+    layers += [
+        "low-level-reduction/bn",
+        "high-feature-red/bn",
+        "pred-conv0/bn",
+        "pred-conv1/bn",
+        "logits",
+    ]
+
+    use_images = slice(2, 3)
+elif model.name == "UNet":
+    layers += ["UNet2D-encode0/basic/conv0_act"]
+    layers += [f"UNet2D-encode{i}/basic/add" for i in range(4)]
+    layers += ["UNet2D-bottleneck/add"]
+    layers += [f"UNet2D-decode{i}/basic/add" for i in range(5, 9)]
+    layers += ["UNet2D/last/Conn2D"]
+
+    use_images = slice(7, 8)
+
+for layer in layers:
+    print(layer)
+    pred, gradcam = interpetability.grad_cam(model, input_image_np, layer, apply_relu=True)
+
+    for gradcam_img, input_img, label_img, pred_img in zip(
+        gradcam[use_images],
+        input_image_np[use_images],
+        input_labels_np[use_images],
+        pred[use_images, ..., 1],
+    ):
+        gradcam_img = gradcam_img / gradcam_img.max()
+        interpetability.visualize_map(gradcam_img, input_img, label_img, pred_img)
+        plt.suptitle(layer)
+        plt.tight_layout()
+        # plt.savefig(layer.replace("/", "-") + ".png")
+        plt.show()
+        plt.close()
+
 
 # %% [markdown]
 """
@@ -195,6 +262,30 @@ for gradcam_img, input_img, label_img, pred_img in zip(
     plt.show()
     plt.close()
 
+# %% [markdown]
+"""
+### Do Grad-CAM++ over the block output layers
+"""
+
+for layer in layers:
+    print(layer)
+    pred, gradcam = interpetability.grad_cam_plus_plus(
+        model, input_image_np, layer, apply_relu=True
+    )
+
+    for gradcam_img, input_img, label_img, pred_img in zip(
+        gradcam[use_images],
+        input_image_np[use_images],
+        input_labels_np[use_images],
+        pred[use_images, ..., 1],
+    ):
+        gradcam_img = gradcam_img / gradcam_img.max()
+        interpetability.visualize_map(gradcam_img, input_img, label_img, pred_img)
+        plt.suptitle(layer)
+        plt.tight_layout()
+        # plt.savefig(layer.replace("/", "-") + ".png")
+        plt.show()
+        plt.close()
 
 # %% [markdown]
 """

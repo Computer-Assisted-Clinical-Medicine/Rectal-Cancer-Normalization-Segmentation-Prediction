@@ -116,6 +116,19 @@ def combine_models(
     results_post_list = []
     p_id = None
 
+    fold = result_path.parent.name
+    eval_file_path = result_path.parent / f"evaluation-{fold}-{version}_{name}.csv"
+    eval_file_path_post = (
+        result_path.parent / f"evaluation-{fold}-{version}-postprocessed_{name}.csv"
+    )
+
+    if eval_file_path.exists() and eval_file_path_post.exists() and not overwrite:
+        tqdm.write("Already finished")
+        return
+
+    # set preprocessing dir
+    cfg.preprocessed_dir = all_experiments[0].preprocessed_dir
+
     for pat in tqdm(patients, unit="patient"):
 
         if not result_path.exists():
@@ -145,9 +158,24 @@ def combine_models(
             if not np.any(found):
                 continue
             p_weights = weights.total_weight[found]
+            # norm them
+            p_weights = p_weights / p_weights.sum()
             probability_files = p_files[found]
-            probabilities = np.array([np.load(f) for f in probability_files])
-            probability_avg = np.average(probabilities, axis=0, weights=p_weights)
+
+            # read and average the probabilities
+            probability_avg = None
+            for prop_file, weight in zip(probability_files, p_weights):
+                try:
+                    probabilities = np.load(prop_file)
+                except ValueError as exc:  # TODO: nicer error handling
+                    print(f"There was an error reading {prop_file}")
+                    print(exc)
+                if probability_avg is None:
+                    probability_avg = probabilities * weight
+                else:
+                    probability_avg += probabilities * weight
+            assert probability_avg is not None, "No probabilities found"
+
             # write probabilities
             if WRITE_PROBABILITIES:
                 with open(result_path / f"prediction-{p_id}-{version}.npy", "wb") as file:
@@ -180,9 +208,7 @@ def combine_models(
             keep_big_structures(pred_path, pred_path_post)
 
         # evaluate
-        label_path = testloader.get_filenames(all_experiments[0].data_dir / pat)[
-            1
-        ]  # pylint: disable=protected-access
+        label_path = testloader.get_filenames(all_experiments[0].data_dir / pat)[1]
         if Path(label_path).exists():
             result_metrics = {"File Number": p_id}
             evaluation.evaluate_segmentation_prediction(
@@ -197,17 +223,12 @@ def combine_models(
             results_post_list.append(result_metrics)
 
     # write evaluation results
-    fold = result_path.parent.name
     results = pd.DataFrame(results_list)
     results.set_index("File Number", inplace=True)
-    eval_file_path = result_path.parent / f"evaluation-{fold}-{version}_{name}.csv"
     results.to_csv(eval_file_path, sep=";")
     # also the postprocessed ones
     results_post = pd.DataFrame(results_post_list)
     results_post.set_index("File Number", inplace=True)
-    eval_file_path_post = (
-        result_path.parent / f"evaluation-{fold}-{version}-postprocessed_{name}.csv"
-    )
     results_post.to_csv(eval_file_path_post, sep=";")
 
 

@@ -166,11 +166,13 @@ def compare_hyperparameters(experiments, experiment_dir, version="best"):
     hparams = []
     for exp in experiments:
         res_name = "evaluation-all-files.csv"
-        res = exp.output_path / f"results_test_{version}" / res_name
-        res_post = exp.output_path / f"results_test_{version}-postprocessed" / res_name
-        res_ext = exp.output_path / f"results_external_testset_{version}" / res_name
+        res = exp.output_path_rel / f"results_test_{version}" / res_name
+        res_post = exp.output_path_rel / f"results_test_{version}-postprocessed" / res_name
+        res_ext = exp.output_path_rel / f"results_external_testset_{version}" / res_name
         res_ext_post = (
-            exp.output_path / f"results_external_testset_{version}-postprocessed" / res_name
+            exp.output_path_rel
+            / f"results_external_testset_{version}-postprocessed"
+            / res_name
         )
         # and parameters
         hparams.append(
@@ -181,7 +183,7 @@ def compare_hyperparameters(experiments, experiment_dir, version="best"):
                 "loss": exp.hyper_parameters["loss"],
                 "architecture": exp.hyper_parameters["architecture"].__name__,
                 "dimensions": exp.hyper_parameters["dimensions"],
-                "path": exp.output_path,
+                "path": exp.output_path_rel,
                 "results_file": res,
                 "results_file_postprocessed": res_post,
                 "results_file_external_testset": res_ext,

@@ -107,6 +107,13 @@ sns.catplot(
 )
 save_and_show("test_set_dice_worst_files")
 
+worst_files = list(results_mean.sort_values("Dice").iloc[:10].index)
+worst_files_results = results[[f in worst_files for f in results["File Number"]]]
+sns.catplot(
+    data=worst_files_results, y="File Number", x="Dice", order=worst_files, hue="name"
+)
+save_and_show("test_set_dice_worst_files_by_model")
+
 plt.scatter(x=results_mean["Volume (L)"], y=results_mean["Dice"])
 plt.xlabel("GT Volume")
 plt.ylabel("Dice")
