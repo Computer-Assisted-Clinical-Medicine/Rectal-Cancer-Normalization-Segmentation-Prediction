@@ -186,16 +186,19 @@ def estimate_batch_size(dimension, a_name):
 
 
 dimensions = [2, 3]
-names = ["train", "vald"]
+names = [
+    "train",
+    # "vald"
+]
 modules = [seg_data_loader]
 normalizing_methods = [
-    NORMALIZING.HM_QUANTILE,
-    NORMALIZING.HM_QUANT_MEAN,
-    NORMALIZING.QUANTILE,
+    # NORMALIZING.HM_QUANTILE,
+    # NORMALIZING.HM_QUANT_MEAN,
+    # NORMALIZING.QUANTILE,
     NORMALIZING.WINDOW,
-    NORMALIZING.MEAN_STD,
+    # NORMALIZING.MEAN_STD,
     NORMALIZING.HISTOGRAM_MATCHING,
-    NORMALIZING.Z_SCORE,
+    # NORMALIZING.Z_SCORE,
 ]
 frac_objects = [0, 0.3, 1]
 
@@ -205,7 +208,7 @@ frac_objects = [0, 0.3, 1]
 @pytest.mark.parametrize("module", modules)
 @pytest.mark.parametrize("normalizing_method", normalizing_methods)
 @pytest.mark.parametrize("frac_obj", frac_objects)
-def test_functions(dimension, name, module, normalizing_method, frac_obj=0.5):
+def test_functions(dimension, name, module, normalizing_method, frac_obj):
     """Test the individual functions contained in the wrapper.
 
     Parameters
@@ -275,7 +278,7 @@ def test_functions(dimension, name, module, normalizing_method, frac_obj=0.5):
 @pytest.mark.parametrize("module", modules)
 @pytest.mark.parametrize("normalizing_method", normalizing_methods)
 @pytest.mark.parametrize("frac_obj", frac_objects)
-def test_wrapper(dimension, name, module, normalizing_method, frac_obj=0.5):
+def test_wrapper(dimension, name, module, normalizing_method, frac_obj):
     """Test the complete wrapper and check shapes
 
     Parameters
@@ -450,5 +453,5 @@ if __name__ == "__main__":
     for dim in dimensions:
         for mod_name in names:
             for norm_meth in normalizing_methods:
-                test_functions(dim, mod_name, seg_data_loader, norm_meth)
-                test_wrapper(dim, mod_name, seg_data_loader, norm_meth)
+                test_functions(dim, mod_name, seg_data_loader, norm_meth, frac_obj=0.4)
+                test_wrapper(dim, mod_name, seg_data_loader, norm_meth, frac_obj=0.4)

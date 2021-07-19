@@ -19,7 +19,6 @@ import evaluation
 from seg_data_loader import ApplyLoader, SegLoader
 from SegmentationNetworkBasis import config as cfg
 from SegmentationNetworkBasis import postprocessing
-from SegmentationNetworkBasis.NetworkBasis.util import write_configurations
 from utils import export_slurm_job
 
 # configure logger
@@ -472,7 +471,6 @@ class Experiment:
             # add initialization parameters
             **self.hyper_parameters["network_parameters"],
         )
-        write_configurations(self.output_path, folder_name, net, cfg)
         # Train the network with the dataset iterators
         logger.info("Started training of %s", folder_name)
         net.train(
