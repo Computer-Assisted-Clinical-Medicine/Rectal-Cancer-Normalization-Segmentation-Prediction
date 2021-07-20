@@ -145,6 +145,7 @@ if __name__ == "__main__":
         "n_filters": (F_BASE * 8, F_BASE * 16, F_BASE * 32, F_BASE * 64, F_BASE * 128),
         "do_bias": True,
         "do_batch_normalization": False,
+        "ratio": 2,
     }
     network_parameters_DenseTiramisu = {
         "regularize": (True, "L2", 1e-5),
@@ -162,8 +163,8 @@ if __name__ == "__main__":
         "aspp_rates": (3, 6, 9),  # half because input is half the size
         "clipping_value": 50,
     }
-    network_parameters = [network_parameters_DeepLabv3plus]
-    architectures = [DeepLabv3plus]
+    network_parameters = [network_parameters_UNet]
+    architectures = [UNet]
 
     hyper_parameters_new = []
     for hyp in hyper_parameters:
@@ -194,19 +195,14 @@ if __name__ == "__main__":
         hyper_parameters, ("train_parameters", "percent_of_object_samples"), pos_values
     )
 
-    ### backbone ###
-    backbones = [
-        "mobilenet_v2",
-        "densenet121",
-        # "densenet169",
-        # "densenet201"
-        "efficientnetB0",
-        "resnet50",
-        # "resnet101",
-        # "resnet152",
-    ]
+    attention = [True, False]
     hyper_parameters = vary_hyperparameters(
-        hyper_parameters, ("network_parameters", "backbone"), backbones
+        hyper_parameters, ("network_parameters", "attention"), attention
+    )
+
+    encoder_attention = [None, "SE", "CBAM"]
+    hyper_parameters = vary_hyperparameters(
+        hyper_parameters, ("network_parameters", "encoder_attention"), encoder_attention
     )
 
     # generate tensorflow command
@@ -243,7 +239,7 @@ if __name__ == "__main__":
                     )
                     hyp["network_parameters"]["n_filters"] = n_filters
 
-        # define experiment
+        # define experiment (not a constant)
         experiment_name = generate_folder_name(hyp)  # pylint: disable=invalid-name
 
         exp = Experiment(

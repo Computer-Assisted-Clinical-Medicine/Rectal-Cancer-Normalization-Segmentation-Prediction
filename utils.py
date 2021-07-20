@@ -257,6 +257,14 @@ def generate_folder_name(parameters):
 
     # TODO: move this logic into the network
     if parameters["architecture"] is UNet:
+        # attention parameters
+        if "encoder_attention" in parameters["network_parameters"]:
+            if parameters["network_parameters"]["encoder_attention"] is not None:
+                params.append(parameters["network_parameters"]["encoder_attention"])
+        if "attention" in parameters["network_parameters"]:
+            if parameters["network_parameters"]["attention"]:
+                params.append("Attn")
+
         # residual connections if it is an attribute
         if "res_connect" in parameters["network_parameters"]:
             if parameters["network_parameters"]["res_connect"]:

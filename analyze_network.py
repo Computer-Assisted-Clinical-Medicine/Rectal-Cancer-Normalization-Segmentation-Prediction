@@ -30,7 +30,7 @@ tf.python.framework.ops.disable_eager_execution()
 ## load network
 """
 
-EXP = 0
+EXP = 3
 FOLD = 0
 FOREGROUND = 1
 
@@ -269,12 +269,12 @@ for gradcam_img, input_img, label_img, pred_img in zip(
 
 for layer in layers:
     print(layer)
-    pred, gradcam = interpetability.grad_cam_plus_plus(
+    pred, gradcam_plus = interpetability.grad_cam_plus_plus(
         model, input_image_np, layer, apply_relu=True
     )
 
     for gradcam_img, input_img, label_img, pred_img in zip(
-        gradcam[use_images],
+        gradcam_plus[use_images],
         input_image_np[use_images],
         input_labels_np[use_images],
         pred[use_images, ..., 1],
@@ -286,6 +286,49 @@ for layer in layers:
         # plt.savefig(layer.replace("/", "-") + ".png")
         plt.show()
         plt.close()
+
+# %% [markdown]
+"""
+### Compare GradCam and GradCam++
+"""
+
+label = input_labels_np[use_images][0]
+label_contour = interpetability.find_contour(label.astype(float))
+img = input_image_np[use_images][0]
+
+for layer in layers:
+    print(layer)
+    pred, gradcam = interpetability.grad_cam(model, input_image_np, layer, apply_relu=True)
+    _, gradcam_plus = interpetability.grad_cam_plus_plus(
+        model, input_image_np, layer, apply_relu=True
+    )
+
+    # get the images
+    pred_contour = interpetability.find_contour(pred[use_images, ..., 1][0])
+    gradcam = gradcam[use_images][0]
+    gradcampp = gradcam_plus[use_images][0]
+
+    # norm them
+    gradcam = gradcam / gradcam.max()
+    gradcampp = gradcampp / gradcam.max()
+
+    fig, axes = plt.subplots(1, 2, figsize=(16, 8))
+
+    for ax, map_img in zip(axes, [gradcam, gradcampp]):
+
+        ax.imshow(img[..., 0], cmap="gray")
+        ax.imshow(np.ones(map_img.shape), cmap="bwr", vmin=0, vmax=1, alpha=map_img)
+        ax.imshow(label_contour, cmap="Wistia", alpha=(label_contour > 0.1).astype(float))
+        interpetability.disable_ticks(ax)
+
+    axes[0].set_title("GradCam")
+    axes[1].set_title("GradCam++")
+
+    plt.suptitle(layer)
+    plt.tight_layout()
+    plt.savefig(layer.replace("/", "-") + ".png")
+    plt.show()
+    plt.close()
 
 # %% [markdown]
 """
