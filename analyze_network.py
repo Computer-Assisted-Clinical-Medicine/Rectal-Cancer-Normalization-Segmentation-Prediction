@@ -309,15 +309,22 @@ for layer in layers:
     gradcampp = gradcam_plus[use_images][0]
 
     # norm them
-    gradcam = gradcam / gradcam.max()
-    gradcampp = gradcampp / gradcam.max()
+    gradcam = gradcam / np.quantile(gradcam, 0.99)
+    gradcam = np.clip(gradcam, 0, 1)  # type: ignore
+    gradcampp = gradcampp / np.quantile(gradcampp, 0.99)
+    gradcampp = np.clip(gradcampp, 0, 1)
 
     fig, axes = plt.subplots(1, 2, figsize=(16, 8))
 
     for ax, map_img in zip(axes, [gradcam, gradcampp]):
 
-        ax.imshow(img[..., 0], cmap="gray")
-        ax.imshow(np.ones(map_img.shape), cmap="bwr", vmin=0, vmax=1, alpha=map_img)
+        if "decode" in layer or "last" in layer:
+            ax.imshow(img[..., 0], cmap="gray")
+            ax.imshow(np.ones(map_img.shape), cmap="bwr", vmin=0, vmax=1, alpha=map_img)
+        else:
+            ax.imshow(np.ones(map_img.shape), cmap="bwr", vmin=0, vmax=1, alpha=map_img)
+            ax.imshow(pred_contour, cmap="binary", alpha=(pred_contour > 0.1).astype(float))
+
         ax.imshow(label_contour, cmap="Wistia", alpha=(label_contour > 0.1).astype(float))
         interpetability.disable_ticks(ax)
 
@@ -326,7 +333,7 @@ for layer in layers:
 
     plt.suptitle(layer)
     plt.tight_layout()
-    plt.savefig(layer.replace("/", "-") + ".png")
+    # plt.savefig(layer.replace("/", "-") + ".png")
     plt.show()
     plt.close()
 

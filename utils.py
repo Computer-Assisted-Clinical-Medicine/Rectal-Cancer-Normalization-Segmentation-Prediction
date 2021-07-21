@@ -373,7 +373,7 @@ def gather_results(
 
     results_all_list = []
     for _, row in hparams.iterrows():
-        results_file = row[file_field]
+        results_file = experiment_dir / row[file_field]
         if Path(results_file).exists():
             results = pd.read_csv(results_file, sep=";")
             # set the model

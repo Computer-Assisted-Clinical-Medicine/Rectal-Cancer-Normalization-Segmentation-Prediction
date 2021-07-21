@@ -51,10 +51,18 @@ def save_and_show(name: str):
     plt.close()
 
 
-def shorten_names(dataframe):
+def remove_parameters(name: str):
     # make nicer names
     for delete in ["DICE-Res-", "nBN-DO-", "-100"]:
-        dataframe.name = dataframe.name.str.replace(delete, "")
+        name = name.replace(delete, "")
+    return name
+
+
+def add_linebrakes(name: str, max_length=20):
+    if len(name) > max_length and len(name) - max_length > max_length / 2:
+        # add linebreak at the next -
+        name = name[:max_length] + add_linebrakes(name[max_length:]).replace("-", "\n-", 1)
+    return name
 
 
 # %% [markdown]
@@ -66,7 +74,9 @@ results = gather_results(experiment_dir, combined=True)
 # 1035_1 is with fat supression
 results = results.drop(results.index[results["File Number"] == "1035_1"])
 # make nicer names
-shorten_names(results)
+results.name = results.name.cat.rename_categories(
+    lambda x: add_linebrakes(remove_parameters(x))
+)
 results.sort_values("name", inplace=True)
 # take the mean over all folds and models
 results_mean = results.groupby("File Number").mean()
@@ -159,7 +169,9 @@ experiment_dir = Path(os.environ["experiment_dir"])
 results_ex = gather_results(experiment_dir, combined=True, external=True)
 results_ex = results_ex[np.logical_not(results_ex["File Number"].str.startswith("99"))]
 # make nicer names
-shorten_names(results_ex)
+results_ex.name = results_ex.name.cat.rename_categories(
+    lambda x: add_linebrakes(remove_parameters(x))
+)
 results_ex.sort_values("name", inplace=True)
 
 sns.catplot(data=results_ex, y="name", x="Dice", kind="box", aspect=2)

@@ -110,6 +110,9 @@ def grad_cam(
         # resize to the output shape
         cam = resize_image(width, height, cam)
 
+        # apply ReLu again (interpolation can lead to negative values)
+        cam = np.maximum(cam, 0)
+
         results[num] = cam
 
     # norm results
@@ -226,8 +229,6 @@ def grad_cam_plus_plus(
         zip(output, grads_val, second_grad, third_grad)
     ):
 
-        # out = np.maximum(out, 0)
-
         # calculate alpha
         # alpha = 1 / (2 + np.sum(out, axis=(0, 1)) * grad + eps)
         alpha_num = grad_exp_2
@@ -246,6 +247,9 @@ def grad_cam_plus_plus(
 
         # resize to the output shape
         cam = resize_image(width, height, cam)
+
+        # apply ReLu again (interpolation can lead to negative values)
+        cam = np.maximum(cam, 0)
 
         results[num] = cam
 
@@ -408,7 +412,7 @@ def visualize_gradients(
     if normalize:
         # norm the gradients
         maximum = np.quantile(np.abs(grad_img), 0.95)
-        grad_img = np.clip(grad_img, a_min=-maximum, a_max=maximum)
+        grad_img = np.clip(grad_img, a_min=-maximum, a_max=maximum)  # type: ignore
         grad_img = grad_img / maximum
 
     grad_img_relu = np.maximum(0, grad_img)
