@@ -65,6 +65,10 @@ def add_linebrakes(name: str, max_length=20):
     return name
 
 
+def remove_linebrakes(name: str):
+    return name.replace("\n", "")
+
+
 # %% [markdown]
 """
 ## Do the analysis for the training set
@@ -151,6 +155,9 @@ save_and_show("test_set_volume_vs_volume")
 sns.pairplot(results[["name", "Dice", "Hausdorff", "Volume (P)"]], hue="name")
 save_and_show("test_model_pairplot")
 
+# remove linebreaks when exporting to csv
+for res in [results, results_study_only]:
+    res.name = results.name.cat.rename_categories(lambda x: remove_linebrakes(x))
 results.groupby("name").describe().transpose().to_csv(
     plot_dir / "summary_test_set.csv", sep=";"
 )

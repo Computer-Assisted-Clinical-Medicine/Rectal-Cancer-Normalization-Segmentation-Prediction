@@ -371,7 +371,11 @@ class Experiment:
                 # this was determined by trail and error for 128x128x32x2 patches
                 memory_consumption_guess = 128 * first_f
             if "attention" in self.hyper_parameters["network_parameters"]:
-                if self.hyper_parameters["network_parameters"]["attention"]:
+                if (
+                    self.hyper_parameters["network_parameters"]["attention"]
+                    or self.hyper_parameters["network_parameters"]["encoder_attention"]
+                    is not None
+                ):
                     memory_consumption_guess *= 2
         elif a_name == "DenseTiramisu":
             if dim == 2:

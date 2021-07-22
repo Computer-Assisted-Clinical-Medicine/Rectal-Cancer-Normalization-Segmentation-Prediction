@@ -44,16 +44,23 @@ def configure_logging(tf_logger: logging.Logger) -> logging.Logger:
     return logger
 
 
-def plot_hparam_comparison(hparam_dir, metrics=None, external=False, postprocessed=False):
+def plot_hparam_comparison(
+    experiment_dir: os.PathLike,
+    metrics=None,
+    external=False,
+    postprocessed=False,
+    plot_errors=True,
+):
     """
     Do separate plots for every changed hyperparameter.
     """
+    experiment_dir = Path(experiment_dir)
 
     if metrics is None:
         metrics = ["Dice"]
 
-    hparam_file = hparam_dir / "hyperparameters.csv"
-    hparam_changed_file = hparam_dir / "hyperparameters_changed.csv"
+    hparam_file = experiment_dir / "hyperparameters.csv"
+    hparam_changed_file = experiment_dir / "hyperparameters_changed.csv"
 
     if external:
         file_field = "results_file_external_testset"
@@ -72,31 +79,38 @@ def plot_hparam_comparison(hparam_dir, metrics=None, external=False, postprocess
     hparams: pd.DataFrame = pd.read_csv(hparam_file, sep=";")
     hparams_changed: pd.DataFrame = pd.read_csv(hparam_changed_file, sep=";")
     changed_params = hparams_changed.columns[1:]
-    # collect all results
-    results_means = []
-    results_stds = []
-    for results_file in hparams[file_field]:
-        if Path(results_file).exists():
+
+    # type is incorrectly detected
+    # pylint: disable=no-member,unsubscriptable-object
+
+    # collect mean and error of mean from all results
+    results_means_collected = []
+    results_m_err_collected = []
+    for results_file_str in hparams[file_field]:
+        results_file = experiment_dir / Path(results_file_str)
+        if results_file.exists():
             results = pd.read_csv(results_file, sep=";")
             # save results
-            results_means.append(results[metrics].mean())
-            results_stds.append(results[metrics].std())
+            results_means_collected.append(results[metrics].mean())
+            results_m_err_collected.append(
+                results[metrics].std() / np.sqrt(results.shape[0])
+            )
         else:
-            name = Path(results_file).parent.parent.name
+            name = results_file.parent.parent.name
             print(
                 f"Could not find the evaluation file for {name}"
                 + " (probably not finished with training yet)."
             )
-            results_means.append(pd.Series({m: pd.NA for m in metrics}))
-            results_stds.append(pd.Series({m: pd.NA for m in metrics}))
+            results_means_collected.append(pd.Series({m: pd.NA for m in metrics}))
+            results_m_err_collected.append(pd.Series({m: pd.NA for m in metrics}))
 
-    if len(results_means) == 0:
+    if len(results_means_collected) == 0:
         print("No files to evaluate")
         return
 
     # convert to dataframes
-    results_means = pd.DataFrame(results_means)
-    results_stds = pd.DataFrame(results_stds)
+    results_means = pd.DataFrame(results_means_collected)
+    results_m_errs = pd.DataFrame(results_m_err_collected)
 
     # plot all metrics with all parameters
     fig, axes = plt.subplots(
@@ -107,6 +121,11 @@ def plot_hparam_comparison(hparam_dir, metrics=None, external=False, postprocess
     )
     # fix the dimensions
     axes = np.array(axes).reshape((len(metrics), len(changed_params)))
+
+    # fix the names
+    for col in hparams_changed:
+        if not pd.api.types.is_numeric_dtype(hparams_changed[col]):
+            hparams_changed[col] = hparams_changed[col].fillna("None").astype(str)
 
     for met, ax_row in zip(metrics, axes):
         for col, ax in zip(changed_params, ax_row):
@@ -121,14 +140,26 @@ def plot_hparam_comparison(hparam_dir, metrics=None, external=False, postprocess
                 m_data = results_means.loc[data.index, met]
                 # sort by values
                 m_data.sort_values()
+                # get standard deviations
+                if plot_errors:
+                    m_data_err = results_m_errs.loc[m_data.index, met]
+                else:
+                    m_data_err = None
                 # only plot if not nan
                 if not m_data.isna().all():
-                    ax.plot(
-                        data.loc[m_data.notna(), col],
-                        m_data[m_data.notna()],
-                        marker="x",
+                    _, caps, bars = ax.errorbar(
+                        x=data.loc[m_data.notna(), col],
+                        y=m_data[m_data.notna()],
+                        yerr=m_data_err[m_data.notna()],
                         label=str(group),
+                        marker="x",
+                        capsize=4,
                     )
+                    # loop through bars and caps and set the alpha value
+                    for bar in bars:
+                        bar.set_alpha(0.4)
+                    for cap in caps:
+                        cap.set_alpha(0.4)
             # if the label is text, turn it
             if not pd.api.types.is_numeric_dtype(hparams_changed[col]):
                 plt.setp(
@@ -150,7 +181,7 @@ def plot_hparam_comparison(hparam_dir, metrics=None, external=False, postprocess
 
     fig.suptitle("Hypereparameter Comparison")
     plt.tight_layout()
-    plt.savefig(hparam_dir / result_name)
+    plt.savefig(experiment_dir / result_name)
     plt.close()
 
 
@@ -319,7 +350,11 @@ def generate_folder_name(parameters):
 
 
 def gather_results(
-    experiment_dir, external=False, postprocessed=False, combined=True, version="best"
+    experiment_dir: os.PathLike,
+    external=False,
+    postprocessed=False,
+    combined=True,
+    version="best",
 ) -> pd.DataFrame:
     """Collect all result files from all experiments. Only experiments that are
     already finished will be included in the analysis.
@@ -342,6 +377,7 @@ def gather_results(
     pd.DataFrame
         The results with all metrics for all files
     """
+    experiment_dir = Path(experiment_dir)
     hparam_file = experiment_dir / "hyperparameters.csv"
 
     if external:
@@ -353,6 +389,8 @@ def gather_results(
         file_field += "_postprocessed"
 
     hparams = pd.read_csv(hparam_file, sep=";")
+    # type is incorrectly detected
+    # pylint: disable=no-member
 
     # add combined model if present
     if combined:
