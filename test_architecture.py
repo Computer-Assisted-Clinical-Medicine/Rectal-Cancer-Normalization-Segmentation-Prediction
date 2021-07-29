@@ -12,7 +12,7 @@ import seg_data_loader
 from SegmentationNetworkBasis import architecture
 from SegmentationNetworkBasis import config as cfg
 from SegmentationNetworkBasis.segbasisloader import NORMALIZING
-from test_seg_data_loader import (
+from SegmentationNetworkBasis.test_seg_data_loader import (
     get_loader,
     load_dataset,
     set_parameters_according_to_dimension,
@@ -161,5 +161,3 @@ if __name__ == "__main__":
             # add training parameters
             **(hyper_parameters["train_parameters"]),
         )
-
-        pass
