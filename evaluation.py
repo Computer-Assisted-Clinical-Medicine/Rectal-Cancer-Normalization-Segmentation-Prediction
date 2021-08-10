@@ -166,7 +166,7 @@ def combine_evaluation_results_from_folds(results_path, eval_files: List):
         statistics_list.append(data)
 
     # concatenate to one array
-    statistics = pd.concat(statistics_list).sort_values("File Number")
+    statistics = pd.concat(statistics_list).sort_values(["File Number", "fold"])
     # write to file
     statistics.to_csv(all_statistics_path, sep=";")
 

@@ -240,7 +240,7 @@ if __name__ == "__main__":
     hparam_file = experiment_dir / "hyperparameters.csv"
     all_experiments = []
     for e in pd.read_csv(hparam_file, sep=";")["path"]:
-        param_file = Path(e) / "parameters.yaml"
+        param_file = experiment_dir / Path(e) / "parameters.yaml"
         all_experiments.append(Experiment.from_file(param_file))
 
     # get the weights

@@ -775,7 +775,6 @@ class Experiment:
                     self.output_path / f_name / f"evaluation-{f_name}-{version}_{name}.csv"
                 )
             if not np.all([f.exists() for f in eval_files]):
-                print(eval_files)
                 raise FileNotFoundError("Eval file not found")
             # combine previous evaluations
             output_path = self.output_path / f"results_{name}_{version}"
