@@ -127,7 +127,7 @@ def combine_models(
         return
 
     # set preprocessing dir
-    cfg.preprocessed_dir = all_experiments[0].preprocessed_dir
+    cfg.data_base_dir = all_experiments[0].preprocessed_dir
 
     for pat in tqdm(patients, unit="patient"):
 
@@ -142,7 +142,7 @@ def combine_models(
         # load reference images
         testloader = ApplyLoader(
             name="test_loader",
-            **all_experiments[0].hyper_parameters["data_loader_parameters"],
+            file_dict=all_experiments[0].data_set,
         )
 
         # see if it should be overwritten
@@ -150,7 +150,7 @@ def combine_models(
 
             # find all predictions
             func = lambda x: (
-                x / result_path.name / f"prediction-{p_id}-{version}.npy"
+                x / result_path.name / f"prediction-{p_id}-{version}.npz"
             )  # pylint: disable=cell-var-from-loop
             p_files = weights.fold_dir.apply(func)
             found = p_files.apply(lambda x: x.exists())
@@ -178,10 +178,10 @@ def combine_models(
 
             # write probabilities
             if WRITE_PROBABILITIES:
-                with open(result_path / f"prediction-{p_id}-{version}.npy", "wb") as file:
-                    np.save(file, probability_avg)
+                with open(result_path / f"prediction-{p_id}-{version}.npz", "wb") as file:
+                    np.savez_compressed(file, probability_avg)
 
-            cfg.preprocessed_dir = all_experiments[0].preprocessed_dir
+            cfg.data_base_dir = all_experiments[0].preprocessed_dir
             ref_img_pre = testloader.get_processed_image(all_experiments[0].data_dir / pat)
             original_image = testloader.get_original_image(
                 all_experiments[0].data_dir / pat

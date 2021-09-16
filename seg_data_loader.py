@@ -75,6 +75,3 @@ class ApplyLoader(ApplyBasisLoader):
             if label_img.GetPixelID() != sitk.sitkUInt8:
                 label_img = sitk.Cast(label_img, sitk.sitkUInt8)
         return data_img, label_img
-
-    def _check_images(self, data, lbl):
-        return

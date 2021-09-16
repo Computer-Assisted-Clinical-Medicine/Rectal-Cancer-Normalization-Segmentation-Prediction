@@ -2,14 +2,13 @@
 Prepare the training and run it on the cluster or a local machine (automatically detected)
 """
 import copy
-import json
 import logging
 import os
 import sys
 from pathlib import Path
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Union
 
-import numpy as np
+import yaml
 
 # logger has to be set before tensorflow is imported
 tf_logger = logging.getLogger("tensorflow")
@@ -17,17 +16,10 @@ os.environ["TF_CPP_MIN_LOG_LEVEL"] = "3"
 # pylint: disable=wrong-import-position, unused-import
 
 from experiment import Experiment
-from SegmentationNetworkBasis.architecture import (
-    UNet,
-    DenseTiramisu,
-    DeepLabv3plus,
-)
-from SegmentationNetworkBasis.segbasisloader import NORMALIZING
-from utils import (
-    compare_hyperparameters,
-    generate_folder_name,
-    export_batch_file,
-)
+from SegmentationNetworkBasis.architecture import DeepLabv3plus, DenseTiramisu, UNet
+from SegmentationNetworkBasis.normalization import NORMALIZING
+from SegmentationNetworkBasis.preprocessing import preprocess_dataset
+from utils import compare_hyperparameters, export_batch_file, generate_folder_name
 
 # set tf thread mode
 os.environ["TF_GPU_THREAD_MODE"] = "gpu_private"
@@ -74,33 +66,70 @@ if __name__ == "__main__":
     if not experiment_dir.exists():
         experiment_dir.mkdir()
 
-    # load training files
-    train_list = np.loadtxt(data_dir / "train_IDs.csv", dtype="str")
-    train_list = np.array([str(t) for t in train_list])
+    # load data
+    with open(data_dir / "images.yaml") as f:
+        found_images = yaml.load(f, Loader=yaml.Loader)
+    with open(data_dir / "segmented_images.yaml") as f:
+        segmented_images = yaml.load(f, Loader=yaml.Loader)
 
-    # load test files
-    test_list = np.loadtxt(data_dir / "test_IDs.csv", dtype="str")
-    test_list = np.array([str(t) for t in test_list])
+    unsegmented_images = list(
+        set(list(found_images.keys())) - set(list(segmented_images.keys()))
+    )
+    unsegmented_images.sort()
 
     K_FOLD = 5
+    N_CHANNELS = 3
 
-    # get number of channels from database file
-    data_dict_file = data_dir / "dataset.json"
-    if not data_dict_file.exists():
-        raise FileNotFoundError(f"Dataset dict file {data_dict_file} not found.")
-    with open(data_dict_file) as f:
-        data_dict = json.load(f)
-    n_channels = len(data_dict["modality"])
+    # ignore certain files
+    ignore = ["1005_2_l0_d0"]  # this file has labels not in the image
+
+    # create dict with all points. The names have the format:
+    # patient_timepoint_l{label_number}_d{diffusion_number}
+    dataset: Dict[str, Dict[str, Union[List[str], str]]] = {}
+    for timepoint, data in segmented_images.items():
+        for label_num, label_data in enumerate(data):
+            assert "T2 axial" in label_data["name"]
+            found_data = found_images[timepoint]
+            if not "ADC axial recalculated" in found_data:
+                continue
+            if not "Diff axial b800" in found_data:
+                if "Diff axial b800 recalculated" in found_data:
+                    B_NAME = "Diff axial b800 recalculated"
+                else:
+                    raise ValueError("No b800 image found but an ADC image")
+            else:
+                B_NAME = "Diff axial b800"
+            for diff_num, (adc, b800) in enumerate(
+                zip(found_data["ADC axial recalculated"], found_data[B_NAME])
+            ):
+                name = f"{timepoint}_l{label_num}_d{diff_num}"
+                if name in ignore:
+                    continue
+                image = label_data["image"].replace(
+                    "Images", "Images registered and N4 corrected"
+                )
+                b800 = b800.replace("Images", "Images registered and N4 corrected")
+                adc = adc.replace("Images", "Images registered and N4 corrected")
+                dataset[name] = {
+                    "images": [data_dir / image, data_dir / b800, data_dir / adc],
+                    "labels": data_dir / label_data["labels"],
+                }
+
+    # set training files
+    train_list = [key for key in dataset if key.partition("_l")[0] in segmented_images]
+
+    # set test files (just use the rest)
+    test_list: List[str] = list(set(dataset.keys()) - set(train_list))
 
     # define the parameters that are constant
     train_parameters = {
         "l_r": 0.001,
         "optimizer": "Adam",
-        "epochs": 10,
+        "epochs": 50,
         # parameters for saving the best model
         "best_model_decay": 0.3,
         # scheduling parameters
-        "early_stopping": False,
+        "early_stopping": True,
         "patience_es": 15,
         "reduce_lr_on_plateau": False,
         "patience_lr_plat": 5,
@@ -119,11 +148,14 @@ if __name__ == "__main__":
         "max_resolution_augment": 0.9,
     }
 
-    data_loader_parameters = {"do_resampling": True}
+    preprocessing_parameters = {
+        "resample": True,
+        "target_spacing": (1, 1, 3),
+    }
 
     constant_parameters = {
         "train_parameters": train_parameters,
-        "data_loader_parameters": data_loader_parameters,
+        "preprocessing_parameters": preprocessing_parameters,
         "loss": "DICE",
     }
     # define constant parameters
@@ -162,9 +194,10 @@ if __name__ == "__main__":
     network_parameters_DeepLabv3plus = {
         "aspp_rates": (3, 6, 9),  # half because input is half the size
         "clipping_value": 50,
+        "backbone": "densenet121",
     }
-    network_parameters = [network_parameters_UNet]
-    architectures = [UNet]
+    network_parameters = [network_parameters_UNet, network_parameters_DeepLabv3plus]
+    architectures = [UNet, DeepLabv3plus]
 
     hyper_parameters_new = []
     for hyp in hyper_parameters:
@@ -176,14 +209,24 @@ if __name__ == "__main__":
     hyper_parameters = hyper_parameters_new
 
     ### normalization method ###
-    normalization_methods = [
-        NORMALIZING.QUANTILE,
-    ]
-    hyper_parameters = vary_hyperparameters(
-        hyper_parameters,
-        ("data_loader_parameters", "normalizing_method"),
-        normalization_methods,
-    )
+    normalization_methods = {
+        NORMALIZING.QUANTILE: {
+            "lower_q": 0.05,
+            "upper_q": 0.95,
+        },
+        NORMALIZING.HISTOGRAM_MATCHING: {"mask_quantile": 0},
+        NORMALIZING.MEAN_STD: {},
+        NORMALIZING.HM_QUANTILE: {},
+    }
+    # add all methods with their hyperparameters
+    hyper_parameters_new = []
+    for hyp in hyper_parameters:
+        for method, params in normalization_methods.items():
+            hyp_new = copy.deepcopy(hyp)
+            hyp_new["preprocessing_parameters"]["normalizing_method"] = method
+            hyp_new["preprocessing_parameters"]["normalization_parameters"] = params
+            hyper_parameters_new.append(hyp_new)
+    hyper_parameters = hyper_parameters_new
 
     ### dimension ###
     dimensions = [2]
@@ -195,12 +238,12 @@ if __name__ == "__main__":
         hyper_parameters, ("train_parameters", "percent_of_object_samples"), pos_values
     )
 
-    attention = [True, False]
+    attention = [False]
     hyper_parameters = vary_hyperparameters(
         hyper_parameters, ("network_parameters", "attention"), attention
     )
 
-    encoder_attention = [None, "SE", "CBAM"]
+    encoder_attention = [None]
     hyper_parameters = vary_hyperparameters(
         hyper_parameters, ("network_parameters", "encoder_attention"), encoder_attention
     )
@@ -210,7 +253,7 @@ if __name__ == "__main__":
     print(f"To see the progress in tensorboard, run:\n{tensorboard_command}")
 
     # set config
-    PREPROCESSED_DIR = "data_preprocessed"
+    PREPROCESSED_DIR = Path("data_preprocessed")
 
     # set up all experiments
     experiments: List[Experiment] = []
@@ -242,17 +285,31 @@ if __name__ == "__main__":
         # define experiment (not a constant)
         experiment_name = generate_folder_name(hyp)  # pylint: disable=invalid-name
 
+        # set a name for the preprocessing dir
+        # so the same method will also use the same directory
+        preprocessing_name = hyp["preprocessing_parameters"]["normalizing_method"].name
+
+        # preprocess data
+        exp_dataset = preprocess_dataset(
+            data_set=dataset,
+            num_channels=N_CHANNELS,
+            base_dir=experiment_dir,
+            preprocessed_dir=PREPROCESSED_DIR / preprocessing_name,
+            train_dataset=train_list,
+            preprocessing_parameters=hyp["preprocessing_parameters"],
+        )
+
         exp = Experiment(
             hyper_parameters=hyp,
             name=experiment_name,
             output_path_rel=experiment_name,
-            data_set=train_list,
+            data_set=exp_dataset,
+            crossvalidation_set=train_list,
             external_test_set=test_list,
             folds=K_FOLD,
             seed=42,
-            num_channels=n_channels,
+            num_channels=N_CHANNELS,
             folds_dir_rel="folds",
-            preprocessed_dir_rel=PREPROCESSED_DIR,
             tensorboard_images=True,
         )
         experiments.append(exp)

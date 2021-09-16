@@ -11,7 +11,6 @@ import tensorflow as tf
 import seg_data_loader
 from SegmentationNetworkBasis import architecture
 from SegmentationNetworkBasis import config as cfg
-from SegmentationNetworkBasis.segbasisloader import NORMALIZING
 from SegmentationNetworkBasis.test_seg_data_loader import (
     get_loader,
     load_dataset,
@@ -56,11 +55,8 @@ if __name__ == "__main__":
         "max_resolution_augment": 1,
     }
 
-    data_loader_parameters = {"do_resampling": True}
-
     constant_parameters = {
         "train_parameters": train_parameters,
-        "data_loader_parameters": data_loader_parameters,
         "loss": "DICE",
     }
     # define constant parameters
@@ -95,7 +91,6 @@ if __name__ == "__main__":
     hyper_parameters["network_parameters"] = network_parameters_DenseTiramisu
     hyper_parameters["dimensions"] = DIMENSION
 
-    hyper_parameters["data_loader_parameters"]["normalizing_method"] = NORMALIZING.QUANTILE
     hyper_parameters["train_parameters"]["percent_of_object_samples"] = 0.4
 
     set_parameters_according_to_dimension(
@@ -107,7 +102,7 @@ if __name__ == "__main__":
     # generate loader
     data_loader = get_loader("train", seg_data_loader)
 
-    file_list, _ = load_dataset(test_dir)
+    file_list, _, file_dict = load_dataset(test_dir)
 
     cfg.num_files = len(file_list) - cfg.number_of_vald
 
@@ -116,12 +111,14 @@ if __name__ == "__main__":
         batch_size=cfg.batch_size_train,
         n_epochs=N_EPOCHS,
         read_threads=cfg.train_reader_instances,
+        file_dict=file_dict,
     )
     valid_dataset = data_loader(
         file_list[-cfg.number_of_vald :],
         batch_size=cfg.batch_size_train,
         n_epochs=N_EPOCHS,
         read_threads=cfg.train_reader_instances,
+        file_dict=file_dict,
     )
     visualization_dataset = data_loader(
         file_list[:1],

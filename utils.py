@@ -210,7 +210,6 @@ def compare_hyperparameters(experiments, experiment_dir, version="best"):
             {
                 **exp.hyper_parameters["network_parameters"],
                 **exp.hyper_parameters["train_parameters"],
-                **exp.hyper_parameters["data_loader_parameters"],
                 "loss": exp.hyper_parameters["loss"],
                 "architecture": exp.hyper_parameters["architecture"].__name__,
                 "dimensions": exp.hyper_parameters["dimensions"],
@@ -334,7 +333,7 @@ def generate_folder_name(parameters):
         raise NotImplementedError(f'{parameters["architecture"]} not implemented')
 
     # normalization
-    params.append(str(parameters["data_loader_parameters"]["normalizing_method"].name))
+    params.append(str(parameters["preprocessing_parameters"]["normalizing_method"].name))
 
     # object fraction
     params.append(

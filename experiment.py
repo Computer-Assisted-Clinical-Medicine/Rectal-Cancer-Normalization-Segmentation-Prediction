@@ -6,7 +6,7 @@ import logging
 import os
 import sys
 from pathlib import Path, PurePath
-from typing import Iterable, List
+from typing import Dict, Iterable, List, Optional
 
 import GPUtil
 import numpy as np
@@ -33,8 +33,9 @@ class Experiment:
         self,
         name: str,
         hyper_parameters: dict,
-        data_set: List,
-        external_test_set=None,
+        data_set: Dict[str, Dict[str, str]],
+        crossvalidation_set: List,
+        external_test_set: List = None,
         folds=5,
         version="best",
         seed=None,
@@ -43,7 +44,6 @@ class Experiment:
         restart=False,
         reinitialize_folds=False,
         folds_dir_rel=None,
-        preprocessed_dir_rel=None,
         tensorboard_images=False,
     ):
         """Run experiments using a fixed set of hyperparameters
@@ -55,9 +55,13 @@ class Experiment:
             hyper_parameters : dict
                 the hyperparameters that should be used (as soon as something is
                 changed in between experiments, it is a hyperparameter)
-            data_set : List
+            data_set : Dict[str, Dict[str, str]]
+                Dict containing the dataset, for each entry, the key is used to
+                reference that datapoint, the labels the labels file and the image
+                key the images (all relative to the experiment dir)
+            crossvalidation_set : List
                 The list of images which should be used for training, validation and test
-            external_test_set : List, optional
+            external_test_set : Dict, optional
                 The list of images if an external test set should also be used
             folds : int, optional
                 The number of folds to use for validation, by default 5
@@ -77,8 +81,6 @@ class Experiment:
             folds_dir_rel : str, optional
                 Where the fold descripions should be saved (relative to the experiment_dir env. variable).
                 All experiments sharing the same folds should have the same directory here, by default outputdir/folds
-            preprocessed_dir_rel : str, optional
-                Where the preprocessed files are saved (relative to the experiment_dir env. variable),
             self.tensorboard_images : bool, optional
                 Wether to write images to tensorboard, takes a bit, so only for debugging, by default False
         """
@@ -89,10 +91,15 @@ class Experiment:
         self.folds = folds
         self.num_channels = num_channels
         self.reinitialize_folds = reinitialize_folds
-        self.data_set = np.array(data_set)
+        self.data_set = data_set
+        self.crossvalidation_set = np.array(crossvalidation_set)
         if external_test_set is not None:
-            self.external_test_set = np.array(external_test_set)
-            assert self.external_test_set.size > 0, "External test set is empty"
+            self.external_test_set: Optional[np.ndarray] = np.array(external_test_set)
+            if self.external_test_set.size == 0:
+                logger.warning("External test set is empty")
+                self.external_test_set = None
+        else:
+            self.external_test_set = None
 
         if version in ("final", "best"):
             self.version = version
@@ -100,14 +107,37 @@ class Experiment:
             raise ValueError(f"Version should be final or best, not {version}.")
 
         # get the environmental variables
-        self.data_dir = Path(os.environ["data_dir"])
         self.experiment_dir = Path(os.environ["experiment_dir"])
 
         # check input
-        if len(data_set) == 0:
+        if len(self.crossvalidation_set) == 0:
             raise ValueError("Dataset is empty.")
-        if cfg.number_of_vald * self.folds > self.data_set.size:
+        if cfg.number_of_vald * self.folds > self.crossvalidation_set.size:
             raise ValueError("Dataset to small for the specified folds.")
+
+        for d_name in self.crossvalidation_set:
+            if d_name not in self.data_set:
+                raise KeyError(f"{d_name} not found in the data set")
+            if "image" not in self.data_set[d_name]:
+                raise ValueError(f"{d_name} does not have an image")
+            img_path = self.experiment_dir / self.data_set[d_name]["image"]
+            if not img_path.exists():
+                raise FileNotFoundError(f"The image for {d_name} does not exist.")
+            if "labels" not in self.data_set[d_name]:
+                raise ValueError(f"{d_name} does not have labels")
+            lbl_path = self.experiment_dir / self.data_set[d_name]["labels"]
+            if not lbl_path.exists():
+                raise FileNotFoundError(f"The labels file for {d_name} does not exist.")
+
+        if self.external_test_set is not None:
+            for d_name in self.external_test_set:
+                if d_name not in self.data_set:
+                    raise KeyError(f"{d_name} not found in the data set")
+                if "image" not in self.data_set[d_name]:
+                    raise ValueError(f"{d_name} does not have an image")
+                img_path = self.experiment_dir / self.data_set[d_name]["image"]
+                if not img_path.exists():
+                    raise FileNotFoundError(f"The image for {d_name} does not exist.")
 
         if output_path_rel is None:
             self.output_path_rel = PurePath("Experiments", self.name)
@@ -154,18 +184,9 @@ class Experiment:
             test_csv = self.folds_dir / f"test-{fold}-{self.folds}.csv"
             self.datasets.append({"train": train_csv, "vald": vald_csv, "test": test_csv})
         # to the data split
-        self.setup_folds(self.data_set, overwrite=self.reinitialize_folds)
+        self.setup_folds(self.crossvalidation_set, overwrite=self.reinitialize_folds)
 
         self.restart = restart
-
-        self.preprocessed_dir_rel = PurePath(preprocessed_dir_rel)
-
-        if self.preprocessed_dir_rel.is_absolute():
-            raise ValueError("preprocessed_dir_rel is an absolute path")
-
-        self.preprocessed_dir = self.experiment_dir / Path(self.preprocessed_dir_rel)
-        if not self.preprocessed_dir.exists():
-            self.preprocessed_dir.mkdir()
 
         self.tensorboard_images = tensorboard_images
 
@@ -427,14 +448,14 @@ class Experiment:
         """
         tf.keras.backend.clear_session()
 
-        # set preprocessing dir
-        cfg.preprocessed_dir = self.preprocessed_dir
+        # set data dir
+        cfg.data_base_dir = self.experiment_dir.resolve()
 
         # generate loader
         training_dataset = SegLoader(
             name="training_loader",
+            file_dict=self.data_set,
             frac_obj=self.hyper_parameters["train_parameters"]["percent_of_object_samples"],
-            **self.hyper_parameters["data_loader_parameters"],
         )(
             train_files,
             batch_size=cfg.batch_size_train,
@@ -444,8 +465,8 @@ class Experiment:
         validation_dataset = SegLoader(
             mode=SegLoader.MODES.VALIDATE,
             name="validation_loader",
+            file_dict=self.data_set,
             frac_obj=self.hyper_parameters["train_parameters"]["percent_of_object_samples"],
-            **self.hyper_parameters["data_loader_parameters"],
         )(
             vald_files,
             batch_size=cfg.batch_size_valid,
@@ -457,10 +478,10 @@ class Experiment:
         if self.tensorboard_images:
             visualization_dataset = SegLoader(
                 name="visualization",
+                file_dict=self.data_set,
                 frac_obj=1,
-                samples_per_volume=1,
+                samples_per_volume=5,
                 shuffle=False,
-                **self.hyper_parameters["data_loader_parameters"],
             )(
                 vald_files,
                 batch_size=cfg.batch_size_train,
@@ -505,12 +526,10 @@ class Experiment:
         """
         tf.keras.backend.clear_session()
 
-        # set preprocessing dir
-        cfg.preprocessed_dir = self.preprocessed_dir
+        # set data dir
+        cfg.data_base_dir = self.experiment_dir
 
-        testloader = ApplyLoader(
-            name="test_loader", **self.hyper_parameters["data_loader_parameters"]
-        )
+        testloader = ApplyLoader(name="test_loader", file_dict=self.data_set)
 
         net = self.hyper_parameters["architecture"](
             self.hyper_parameters["loss"],
@@ -594,20 +613,13 @@ class Experiment:
         results = []
 
         for file in test_files:
-            file = Path(file)
-            folder = file.parent
-            file_number = file.name
-            prediction_path = (
-                apply_path / f"prediction-{file.name}-{version}{cfg.file_suffix}"
-            )
-            label_path = folder / (
-                cfg.label_file_name_prefix + file_number + cfg.file_suffix
-            )
+            prediction_path = apply_path / f"prediction-{file}-{version}{cfg.file_suffix}"
+            label_path = self.experiment_dir / self.data_set[file]["labels"]
             if not label_path.exists():
                 logger.info("Label %s does not exists. It will be skipped", label_path)
                 continue
             try:
-                result_metrics = {"File Number": file_number}
+                result_metrics = {"File Number": file}
 
                 result_metrics = evaluation.evaluate_segmentation_prediction(
                     result_metrics, str(prediction_path), str(label_path)
@@ -615,7 +627,7 @@ class Experiment:
 
                 # append result to eval file
                 results.append(result_metrics)
-                logger.info("        Finished Evaluation for %s", file_number)
+                logger.info("        Finished Evaluation for %s", file)
             except RuntimeError as err:
                 logger.exception(
                     "    !!! Evaluation of %s failed for %s, %s",
@@ -657,11 +669,6 @@ class Experiment:
         train_files = np.loadtxt(self.datasets[fold]["train"], dtype="str", delimiter=",")
         vald_files = np.loadtxt(self.datasets[fold]["vald"], dtype="str", delimiter=",")
         test_files = np.loadtxt(self.datasets[fold]["test"], dtype="str", delimiter=",")
-
-        # add the path
-        train_files = np.array([str(self.data_dir / t) for t in train_files])
-        vald_files = np.array([str(self.data_dir / t) for t in vald_files])
-        test_files = np.array([str(self.data_dir / t) for t in test_files])
 
         if not folddir.exists():
             folddir.mkdir()
@@ -716,10 +723,6 @@ class Experiment:
 
         # evaluate the external set if present
         if self.external_test_set is not None:
-            # add the path
-            external_test_set = np.array(
-                [self.data_dir / t for t in self.external_test_set]
-            )
             ext_eval = (
                 folddir / f"evaluation-{folder_name}-{self.version}_external_testset.csv"
             )
@@ -729,11 +732,11 @@ class Experiment:
                 logger.info("Already evaluated on external set, skip evaluation.")
             else:
                 self.applying(
-                    folder_name, external_test_set, apply_name="apply_external_testset"
+                    folder_name, self.external_test_set, apply_name="apply_external_testset"
                 )
                 self.evaluate_fold(
                     folder_name,
-                    external_test_set,
+                    self.external_test_set,
                     name="external_testset",
                     apply_name="apply_external_testset",
                 )
@@ -745,7 +748,7 @@ class Experiment:
             if not ext_eval.exists():
                 self.evaluate_fold(
                     folder_name,
-                    external_test_set,
+                    self.external_test_set,
                     name="external_testset",
                     apply_name="apply_external_testset",
                     version=f"{self.version}-postprocessed",
@@ -805,7 +808,6 @@ class Experiment:
         experiment_dict = {
             "name": self.name,
             "hyper_parameters": self.hyper_parameters,
-            "data_set": [str(f) for f in self.data_set],
             "folds": self.folds,
             "seed": self.seed,
             "num_channels": self.num_channels,
@@ -813,15 +815,16 @@ class Experiment:
             "restart": self.restart,
             "reinitialize_folds": self.reinitialize_folds,
             "folds_dir_rel": self.folds_dir_rel,
-            "preprocessed_dir_rel": self.preprocessed_dir_rel,
             "tensorboard_images": self.tensorboard_images,
+            "crossvalidation_set": [str(f) for f in self.crossvalidation_set],
+            "data_set": self.data_set,
         }
         if hasattr(self, "external_test_set"):
             if self.external_test_set is not None:
                 ext_set = [str(f) for f in self.external_test_set]
                 experiment_dict["external_test_set"] = ext_set
         with open(self.experiment_file, "w") as f:
-            yaml.dump(experiment_dict, f)
+            yaml.dump(experiment_dict, f, sort_keys=False)
         return
 
     @classmethod
