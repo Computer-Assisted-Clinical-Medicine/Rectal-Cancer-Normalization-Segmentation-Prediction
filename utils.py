@@ -49,6 +49,7 @@ def plot_hparam_comparison(
     metrics=None,
     external=False,
     postprocessed=False,
+    version="final",
     plot_errors=True,
 ):
     """
@@ -62,17 +63,11 @@ def plot_hparam_comparison(
     hparam_file = experiment_dir / "hyperparameters.csv"
     hparam_changed_file = experiment_dir / "hyperparameters_changed.csv"
 
+    result_name = f"hy_comp_{version}"
     if external:
-        file_field = "results_file_external_testset"
-        result_name = "hyperparameter_comparison_external_testset"
-    else:
-        file_field = "results_file"
-        result_name = "hyperparameter_comparison"
-
+        result_name += "_external_testset"
     if postprocessed:
-        file_field += "_postprocessed"
         result_name += "_postprocessed"
-
     # add pdf
     result_name += ".pdf"
 
@@ -80,14 +75,17 @@ def plot_hparam_comparison(
     hparams_changed: pd.DataFrame = pd.read_csv(hparam_changed_file, sep=";")
     changed_params = hparams_changed.columns[1:]
 
+    res_path = generate_res_path(version, external, postprocessed)
+
     # type is incorrectly detected
     # pylint: disable=no-member,unsubscriptable-object
 
     # collect mean and error of mean from all results
     results_means_collected = []
     results_m_err_collected = []
-    for results_file_str in hparams[file_field]:
-        results_file = experiment_dir / Path(results_file_str)
+    found_any = False
+    for exp_loc in hparams["path"]:
+        results_file = experiment_dir / exp_loc / res_path
         if results_file.exists():
             results = pd.read_csv(results_file, sep=";")
             # save results
@@ -95,6 +93,7 @@ def plot_hparam_comparison(
             results_m_err_collected.append(
                 results[metrics].std() / np.sqrt(results.shape[0])
             )
+            found_any = True
         else:
             name = results_file.parent.parent.name
             print(
@@ -104,8 +103,8 @@ def plot_hparam_comparison(
             results_means_collected.append(pd.Series({m: pd.NA for m in metrics}))
             results_m_err_collected.append(pd.Series({m: pd.NA for m in metrics}))
 
-    if len(results_means_collected) == 0:
-        print("No files to evaluate")
+    if not found_any:
+        print("No files were found")
         return
 
     # convert to dataframes
@@ -181,8 +180,22 @@ def plot_hparam_comparison(
 
     fig.suptitle("Hypereparameter Comparison")
     plt.tight_layout()
-    plt.savefig(experiment_dir / result_name)
+    result_dir = experiment_dir / "analysis" / "hyperparameter_comparison"
+    if not result_dir.exists():
+        result_dir.mkdir(parents=True)
+    plt.savefig(result_dir / result_name)
     plt.close()
+
+def generate_res_path(version:str, external:bool, postprocessed:bool):
+    """For a given path, generate the relative path to the result file"""
+    if external:
+        folder_name = f"results_external_testset_{version}"
+    else:
+        folder_name = f"results_test_{version}"
+    if postprocessed:
+        folder_name += "-postprocessed"
+    res_path = Path(folder_name) / "evaluation-all-files.csv"
+    return res_path
 
 
 def compare_hyperparameters(experiments, experiment_dir, version="best"):
@@ -196,28 +209,16 @@ def compare_hyperparameters(experiments, experiment_dir, version="best"):
     # collect all results
     hparams = []
     for exp in experiments:
-        res_name = "evaluation-all-files.csv"
-        res = exp.output_path_rel / f"results_test_{version}" / res_name
-        res_post = exp.output_path_rel / f"results_test_{version}-postprocessed" / res_name
-        res_ext = exp.output_path_rel / f"results_external_testset_{version}" / res_name
-        res_ext_post = (
-            exp.output_path_rel
-            / f"results_external_testset_{version}-postprocessed"
-            / res_name
-        )
         # and parameters
         hparams.append(
             {
                 **exp.hyper_parameters["network_parameters"],
                 **exp.hyper_parameters["train_parameters"],
+                "normalizing_method" : exp.hyper_parameters["preprocessing_parameters"]["normalizing_method"],
                 "loss": exp.hyper_parameters["loss"],
                 "architecture": exp.hyper_parameters["architecture"].__name__,
                 "dimensions": exp.hyper_parameters["dimensions"],
                 "path": exp.output_path_rel,
-                "results_file": res,
-                "results_file_postprocessed": res_post,
-                "results_file_external_testset": res_ext,
-                "results_file_external_testset_postprocessed": res_ext_post,
             }
         )
 
@@ -250,17 +251,6 @@ def compare_hyperparameters(experiments, experiment_dir, version="best"):
     # drop column specifying the files
     if "path" in hparams_changed:
         hparams_changed.drop(columns="path", inplace=True)
-    # drop column specifying the files
-    if "results_file_postprocessed" in hparams_changed:
-        hparams_changed.drop(columns="results_file_postprocessed", inplace=True)
-    # drop column specifying the files
-    if "results_file_external_testset" in hparams_changed:
-        hparams_changed.drop(columns="results_file_external_testset", inplace=True)
-    # drop column specifying the files
-    if "results_file_external_testset_postprocessed" in hparams_changed:
-        hparams_changed.drop(
-            columns="results_file_external_testset_postprocessed", inplace=True
-        )
     # drop columns only related to architecture
     if "architecture" in hparams_changed:
         arch_groups = hparams_changed.groupby("architecture")
@@ -387,31 +377,23 @@ def gather_results(
     if postprocessed:
         file_field += "_postprocessed"
 
+    res_path = generate_res_path(version, external, postprocessed)
+
     hparams = pd.read_csv(hparam_file, sep=";")
     # type is incorrectly detected
     # pylint: disable=no-member
 
     # add combined model if present
     if combined:
-        c_path = experiment_dir / "combined_models"
-        r_file = "evaluation-all-files.csv"
+        c_path = "combined_models"
         loc = hparams.shape[0]
         hparams.loc[loc] = "Combined"
-        hparams.loc[loc, "results_file"] = c_path
-        hparams.loc[loc, "results_file"] = c_path / f"results_{version}_test" / r_file
-        hparams.loc[loc, "results_file_postprocessed"] = (
-            c_path / f"results_{version}-postprocessed_test" / r_file
-        )
-        hparams.loc[loc, "results_file_external_testset"] = (
-            c_path / f"results_{version}_external_testset" / r_file
-        )
-        r_path = c_path / f"results_{version}-postprocessed_external_testset" / r_file
-        hparams.loc[loc, "results_file_external_testset_postprocessed"] = r_path
+        hparams.loc[loc, "path"] = c_path
 
     results_all_list = []
     for _, row in hparams.iterrows():
-        results_file = experiment_dir / row[file_field]
-        if Path(results_file).exists():
+        results_file = experiment_dir / row["path"] / res_path
+        if results_file.exists():
             results = pd.read_csv(results_file, sep=";")
             # set the model
             results["name"] = Path(row["path"]).name
@@ -424,7 +406,11 @@ def gather_results(
                 + " (probably not finished with training yet)."
             )
 
-    results_all = pd.concat(results_all_list)
+    if len(results_all_list) == 0:
+        print("No files found")
+        return None
+    else:
+        results_all = pd.concat(results_all_list)
     # drop first column (which is just the old index)
     results_all.drop(results_all.columns[0], axis="columns", inplace=True)
     results_all["fold"] = pd.Categorical(results_all["fold"])

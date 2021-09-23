@@ -125,13 +125,13 @@ if __name__ == "__main__":
     train_parameters = {
         "l_r": 0.001,
         "optimizer": "Adam",
-        "epochs": 50,
+        "epochs": 50, # TODO: increase
         # parameters for saving the best model
         "best_model_decay": 0.3,
         # scheduling parameters
-        "early_stopping": True,
+        "early_stopping": True, # TODO: don't
         "patience_es": 15,
-        "reduce_lr_on_plateau": False,
+        "reduce_lr_on_plateau": False, # TODO: do
         "patience_lr_plat": 5,
         "factor_lr_plat": 0.5,
         # finetuning parameters
@@ -342,73 +342,78 @@ if __name__ == "__main__":
         print(f"To start the training, execute {start_all_batch}")
     # if on local computer, export powershell start file
     else:
+        
+        # set the environment (might be changed for each machine)
+        ps_script_set_env = experiment_dir / "set_env.ps1"
         script_dir = Path(sys.argv[0]).resolve().parent
+        COMMAND = f'$env:script_dir="{script_dir}"\n'
+        COMMAND += f'$env:data_dir="{data_dir}"\n'
+        COMMAND += f'$env:experiment_dir="{experiment_dir}"\n'
+
         ps_script = experiment_dir / "start.ps1"
         ps_script_tb = experiment_dir / "start_tensorboard.ps1"
         ps_script_combine = experiment_dir / "start_combine.ps1"
         ps_script_analysis = experiment_dir / "start_analysis.ps1"
 
-        # make a powershell command
-        command = f'$script_dir="{script_dir}"\n'
-        # add paths
-        command += f'$env:data_dir="{data_dir}"\n'
-        command += f'$env:experiment_dir="{experiment_dir}"\n'
-        command += 'echo "Data dir: $env:data_dir"\n'
-        command += 'echo "Experiment dir: $env:experiment_dir"\n'
-        command += 'echo "Script path: $script"\n'
+        # make a powershell command, add env
+        COMMAND = '$set_env="${PSScriptRoot}\\set_env.ps1"\n'
+        COMMAND += 'Invoke-Expression ${set_env}\n'
+        COMMAND += 'Write-Output "Data dir: $env:data_dir"\n'
+        COMMAND += 'Write-Output "Experiment dir: $env:experiment_dir"\n'
+        COMMAND += 'Write-Output "Script dir: $env:script_dir"\n'
 
         # activate
-        command += 'echo "Activate Virtual Environment"\n'
-        command += '$activate=${script_dir} + "\\venv\\Scripts\\activate.ps1"\n'
-        command += "Invoke-Expression ${activate}\n"
+        COMMAND += 'Write-Output "Activate Virtual Environment"\n'
+        COMMAND += '$activate=${env:script_dir} + "\\venv\\Scripts\\activate.ps1"\n'
+        COMMAND += "Invoke-Expression ${activate}\n"
 
         # tensorboard command (up to here, it is the same)
-        command_tb = command
-        command_tb += "$start='tensorboard --logdir=\"' + ${env:experiment_dir} + '\"'\n"
-        command_tb += "echo $start\n"
-        command_tb += "Invoke-Expression ${start}\n"
-        command_tb += 'read-host "Finished, press ENTER to close."'
+        COMMAND_TB = COMMAND
+        COMMAND_TB += "$start='tensorboard --logdir=\"' + ${env:experiment_dir} + '\"'\n"
+        COMMAND_TB += "Write-Output $start\n"
+        COMMAND_TB += "Invoke-Expression ${start}\n"
+        COMMAND_TB += 'read-host "Finished, press ENTER to close."'
 
         # run combine
-        command_combine = command
-        command_combine += '$script=${script_dir} + "\\combine_models.py"\n'
-        command_combine += '$command="python " + ${script}\n'
-        command_combine += "Invoke-Expression ${command}\n"
-        command_combine += 'read-host "Finished, press ENTER to close."'
+        COMMAND_COMBINE = COMMAND
+        COMMAND_COMBINE += '$script=${env:script_dir} + "\\combine_models.py"\n'
+        COMMAND_COMBINE += '$command="python " + ${script}\n'
+        COMMAND_COMBINE += "Invoke-Expression ${command}\n"
+        COMMAND_COMBINE += 'read-host "Finished, press ENTER to close."'
 
         # run analysis
-        command_analysis = command
-        command_analysis += '$script=${script_dir} + "\\analyze_results.py"\n'
-        command_analysis += '$command="python " + ${script}\n'
-        command_analysis += "Invoke-Expression ${command}\n"
-        command_analysis += 'read-host "Finished, press ENTER to close."'
+        COMMAND_ANALYSIS = COMMAND
+        COMMAND_ANALYSIS += '$script=${env:script_dir} + "\\analyze_results.py"\n'
+        COMMAND_ANALYSIS += '$command="python " + ${script}\n'
+        COMMAND_ANALYSIS += "Invoke-Expression ${command}\n"
+        COMMAND_ANALYSIS += 'read-host "Finished, press ENTER to close."'
 
         # add the experiments
-        command += '$script=${script_dir} + "\\run_single_experiment.py"\n'
+        COMMAND += '$script=${env:script_dir} + "\\run_single_experiment.py"\n'
         for exp in experiments:
-            command += f'\n\necho "starting with {exp.name}"\n'
-            command += (
+            COMMAND += f'\n\nWrite-Output "starting with {exp.name}"\n'
+            COMMAND += (
                 f'$output_path=${{env:experiment_dir}} + "\\{exp.output_path.name}"\n'
             )
             for fold_num in range(K_FOLD):
-                command += f'$command="python " + ${{script}} + " -f {fold_num} -e " + \'${{output_path}}\'\n'
-                command += "Invoke-Expression ${command}\n"
-        command += 'read-host "Finished, press ENTER to close."'
+                COMMAND += f'$command="python " + ${{script}} + " -f {fold_num} -e " + \'${{output_path}}\'\n'
+                COMMAND += "Invoke-Expression ${command}\n"
+        COMMAND += 'read-host "Finished, press ENTER to close."'
 
         with open(ps_script, "w+") as powershell_file:
-            powershell_file.write(command)
+            powershell_file.write(COMMAND)
 
         # create tensorboard file
         with open(ps_script_tb, "w+") as powershell_file_tb:
-            powershell_file_tb.write(command_tb)
+            powershell_file_tb.write(COMMAND_TB)
 
         # create combine file
         with open(ps_script_combine, "w+") as powershell_file_combine:
-            powershell_file_combine.write(command_combine)
+            powershell_file_combine.write(COMMAND_COMBINE)
 
         # create analysis file
         with open(ps_script_analysis, "w+") as powershell_file_analysis:
-            powershell_file_analysis.write(command_analysis)
+            powershell_file_analysis.write(COMMAND_ANALYSIS)
 
         print(f"To run the training, execute {ps_script}")
         print(f"To run tensorboard, execute {ps_script_tb}")

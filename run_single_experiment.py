@@ -125,24 +125,28 @@ else:
     print("Evaluation finished.")
 
 # try to evaluate the external testset
-try:
-    exp.evaluate_external_testset()
-except FileNotFoundError:
-    print("Could not evaluate the experiment (happens if not all folds are finished).")
-else:
-    print("Evaluation finished.")
+if exp.external_test_set is not None:
+    try:
+        exp.evaluate_external_testset()
+    except FileNotFoundError:
+        print("Could not evaluate the experiment (happens if not all folds are finished).")
+    else:
+        print("Evaluation finished.")
 
 try:
-    plot_hparam_comparison(experiment_dir)
-    plot_hparam_comparison(experiment_dir, postprocessed=True)
+    for version in ["best", "final"]:
+        plot_hparam_comparison(experiment_dir, version=version)
+        plot_hparam_comparison(experiment_dir, postprocessed=True, version=version)
 except FileNotFoundError:
     print("Plotting of hyperparameter comparison failed.")
 else:
     print("Hyperparameter comparison was plotted.")
 
 try:
-    plot_hparam_comparison(experiment_dir, external=True)
-    plot_hparam_comparison(experiment_dir, external=True, postprocessed=True)
+    for version in ["best", "final"]:
+        if exp.external_test_set is not None:
+            plot_hparam_comparison(experiment_dir, external=True, version=version)
+            plot_hparam_comparison(experiment_dir, external=True, postprocessed=True, version=version)
 except FileNotFoundError:
     print("Plotting of hyperparameter comparison on the external testset failed.")
 else:

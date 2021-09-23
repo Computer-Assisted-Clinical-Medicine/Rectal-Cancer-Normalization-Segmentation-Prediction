@@ -29,7 +29,7 @@ import matplotlib.pyplot as plt
 
 data_dir = Path(os.environ["data_dir"])
 experiment_dir = Path(os.environ["experiment_dir"])
-plot_dir = experiment_dir / "plots"
+plot_dir = experiment_dir / "analysis"
 
 if not plot_dir.exists():
     plot_dir.mkdir()
@@ -74,7 +74,9 @@ def remove_linebrakes(name: str):
 ## Do the analysis for the training set
 """
 
-results = gather_results(experiment_dir, combined=True)
+VERSION = "best"
+
+results = gather_results(experiment_dir, combined=True, version=VERSION)
 # 1035_1 is with fat supression
 results = results.drop(results.index[results["File Number"] == "1035_1"])
 # make nicer names
@@ -90,59 +92,55 @@ results_study_only = results.drop(
 )
 
 sns.catplot(data=results, y="name", x="Dice", kind="box", aspect=2)
-save_and_show("test_set_dice_models")
+save_and_show(f"{VERSION}_test_set_dice_models")
 
 sns.catplot(data=results_study_only, y="name", x="Dice", kind="box", aspect=2)
-save_and_show("test_set_dice_models_study_only")
+save_and_show(f"{VERSION}_test_set_dice_models_study_only")
+
+sns.catplot(data=results, y="name", x="IoU", kind="box", aspect=2)
+save_and_show(f"{VERSION}_test_set_iou_models")
+
+sns.catplot(data=results_study_only, y="name", x="IoU", kind="box", aspect=2)
+save_and_show(f"{VERSION}_test_set_iou_models_study_only")
 
 sns.catplot(data=results, y="name", x="Dice", hue="fold", kind="box", aspect=2)
-save_and_show("test_set_dice_models_folds")
+save_and_show(f"{VERSION}_test_set_dice_models_folds")
 
 sns.catplot(data=results_study_only, y="name", x="Dice", hue="fold", kind="box", aspect=2)
-save_and_show("test_set_dice_models_folds_study_only")
+save_and_show(f"{VERSION}_test_set_dice_models_folds_study_only")
 
 sns.catplot(data=results, y="fold", x="Dice", kind="box", aspect=2)
-save_and_show("test_set_dice_folds")
-
-sns.catplot(
-    data=results.sort_values("File Number"),
-    y="File Number",
-    x="Dice",
-    kind="box",
-    aspect=0.3,
-    height=15,
-)
-save_and_show("test_set_dice_files")
+save_and_show(f"{VERSION}_test_set_dice_folds")
 
 worst_files = list(results_mean.sort_values("Dice").iloc[:10].index)
 worst_files_results = results[[f in worst_files for f in results["File Number"]]]
 sns.catplot(
     data=worst_files_results, y="File Number", x="Dice", kind="box", order=worst_files
 )
-save_and_show("test_set_dice_worst_files")
+save_and_show(f"{VERSION}_test_set_dice_worst_files")
 
 worst_files = list(results_mean.sort_values("Dice").iloc[:10].index)
 worst_files_results = results[[f in worst_files for f in results["File Number"]]]
 sns.catplot(
     data=worst_files_results, y="File Number", x="Dice", order=worst_files, hue="name"
 )
-save_and_show("test_set_dice_worst_files_by_model")
+save_and_show(f"{VERSION}_test_set_dice_worst_files_by_model")
 
 plt.scatter(x=results_mean["Volume (L)"], y=results_mean["Dice"])
 plt.xlabel("GT Volume")
 plt.ylabel("Dice")
-save_and_show("test_set_volume_vs_dice")
+save_and_show(f"{VERSION}_test_set_volume_vs_dice")
 
 plt.hist([results_mean["Volume (L)"].values, results_mean["Volume (P)"].values])
 plt.xlabel("Volume")
 plt.ylabel("Occurrence")
 plt.legend(labels=["Ground Truth", "Predicted"])
-save_and_show("test_set_label_volume_hist")
+save_and_show(f"{VERSION}_test_set_label_volume_hist")
 
 plt.scatter(x=results_mean["Volume (L)"], y=results_mean["Hausdorff"])
 plt.xlabel("GT Volume")
 plt.ylabel("Hausdorff")
-save_and_show("test_set_volume_vs_hausdorff")
+save_and_show(f"{VERSION}_test_set_volume_vs_hausdorff")
 
 plt.scatter(x=results_mean["Volume (L)"], y=results_mean["Volume (P)"])
 max_l = results_mean["Volume (L)"].max()
@@ -150,19 +148,16 @@ max_p = results_mean["Volume (P)"].max()
 plt.plot([0, max_l], [0, max_p], color="gray")
 plt.xlabel("GT Volume")
 plt.ylabel("Predicted Volume")
-save_and_show("test_set_volume_vs_volume")
-
-sns.pairplot(results[["name", "Dice", "Hausdorff", "Volume (P)"]], hue="name")
-save_and_show("test_model_pairplot")
+save_and_show(f"{VERSION}_test_set_volume_vs_volume")
 
 # remove linebreaks when exporting to csv
 for res in [results, results_study_only]:
     res.name = results.name.cat.rename_categories(lambda x: remove_linebrakes(x))
 results.groupby("name").describe().transpose().to_csv(
-    plot_dir / "summary_test_set.csv", sep=";"
+    plot_dir / f"{VERSION}_summary_test_set.csv", sep=";"
 )
 results_study_only.groupby("name").describe().transpose().to_csv(
-    plot_dir / "summary_test_set_study_only.csv", sep=";"
+    plot_dir / f"{VERSION}_summary_test_set_study_only.csv", sep=";"
 )
 
 # %% [markdown]
@@ -173,7 +168,10 @@ results_study_only.groupby("name").describe().transpose().to_csv(
 data_dir = Path(os.environ["data_dir"])
 experiment_dir = Path(os.environ["experiment_dir"])
 
-results_ex = gather_results(experiment_dir, combined=True, external=True)
+results_ex = gather_results(experiment_dir, combined=True, external=True, version=VERSION)
+if results_ex is None:
+    print("No external testset")
+    sys.exit()
 results_ex = results_ex[np.logical_not(results_ex["File Number"].str.startswith("99"))]
 # make nicer names
 results_ex.name = results_ex.name.cat.rename_categories(
@@ -182,24 +180,24 @@ results_ex.name = results_ex.name.cat.rename_categories(
 results_ex.sort_values("name", inplace=True)
 
 sns.catplot(data=results_ex, y="name", x="Dice", kind="box", aspect=2)
-save_and_show("external_test_set_dice_models")
+save_and_show(f"{VERSION}_external_test_set_dice_models")
 
 sns.catplot(data=results_ex, y="name", x="Dice", hue="fold", kind="box", aspect=2)
-save_and_show("external_test_set_dice_models_folds")
+save_and_show(f"{VERSION}_external_test_set_dice_models_folds")
 
 sns.catplot(data=results_ex, y="fold", x="Dice", kind="box", aspect=2)
-save_and_show("external_test_set_dice_folds")
+save_and_show(f"{VERSION}_external_test_set_dice_folds")
 
 sns.catplot(
     data=results_ex, y="File Number", x="Dice", hue="name", kind="box", aspect=1.4, height=6
 )
-save_and_show("external_test_set_dice_files")
+save_and_show(f"{VERSION}_external_test_set_dice_files")
 
 results_ex_mean = results_ex.groupby("File Number").mean()
 plt.scatter(x=results_ex_mean["Volume (L)"], y=results_ex_mean["Dice"])
 plt.xlabel("GT Volume")
 plt.ylabel("Dice")
-save_and_show("external_test_set_volume_vs_dice")
+save_and_show(f"{VERSION}_external_test_set_volume_vs_dice")
 
 plt.scatter(x=results_ex_mean["Volume (L)"], y=results_ex_mean["Volume (P)"])
 max_l = results_ex_mean["Volume (L)"].max()
@@ -207,4 +205,4 @@ max_p = results_ex_mean["Volume (P)"].max()
 plt.plot([0, max_l], [0, max_p], color="gray")
 plt.xlabel("GT Volume")
 plt.ylabel("Predicted Volume")
-save_and_show("external_test_set_volume_vs_volume")
+save_and_show(f"{VERSION}_external_test_set_volume_vs_volume")

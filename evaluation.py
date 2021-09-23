@@ -78,8 +78,9 @@ def evaluate_segmentation_prediction(
 
     result_metrics["Volume (P)"] = Metric.get_ml_sitk(pred_img)
 
-    orig_dice, orig_vs, orig_fn, orig_fp = Metric.overlap_measures_sitk(pred_img, label_img)
+    orig_dice, orig_vs, orig_fn, orig_fp, orig_iou = Metric.overlap_measures_sitk(pred_img, label_img)
     result_metrics["Dice"] = orig_dice
+    result_metrics["IoU"] = orig_iou
     # result_metrics['Volume Similarity'] = orig_vs/
     result_metrics["False Negative"] = orig_fn
     result_metrics["False Positive"] = orig_fp

@@ -37,7 +37,7 @@ class Experiment:
         crossvalidation_set: List,
         external_test_set: List = None,
         folds=5,
-        version="best",
+        versions=("best", "final"),
         seed=None,
         num_channels=1,
         output_path_rel=None,
@@ -65,8 +65,8 @@ class Experiment:
                 The list of images if an external test set should also be used
             folds : int, optional
                 The number of folds to use for validation, by default 5
-            version : str, optional
-                The version of the network to use (final or best), by default best
+            versions : Tuple, optional
+                The versions of the network to use (final, best or both), by default ("best",)
             seed : int, optional
                 the global seed, by default None
             num_channels: int, optional
@@ -101,10 +101,10 @@ class Experiment:
         else:
             self.external_test_set = None
 
-        if version in ("final", "best"):
-            self.version = version
+        if np.all([v in ("final", "best") for v in versions]):
+            self.versions = versions
         else:
-            raise ValueError(f"Version should be final or best, not {version}.")
+            raise ValueError(f"Version should be final or best, not {versions}.")
 
         # get the environmental variables
         self.experiment_dir = Path(os.environ["experiment_dir"])
@@ -512,7 +512,7 @@ class Experiment:
             **(self.hyper_parameters["train_parameters"]),
         )
 
-    def applying(self, folder_name: str, test_files: Iterable, apply_name="apply"):
+    def applying(self, folder_name: str, test_files: Iterable, apply_name="apply", version="best"):
         """Apply the trained network to the test files
 
         Parameters
@@ -523,6 +523,8 @@ class Experiment:
             Iterable of test files as string
         apply_name : str, optional
             The subfolder where the evaluated files are stored, by default apply
+        version : str, optional
+            The version to use (final or best), by default "best"
         """
         tf.keras.backend.clear_session()
 
@@ -535,7 +537,7 @@ class Experiment:
             self.hyper_parameters["loss"],
             is_training=False,
             model_path=str(
-                self.output_path / folder_name / "models" / f"model-{self.version}"
+                self.output_path / folder_name / "models" / f"model-{version}"
             ),
             **(self.hyper_parameters["network_parameters"]),
         )
@@ -550,7 +552,7 @@ class Experiment:
 
             # do inference
             result_image = (
-                apply_path / f"prediction-{f_name}-{self.version}{cfg.file_suffix}"
+                apply_path / f"prediction-{f_name}-{version}{cfg.file_suffix}"
             )
             if not result_image.exists():
                 net.apply(testloader, file, apply_path=apply_path)
@@ -558,7 +560,7 @@ class Experiment:
             # postprocess the image
             postprocessed_image = (
                 apply_path
-                / f"prediction-{f_name}-{self.version}-postprocessed{cfg.file_suffix}"
+                / f"prediction-{f_name}-{version}-postprocessed{cfg.file_suffix}"
             )
             if not postprocessed_image.exists():
                 self.postprocess(result_image, postprocessed_image)
@@ -696,63 +698,64 @@ class Experiment:
             cfg.batch_size_train = cfg.samples_per_volume * cfg.num_files
 
         # try the actual training
-        model_result = folddir / "models" / f"model-{self.version}"
+        model_result = folddir / "models" / "model-final"
         if self.restart is False and model_result.exists():
             tqdm.write("Already trained, skip training.")
             logger.info("Already trained, skip training.")
         else:
             self.training(folder_name, train_files, vald_files)
 
-        # do the application and evaluation
-        eval_file_path = folddir / f"evaluation-{folder_name}-{self.version}_test.csv"
-        if eval_file_path.exists():
-            tqdm.write("Already evaluated, skip evaluation.")
-            logger.info("Already evaluated, skip evaluation.")
-        else:
-            self.applying(folder_name, test_files)
-            self.evaluate_fold(folder_name, test_files)
-
-        # evaluate the postprocessed files
-        eval_file_path = (
-            folddir / f"evaluation-{folder_name}-{self.version}-postprocessed_test.csv"
-        )
-        if not eval_file_path.exists():
-            self.evaluate_fold(
-                folder_name, test_files, version=f"{self.version}-postprocessed"
-            )
-
-        # evaluate the external set if present
-        if self.external_test_set is not None:
-            ext_eval = (
-                folddir / f"evaluation-{folder_name}-{self.version}_external_testset.csv"
-            )
-            # TODO: determine better if finished
-            if ext_eval.exists():
-                tqdm.write("Already evaluated on external set, skip evaluation.")
-                logger.info("Already evaluated on external set, skip evaluation.")
+        for version in self.versions:
+            # do the application and evaluation
+            eval_file_path = folddir / f"evaluation-{folder_name}-{version}_test.csv"
+            if eval_file_path.exists():
+                tqdm.write(f"Already evaluated {version}, skip evaluation.")
+                logger.info("Already evaluated %s, skip evaluation.", version)
             else:
-                self.applying(
-                    folder_name, self.external_test_set, apply_name="apply_external_testset"
-                )
+                self.applying(folder_name, test_files, version=version)
+                self.evaluate_fold(folder_name, test_files, version=version)
+
+            # evaluate the postprocessed files
+            eval_file_path = (
+                folddir / f"evaluation-{folder_name}-{version}-postprocessed_test.csv"
+            )
+            if not eval_file_path.exists():
                 self.evaluate_fold(
-                    folder_name,
-                    self.external_test_set,
-                    name="external_testset",
-                    apply_name="apply_external_testset",
+                    folder_name, test_files, version=f"{version}-postprocessed"
                 )
 
-            ext_eval = (
-                folddir
-                / f"evaluation-{folder_name}-{self.version}-postprocessed_external_testset.csv"
-            )
-            if not ext_eval.exists():
-                self.evaluate_fold(
-                    folder_name,
-                    self.external_test_set,
-                    name="external_testset",
-                    apply_name="apply_external_testset",
-                    version=f"{self.version}-postprocessed",
+            # evaluate the external set if present
+            if self.external_test_set is not None:
+                ext_eval = (
+                    folddir / f"evaluation-{folder_name}-{version}_external_testset.csv"
                 )
+                if ext_eval.exists():
+                    tqdm.write("Already evaluated on external set, skip evaluation.")
+                    logger.info("Already evaluated on external set, skip evaluation.")
+                else:
+                    self.applying(
+                        folder_name, self.external_test_set, apply_name="apply_external_testset", version=version
+                    )
+                    self.evaluate_fold(
+                        folder_name,
+                        self.external_test_set,
+                        name="external_testset",
+                        apply_name="apply_external_testset",
+                        version=version
+                    )
+                # also evaluate the postprocessed version
+                ext_eval = (
+                    folddir
+                    / f"evaluation-{folder_name}-{version}-postprocessed_external_testset.csv"
+                )
+                if not ext_eval.exists():
+                    self.evaluate_fold(
+                        folder_name,
+                        self.external_test_set,
+                        name="external_testset",
+                        apply_name="apply_external_testset",
+                        version=f"{version}-postprocessed",
+                    )
 
         tqdm.write(
             f"Finished with {self.name} {folder_name} (Fold {fold+1} of {self.folds})"
@@ -770,7 +773,9 @@ class Experiment:
             If and eval file was not found, most likely because the training failed
             or is not finished yet
         """
-        for version in [self.version, f"{self.version}-postprocessed"]:
+
+        # use all versions plus their postprocessed versions
+        for version in [v+p for p in ["", "-postprocessed"] for v in self.versions]:
             # set eval files
             eval_files = []
             for f_name in self.fold_dir_names:
@@ -818,6 +823,7 @@ class Experiment:
             "tensorboard_images": self.tensorboard_images,
             "crossvalidation_set": [str(f) for f in self.crossvalidation_set],
             "data_set": self.data_set,
+            "versions": self.versions,
         }
         if hasattr(self, "external_test_set"):
             if self.external_test_set is not None:
