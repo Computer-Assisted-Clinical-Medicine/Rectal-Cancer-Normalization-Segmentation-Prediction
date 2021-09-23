@@ -186,7 +186,8 @@ def plot_hparam_comparison(
     plt.savefig(result_dir / result_name)
     plt.close()
 
-def generate_res_path(version:str, external:bool, postprocessed:bool):
+
+def generate_res_path(version: str, external: bool, postprocessed: bool):
     """For a given path, generate the relative path to the result file"""
     if external:
         folder_name = f"results_external_testset_{version}"
@@ -214,7 +215,9 @@ def compare_hyperparameters(experiments, experiment_dir, version="best"):
             {
                 **exp.hyper_parameters["network_parameters"],
                 **exp.hyper_parameters["train_parameters"],
-                "normalizing_method" : exp.hyper_parameters["preprocessing_parameters"]["normalizing_method"],
+                "normalizing_method": exp.hyper_parameters["preprocessing_parameters"][
+                    "normalizing_method"
+                ],
                 "loss": exp.hyper_parameters["loss"],
                 "architecture": exp.hyper_parameters["architecture"].__name__,
                 "dimensions": exp.hyper_parameters["dimensions"],

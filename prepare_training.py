@@ -125,13 +125,13 @@ if __name__ == "__main__":
     train_parameters = {
         "l_r": 0.001,
         "optimizer": "Adam",
-        "epochs": 50, # TODO: increase
+        "epochs": 50,  # TODO: increase
         # parameters for saving the best model
         "best_model_decay": 0.3,
         # scheduling parameters
-        "early_stopping": True, # TODO: don't
+        "early_stopping": True,  # TODO: don't
         "patience_es": 15,
-        "reduce_lr_on_plateau": False, # TODO: do
+        "reduce_lr_on_plateau": False,  # TODO: do
         "patience_lr_plat": 5,
         "factor_lr_plat": 0.5,
         # finetuning parameters
@@ -342,7 +342,7 @@ if __name__ == "__main__":
         print(f"To start the training, execute {start_all_batch}")
     # if on local computer, export powershell start file
     else:
-        
+
         # set the environment (might be changed for each machine)
         ps_script_set_env = experiment_dir / "set_env.ps1"
         script_dir = Path(sys.argv[0]).resolve().parent
@@ -357,7 +357,7 @@ if __name__ == "__main__":
 
         # make a powershell command, add env
         COMMAND = '$set_env="${PSScriptRoot}\\set_env.ps1"\n'
-        COMMAND += 'Invoke-Expression ${set_env}\n'
+        COMMAND += "Invoke-Expression ${set_env}\n"
         COMMAND += 'Write-Output "Data dir: $env:data_dir"\n'
         COMMAND += 'Write-Output "Experiment dir: $env:experiment_dir"\n'
         COMMAND += 'Write-Output "Script dir: $env:script_dir"\n'

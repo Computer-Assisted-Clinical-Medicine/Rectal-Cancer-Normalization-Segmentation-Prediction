@@ -137,7 +137,9 @@ def combine_models(
         # define paths
         p_id = Path(pat).name
         pred_path = result_path / f"prediction-{p_id}-{version}{cfg.file_suffix}"
-        pred_path_post = result_path / f"prediction-{p_id}-{version}-postprocessed{cfg.file_suffix}"
+        pred_path_post = (
+            result_path / f"prediction-{p_id}-{version}-postprocessed{cfg.file_suffix}"
+        )
 
         # load reference images
         testloader = ApplyLoader(
@@ -150,7 +152,9 @@ def combine_models(
 
             # find all predictions
             func = lambda x: (
-                x / result_path.name / f"prediction-{p_id}-{version}_probabilities{cfg.file_suffix}"
+                x
+                / result_path.name
+                / f"prediction-{p_id}-{version}_probabilities{cfg.file_suffix}"
             )  # pylint: disable=cell-var-from-loop
             p_files = weights.fold_dir.apply(func)
             found = p_files.apply(lambda x: x.exists())
@@ -175,11 +179,17 @@ def combine_models(
                     first_image = image
                 else:
                     # resample if there is some mismatch
-                    if not np.all([
-                        np.allclose(image.GetSize(), first_image.GetSize()),
-                        np.allclose(image.GetOrigin(), first_image.GetOrigin(), atol=0.01),
-                        np.allclose(image.GetDirection(), first_image.GetDirection(), atol=0.01),
-                    ]):
+                    if not np.all(
+                        [
+                            np.allclose(image.GetSize(), first_image.GetSize()),
+                            np.allclose(
+                                image.GetOrigin(), first_image.GetOrigin(), atol=0.01
+                            ),
+                            np.allclose(
+                                image.GetDirection(), first_image.GetDirection(), atol=0.01
+                            ),
+                        ]
+                    ):
                         print(f"{pat} was resample because of a size missmatch.")
                         image = sitk.Resample(image, referenceImage=first_image)
                 probabilities = sitk.GetArrayFromImage(image)
@@ -256,7 +266,9 @@ if __name__ == "__main__":
 
     # get the weights
     VERSION = "best"
-    ensemble_weights = calculate_ensemble_weights(all_experiments, metric="Dice", version=VERSION)
+    ensemble_weights = calculate_ensemble_weights(
+        all_experiments, metric="Dice", version=VERSION
+    )
 
     work_dir = experiment_dir / "combined_models"
     if not work_dir.exists():
@@ -265,10 +277,14 @@ if __name__ == "__main__":
     # get the dataset
     data_set = all_experiments[0].data_set
     for e in all_experiments:
-        assert np.all(e.data_set.keys() == data_set.keys()), f"Not the same data set for {e.name}"
+        assert np.all(
+            e.data_set.keys() == data_set.keys()
+        ), f"Not the same data set for {e.name}"
 
     # see if there is an external test-set specified
-    external_set_present = [getattr(e, "external_test_set") is not None for e in all_experiments]
+    external_set_present = [
+        getattr(e, "external_test_set") is not None for e in all_experiments
+    ]
     if np.any(external_set_present):
         assert np.all(external_set_present), "external set was not used for all models"
         external_test_set = all_experiments[0].external_test_set
@@ -284,7 +300,14 @@ if __name__ == "__main__":
     eval_files_post = []
     for f, w in ensemble_weights.groupby("fold"):
         tqdm.write(f)
-        combine_models(data_set, w, work_dir / f / "apply", "test", overwrite=OVERWRITE, version=VERSION)
+        combine_models(
+            data_set,
+            w,
+            work_dir / f / "apply",
+            "test",
+            overwrite=OVERWRITE,
+            version=VERSION,
+        )
         eval_files.append(work_dir / f / f"evaluation-{f}-{VERSION}_test.csv")
         eval_files_post.append(
             work_dir / f / f"evaluation-{f}-{VERSION}-postprocessed_test.csv"
@@ -305,7 +328,9 @@ if __name__ == "__main__":
         for f, w in ensemble_weights.groupby("fold"):
             tqdm.write(f)
             applied = work_dir / f / "apply_external_testset"
-            combine_models(external_test_set, w, applied, NAME, overwrite=OVERWRITE, version=VERSION)
+            combine_models(
+                external_test_set, w, applied, NAME, overwrite=OVERWRITE, version=VERSION
+            )
             eval_files.append(work_dir / f / f"evaluation-{f}-{VERSION}_{NAME}.csv")
             eval_files_post.append(
                 work_dir / f / f"evaluation-{f}-{VERSION}-postprocessed_{NAME}.csv"
@@ -315,7 +340,9 @@ if __name__ == "__main__":
         tqdm.write(f)
         w = ensemble_weights
         applied = work_dir / f / "apply_external_testset"
-        combine_models(external_test_set, w, applied, NAME, overwrite=OVERWRITE, version=VERSION)
+        combine_models(
+            external_test_set, w, applied, NAME, overwrite=OVERWRITE, version=VERSION
+        )
         eval_files.append(work_dir / f / f"evaluation-{f}-{VERSION}_{NAME}.csv")
         eval_files_post.append(
             work_dir / f / f"evaluation-{f}-{VERSION}-postprocessed_{NAME}.csv"

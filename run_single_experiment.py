@@ -146,7 +146,9 @@ try:
     for version in ["best", "final"]:
         if exp.external_test_set is not None:
             plot_hparam_comparison(experiment_dir, external=True, version=version)
-            plot_hparam_comparison(experiment_dir, external=True, postprocessed=True, version=version)
+            plot_hparam_comparison(
+                experiment_dir, external=True, postprocessed=True, version=version
+            )
 except FileNotFoundError:
     print("Plotting of hyperparameter comparison on the external testset failed.")
 else:

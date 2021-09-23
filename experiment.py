@@ -512,7 +512,9 @@ class Experiment:
             **(self.hyper_parameters["train_parameters"]),
         )
 
-    def applying(self, folder_name: str, test_files: Iterable, apply_name="apply", version="best"):
+    def applying(
+        self, folder_name: str, test_files: Iterable, apply_name="apply", version="best"
+    ):
         """Apply the trained network to the test files
 
         Parameters
@@ -536,9 +538,7 @@ class Experiment:
         net = self.hyper_parameters["architecture"](
             self.hyper_parameters["loss"],
             is_training=False,
-            model_path=str(
-                self.output_path / folder_name / "models" / f"model-{version}"
-            ),
+            model_path=str(self.output_path / folder_name / "models" / f"model-{version}"),
             **(self.hyper_parameters["network_parameters"]),
         )
 
@@ -551,16 +551,13 @@ class Experiment:
             f_name = Path(file).name
 
             # do inference
-            result_image = (
-                apply_path / f"prediction-{f_name}-{version}{cfg.file_suffix}"
-            )
+            result_image = apply_path / f"prediction-{f_name}-{version}{cfg.file_suffix}"
             if not result_image.exists():
                 net.apply(testloader, file, apply_path=apply_path)
 
             # postprocess the image
             postprocessed_image = (
-                apply_path
-                / f"prediction-{f_name}-{version}-postprocessed{cfg.file_suffix}"
+                apply_path / f"prediction-{f_name}-{version}-postprocessed{cfg.file_suffix}"
             )
             if not postprocessed_image.exists():
                 self.postprocess(result_image, postprocessed_image)
@@ -734,14 +731,17 @@ class Experiment:
                     logger.info("Already evaluated on external set, skip evaluation.")
                 else:
                     self.applying(
-                        folder_name, self.external_test_set, apply_name="apply_external_testset", version=version
+                        folder_name,
+                        self.external_test_set,
+                        apply_name="apply_external_testset",
+                        version=version,
                     )
                     self.evaluate_fold(
                         folder_name,
                         self.external_test_set,
                         name="external_testset",
                         apply_name="apply_external_testset",
-                        version=version
+                        version=version,
                     )
                 # also evaluate the postprocessed version
                 ext_eval = (
@@ -775,7 +775,7 @@ class Experiment:
         """
 
         # use all versions plus their postprocessed versions
-        for version in [v+p for p in ["", "-postprocessed"] for v in self.versions]:
+        for version in [v + p for p in ["", "-postprocessed"] for v in self.versions]:
             # set eval files
             eval_files = []
             for f_name in self.fold_dir_names:
