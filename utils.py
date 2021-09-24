@@ -45,7 +45,7 @@ def configure_logging(tf_logger: logging.Logger) -> logging.Logger:
 
 
 def plot_hparam_comparison(
-    experiment_dir: os.PathLike,
+    current_experiment: os.PathLike,
     metrics=None,
     external=False,
     postprocessed=False,
@@ -55,13 +55,14 @@ def plot_hparam_comparison(
     """
     Do separate plots for every changed hyperparameter.
     """
-    experiment_dir = Path(experiment_dir)
+    base_dir = Path(os.environ["experiment_dir"])
+    current_experiment = Path(current_experiment)
 
     if metrics is None:
         metrics = ["Dice"]
 
-    hparam_file = experiment_dir / "hyperparameters.csv"
-    hparam_changed_file = experiment_dir / "hyperparameters_changed.csv"
+    hparam_file = current_experiment / "hyperparameters.csv"
+    hparam_changed_file = current_experiment / "hyperparameters_changed.csv"
 
     result_name = f"hy_comp_{version}"
     if external:
@@ -85,7 +86,7 @@ def plot_hparam_comparison(
     results_m_err_collected = []
     found_any = False
     for exp_loc in hparams["path"]:
-        results_file = experiment_dir / exp_loc / res_path
+        results_file = base_dir / exp_loc / res_path
         if results_file.exists():
             results = pd.read_csv(results_file, sep=";")
             # save results
@@ -180,7 +181,7 @@ def plot_hparam_comparison(
 
     fig.suptitle("Hypereparameter Comparison")
     plt.tight_layout()
-    result_dir = experiment_dir / "analysis" / "hyperparameter_comparison"
+    result_dir = current_experiment / "analysis" / "hyperparameter_comparison"
     if not result_dir.exists():
         result_dir.mkdir(parents=True)
     plt.savefig(result_dir / result_name)
