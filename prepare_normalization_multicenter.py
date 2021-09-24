@@ -253,21 +253,23 @@ if __name__ == "__main__":
 
     for location in ["Frankfurt", "Regensburg", "Mannheim-not-from-study", "all"]:
 
+        timepoints_mannheim = [
+            s for s in segmented_images.keys() if s.startswith("990") and s.endswith("_1")
+        ]
         if location in ["Regensburg", "Frankfurt"]:
             # only use before therapy images that are segmented
             timepoints_train = timepoints.query(
                 f"treatment_status=='before therapy' & segmented & location=='{location}'"
             ).index
         elif location == "all":
-            timepoints_train = timepoints.query(
-                "treatment_status=='before therapy' & segmented"
-            ).index
+            timepoints_train = (
+                list(
+                    timepoints.query("treatment_status=='before therapy' & segmented").index
+                )
+                + timepoints_mannheim
+            )
         elif location == "Mannheim-not-from-study":
-            timepoints_train = [
-                s
-                for s in segmented_images.keys()
-                if s.startswith("990") and s.endswith("_1")
-            ]
+            timepoints_train = timepoints_mannheim
 
         experiment_group_name = f"Normalization_{location}"
         current_exp_dir = experiment_dir / experiment_group_name
