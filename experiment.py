@@ -150,7 +150,7 @@ class Experiment:
         self.output_path = self.experiment_dir / Path(self.output_path_rel)
 
         if not self.output_path.exists():
-            self.output_path.mkdir()
+            self.output_path.mkdir(parents=True)
         logger.info("Set %s as output folder, all output will be there", self.output_path)
 
         # check for finetuning
