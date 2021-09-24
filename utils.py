@@ -230,7 +230,7 @@ def compare_hyperparameters(experiments, experiment_dir, version="best"):
     # find changed parameters
     changed_params = []
     # drop the results file when analyzing the changed hyperparameters
-    for col in hparams.drop(columns="results_file"):
+    for col in hparams:
         if hparams[col].astype(str).unique().size > 1:
             changed_params.append(col)
     # have at least one changed parameters (for the plots)

@@ -8,6 +8,7 @@ import sys
 from pathlib import Path
 from typing import Any, Dict, List, Union
 
+import pandas as pd
 import yaml
 
 # logger has to be set before tensorflow is imported
@@ -71,6 +72,7 @@ if __name__ == "__main__":
         found_images = yaml.load(f, Loader=yaml.Loader)
     with open(data_dir / "segmented_images.yaml") as f:
         segmented_images = yaml.load(f, Loader=yaml.Loader)
+    timepoints = pd.read_csv(data_dir / "timepoints.csv", sep=";", index_col=0)
 
     unsegmented_images = list(
         set(list(found_images.keys())) - set(list(segmented_images.keys()))
@@ -115,8 +117,12 @@ if __name__ == "__main__":
                     "labels": data_dir / label_data["labels"],
                 }
 
+    # only use before therapy images that are segmented from frankfurt
+    timepoints_train = timepoints.query(
+        "treatment_status=='before therapy' & segmented & location=='Frankfurt'"
+    ).index
     # set training files
-    train_list = [key for key in dataset if key.partition("_l")[0] in segmented_images]
+    train_list = [key for key in dataset if key.partition("_l")[0] in timepoints_train]
 
     # set test files (just use the rest)
     test_list: List[str] = list(set(dataset.keys()) - set(train_list))
@@ -125,25 +131,25 @@ if __name__ == "__main__":
     train_parameters = {
         "l_r": 0.001,
         "optimizer": "Adam",
-        "epochs": 50,  # TODO: increase
+        "epochs": 100,
         # parameters for saving the best model
         "best_model_decay": 0.3,
         # scheduling parameters
-        "early_stopping": True,  # TODO: don't
+        "early_stopping": False,
         "patience_es": 15,
-        "reduce_lr_on_plateau": False,  # TODO: do
-        "patience_lr_plat": 5,
+        "reduce_lr_on_plateau": False,
+        "patience_lr_plat": 10,
         "factor_lr_plat": 0.5,
         # finetuning parameters
         "finetune_epoch": 0,
         "finetune_layers": "all",
-        "finetune_lr": 0.0005,
+        "finetune_lr": 0.001,
         # sampling parameters
         "samples_per_volume": 80,
         "background_label_percentage": 0.15,
         # Augmentation parameters
         "add_noise": False,
-        "max_rotation": 0,
+        "max_rotation": 0.1,
         "min_resolution_augment": 1.2,
         "max_resolution_augment": 0.9,
     }
@@ -349,6 +355,10 @@ if __name__ == "__main__":
         COMMAND = f'$env:script_dir="{script_dir}"\n'
         COMMAND += f'$env:data_dir="{data_dir}"\n'
         COMMAND += f'$env:experiment_dir="{experiment_dir}"\n'
+
+        # create env file
+        with open(ps_script_set_env, "w+") as powershell_file_tb:
+            powershell_file_tb.write(COMMAND)
 
         ps_script = experiment_dir / "start.ps1"
         ps_script_tb = experiment_dir / "start_tensorboard.ps1"
