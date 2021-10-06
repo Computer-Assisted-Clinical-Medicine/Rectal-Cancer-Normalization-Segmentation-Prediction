@@ -410,14 +410,20 @@ if __name__ == "__main__":
             # run combine
             COMMAND_COMBINE = COMMAND
             COMMAND_COMBINE += '$script=${env:script_dir} + "\\combine_models.py"\n'
-            COMMAND_COMBINE += '$command="python " + ${script}\n'
+            COMMAND_COMBINE += (
+                f'$output_path=${{env:experiment_dir}} + "\\{experiment_group_name}"\n'
+            )
+            COMMAND_COMBINE += '$command="python " + ${script} + " -p ${output_path}"\n'
             COMMAND_COMBINE += "Invoke-Expression ${command}\n"
             COMMAND_COMBINE += 'read-host "Finished, press ENTER to close."'
 
             # run analysis
             COMMAND_ANALYSIS = COMMAND
             COMMAND_ANALYSIS += '$script=${env:script_dir} + "\\analyze_results.py"\n'
-            COMMAND_ANALYSIS += '$command="python " + ${script}\n'
+            COMMAND_ANALYSIS += (
+                f'$output_path=${{env:experiment_dir}} + "\\{experiment_group_name}"\n'
+            )
+            COMMAND_ANALYSIS += '$command="python " + ${script} + " -p ${output_path}"\n'
             COMMAND_ANALYSIS += "Invoke-Expression ${command}\n"
             COMMAND_ANALYSIS += 'read-host "Finished, press ENTER to close."'
 

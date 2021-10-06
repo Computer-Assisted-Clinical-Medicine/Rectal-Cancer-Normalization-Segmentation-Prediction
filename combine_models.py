@@ -1,7 +1,7 @@
 """
 Combine the images from multiple models
 """
-import os
+import argparse
 from pathlib import Path
 from typing import Iterable, List
 
@@ -18,6 +18,24 @@ from SegmentationNetworkBasis.postprocessing import keep_big_structures
 
 WRITE_PROBABILITIES = False
 OVERWRITE = False
+
+
+def init_argparse():
+    """
+    initialize the parser
+    """
+    argpar = argparse.ArgumentParser(
+        description="Combine the labels from different experiments."
+    )
+    argpar.add_argument(
+        "-p",
+        "--path",
+        metavar="path",
+        type=str,
+        nargs=1,
+        help="The directory of the experiment to combine.",
+    )
+    return argpar
 
 
 def calculate_ensemble_weights(
@@ -86,6 +104,7 @@ def calculate_ensemble_weights(
 
 
 def combine_models(
+    experiments: List[Experiment],
     patients: Iterable,
     weights: pd.DataFrame,
     result_path: Path,
@@ -97,6 +116,8 @@ def combine_models(
 
     Parameters
     ----------
+    experiments : List
+        List of experiments
     patients : Iterable
         The list of patients as list of paths
     weights : pd.DataFrame
@@ -127,9 +148,9 @@ def combine_models(
         return
 
     # set preprocessing dir
-    cfg.data_base_dir = all_experiments[0].experiment_dir
+    cfg.data_base_dir = experiments[0].experiment_dir
 
-    for pat in tqdm(patients.keys(), unit="patient"):
+    for pat in tqdm(patients, unit="patient"):
 
         if not result_path.exists():
             result_path.mkdir(parents=True)
@@ -144,7 +165,7 @@ def combine_models(
         # load reference images
         testloader = ApplyLoader(
             name="test_loader",
-            file_dict=all_experiments[0].data_set,
+            file_dict=experiments[0].data_set,
         )
 
         # see if it should be overwritten
@@ -152,9 +173,7 @@ def combine_models(
 
             # find all predictions
             func = lambda x: (
-                x
-                / result_path.name
-                / f"prediction-{p_id}-{version}_probabilities{cfg.file_suffix}"
+                x / result_path.name / f"prediction-{p_id}-{version}{cfg.file_suffix}"
             )  # pylint: disable=cell-var-from-loop
             p_files = weights.fold_dir.apply(func)
             found = p_files.apply(lambda x: x.exists())
@@ -192,11 +211,11 @@ def combine_models(
                     ):
                         print(f"{pat} was resample because of a size missmatch.")
                         image = sitk.Resample(image, referenceImage=first_image)
-                probabilities = sitk.GetArrayFromImage(image)
+                labels = sitk.GetArrayFromImage(image)
                 if probability_avg is None:
-                    probability_avg = probabilities * weight
+                    probability_avg = labels * weight
                 else:
-                    probability_avg += probabilities * weight
+                    probability_avg += labels * weight
             assert probability_avg is not None, "No probabilities found"
 
             # write probabilities
@@ -204,12 +223,12 @@ def combine_models(
                 with open(result_path / f"prediction-{p_id}-{version}.npz", "wb") as file:
                     np.savez_compressed(file, probability_avg)
 
-            cfg.data_base_dir = all_experiments[0].experiment_dir
+            cfg.data_base_dir = experiments[0].experiment_dir
             ref_img_pre = testloader.get_processed_image(pat)
             original_image = testloader.get_original_image(pat)
 
             # generate labels
-            predicted_labels = np.argmax(probability_avg, -1)
+            predicted_labels = np.round(probability_avg).astype(int)
             # make it into an image
             predicted_label_img = sitk.GetImageFromArray(predicted_labels)
             predicted_label_img.CopyInformation(ref_img_pre)
@@ -253,21 +272,13 @@ def combine_models(
     results_post.to_csv(eval_file_path_post, sep=";")
 
 
-if __name__ == "__main__":
-
-    data_dir = Path(os.environ["data_dir"])
-    experiment_dir = Path(os.environ["experiment_dir"])
-
-    hparam_file = experiment_dir / "hyperparameters.csv"
-    all_experiments = []
-    for e in pd.read_csv(hparam_file, sep=";")["path"]:
-        param_file = experiment_dir / Path(e) / "parameters.yaml"
-        all_experiments.append(Experiment.from_file(param_file))
-
+def run_combine(experiments: List[Experiment], version="best"):
+    """
+    Run the combination including the analysis at the end.
+    """
     # get the weights
-    VERSION = "best"
     ensemble_weights = calculate_ensemble_weights(
-        all_experiments, metric="Dice", version=VERSION
+        experiments, metric="Dice", version=version
     )
 
     work_dir = experiment_dir / "combined_models"
@@ -275,81 +286,113 @@ if __name__ == "__main__":
         work_dir.mkdir()
 
     # get the dataset
-    data_set = all_experiments[0].data_set
-    for e in all_experiments:
+    data_set = experiments[0].data_set
+    for exp in experiments:
         assert np.all(
-            e.data_set.keys() == data_set.keys()
-        ), f"Not the same data set for {e.name}"
+            exp.data_set.keys() == data_set.keys()
+        ), f"Not the same data set for {exp.name}"
 
     # see if there is an external test-set specified
     external_set_present = [
-        getattr(e, "external_test_set") is not None for e in all_experiments
+        getattr(e, "external_test_set") is not None for e in experiments
     ]
     if np.any(external_set_present):
         assert np.all(external_set_present), "external set was not used for all models"
-        external_test_set = all_experiments[0].external_test_set
-        for e in all_experiments:
+        external_test_set = experiments[0].external_test_set
+        for exp in experiments:
             assert np.all(
-                e.external_test_set == external_test_set
-            ), f"Not the same data set for {e.name}"
+                exp.external_test_set == external_test_set
+            ), f"Not the same data set for {exp.name}"
     else:
         external_test_set = np.array([])
+    assert isinstance(external_test_set, np.ndarray)
 
     # do the predictions for the train set
     eval_files = []
     eval_files_post = []
-    for f, w in ensemble_weights.groupby("fold"):
+    for f, weight in ensemble_weights.groupby("fold"):
         tqdm.write(f)
         combine_models(
+            experiments,
             data_set,
-            w,
+            weight,
             work_dir / f / "apply",
             "test",
             overwrite=OVERWRITE,
-            version=VERSION,
+            version=version,
         )
-        eval_files.append(work_dir / f / f"evaluation-{f}-{VERSION}_test.csv")
+        eval_files.append(work_dir / f / f"evaluation-{f}-{version}_test.csv")
         eval_files_post.append(
-            work_dir / f / f"evaluation-{f}-{VERSION}-postprocessed_test.csv"
+            work_dir / f / f"evaluation-{f}-{version}-postprocessed_test.csv"
         )
     evaluation.combine_evaluation_results_from_folds(
-        work_dir / f"results_test_{VERSION}", eval_files
+        work_dir / f"results_test_{version}", eval_files
     )
     evaluation.combine_evaluation_results_from_folds(
-        work_dir / f"results_test_{VERSION}-postprocessed", eval_files_post
+        work_dir / f"results_test_{version}-postprocessed", eval_files_post
     )
 
     # and also for the external set
     if external_test_set.size > 0:
-        NAME = "external_testset"
-        tqdm.write(NAME)
+        name = "external_testset"
+        tqdm.write(name)
         eval_files = []
         eval_files_post = []
-        for f, w in ensemble_weights.groupby("fold"):
+        for f, weight in ensemble_weights.groupby("fold"):
             tqdm.write(f)
             applied = work_dir / f / "apply_external_testset"
             combine_models(
-                external_test_set, w, applied, NAME, overwrite=OVERWRITE, version=VERSION
+                experiments,
+                external_test_set,
+                weight,
+                applied,
+                name,
+                overwrite=OVERWRITE,
+                version=version,
             )
-            eval_files.append(work_dir / f / f"evaluation-{f}-{VERSION}_{NAME}.csv")
+            eval_files.append(work_dir / f / f"evaluation-{f}-{version}_{name}.csv")
             eval_files_post.append(
-                work_dir / f / f"evaluation-{f}-{VERSION}-postprocessed_{NAME}.csv"
+                work_dir / f / f"evaluation-{f}-{version}-postprocessed_{name}.csv"
             )
         # combine all folds
         f = "all-folds"
         tqdm.write(f)
-        w = ensemble_weights
+        weight = ensemble_weights
         applied = work_dir / f / "apply_external_testset"
         combine_models(
-            external_test_set, w, applied, NAME, overwrite=OVERWRITE, version=VERSION
+            experiments,
+            external_test_set,
+            weight,
+            applied,
+            name,
+            overwrite=OVERWRITE,
+            version=version,
         )
-        eval_files.append(work_dir / f / f"evaluation-{f}-{VERSION}_{NAME}.csv")
+        eval_files.append(work_dir / f / f"evaluation-{f}-{version}_{name}.csv")
         eval_files_post.append(
-            work_dir / f / f"evaluation-{f}-{VERSION}-postprocessed_{NAME}.csv"
+            work_dir / f / f"evaluation-{f}-{version}-postprocessed_{name}.csv"
         )
         evaluation.combine_evaluation_results_from_folds(
-            work_dir / f"results_{VERSION}_{NAME}", eval_files
+            work_dir / f"results_{name}_{version}", eval_files
         )
         evaluation.combine_evaluation_results_from_folds(
-            work_dir / f"results_{VERSION}-postprocessed_{NAME}", eval_files_post
+            work_dir / f"results_{name}_{version}-postprocessed", eval_files_post
         )
+
+
+if __name__ == "__main__":
+
+    parser = init_argparse()
+    args = parser.parse_args()
+
+    experiment_dir = Path(args.path)
+
+    hparam_file = experiment_dir / "hyperparameters.csv"
+    all_experiments = []
+    for e in pd.read_csv(hparam_file, sep=";")["path"]:
+        param_file = experiment_dir.parent / Path(e) / "parameters.yaml"
+        all_experiments.append(Experiment.from_file(param_file))
+
+    # combine the models
+    run_combine(experiments=all_experiments, version="best")
+    run_combine(experiments=all_experiments, version="final")

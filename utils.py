@@ -389,14 +389,14 @@ def gather_results(
 
     # add combined model if present
     if combined:
-        c_path = "combined_models"
+        c_path = Path(hparams.iloc[0]["path"]).parent / "combined_models"
         loc = hparams.shape[0]
         hparams.loc[loc] = "Combined"
         hparams.loc[loc, "path"] = c_path
 
     results_all_list = []
     for _, row in hparams.iterrows():
-        results_file = experiment_dir / row["path"] / res_path
+        results_file = experiment_dir.parent / row["path"] / res_path
         if results_file.exists():
             results = pd.read_csv(results_file, sep=";")
             # set the model

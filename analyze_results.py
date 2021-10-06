@@ -7,7 +7,7 @@
 import os
 from pathlib import Path
 import sys
-
+import argparse
 import matplotlib
 import numpy as np
 import seaborn as sns
@@ -22,13 +22,33 @@ import matplotlib.pyplot as plt
 
 # pylint: disable=pointless-string-statement
 
+
+def init_argparse():
+    """
+    initialize the parser
+    """
+    argpar = argparse.ArgumentParser(description="Do the training analysis.")
+    argpar.add_argument(
+        "-p",
+        "--path",
+        metavar="path",
+        nargs="?",
+        type=str,
+        help="The directory where all the experiments are.",
+    )
+    return argpar
+
+
 # %% [markdown]
 """
 ## Set Paths
 """
 
+parser = init_argparse()
+args = parser.parse_args()
+
 data_dir = Path(os.environ["data_dir"])
-experiment_dir = Path(os.environ["experiment_dir"])
+experiment_dir = Path(args.path)
 plot_dir = experiment_dir / "analysis"
 
 if not plot_dir.exists():
@@ -164,9 +184,6 @@ results_study_only.groupby("name").describe().transpose().to_csv(
 """
 ## Do the analysis for the test-set
 """
-
-data_dir = Path(os.environ["data_dir"])
-experiment_dir = Path(os.environ["experiment_dir"])
 
 results_ex = gather_results(experiment_dir, combined=True, external=True, version=VERSION)
 if results_ex is None:

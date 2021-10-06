@@ -41,7 +41,7 @@ def init_argparse():
     return argpar
 
 
-def run_experiment_fold(experiment: Experiment, fold: int, base_logger: logging.Logger):
+def run_experiment_fold(experiment: Experiment, fold: int):
     """Run the fold of a singel experiment, this function mainly handles the
     logging and then calls experiment.run_fold(fold)
 
@@ -51,41 +51,13 @@ def run_experiment_fold(experiment: Experiment, fold: int, base_logger: logging.
         The current experiment
     fold : int
         The Number of the fold
-    base_logger : logging.Logger
-        The logger to use
     """
-    # add more detailed logger for each network, when problems arise, use debug
-    fold_dir = experiment.output_path / experiment.fold_dir_names[fold]
-    if not fold_dir.exists():
-        fold_dir.mkdir(parents=True)
-
-    log_formatter = logging.Formatter(
-        "%(levelname)s: %(name)s - %(funcName)s (l.%(lineno)d): %(message)s"
-    )
-
-    # create file handlers
-    fh_info = logging.FileHandler(fold_dir / "log_info.txt")
-    fh_info.setLevel(logging.INFO)
-    fh_info.setFormatter(log_formatter)
-    # add to loggers
-    base_logger.addHandler(fh_info)
-
-    # create file handlers
-    fh_debug = logging.FileHandler(fold_dir / "log_debug.txt")
-    fh_debug.setLevel(logging.DEBUG)
-    fh_debug.setFormatter(log_formatter)
-    # add to loggers
-    base_logger.addHandler(fh_debug)
 
     try:
         experiment.run_fold(fold)
     except Exception as exc:  # pylint: disable=broad-except
         logging.exception(str(exc))
         raise exc
-
-    # remove logger
-    base_logger.removeHandler(fh_info)
-    base_logger.removeHandler(fh_debug)
 
 
 parser = init_argparse()
@@ -113,8 +85,26 @@ log_dir = exp.output_path / exp.fold_dir_names[f]
 if not log_dir.exists():
     log_dir.mkdir(parents=True)
 
+log_formatter = logging.Formatter(
+    "%(levelname)s: %(name)s - %(funcName)s (l.%(lineno)d): %(message)s"
+)
+
+# create file handlers
+fh_info = logging.FileHandler(log_dir / "log_info.txt")
+fh_info.setLevel(logging.INFO)
+fh_info.setFormatter(log_formatter)
+# add to loggers
+logger.addHandler(fh_info)
+
+# create file handlers
+fh_debug = logging.FileHandler(log_dir / "log_debug.txt")
+fh_debug.setLevel(logging.DEBUG)
+fh_debug.setFormatter(log_formatter)
+# add to loggers
+logger.addHandler(fh_debug)
+
 with tf.device("/device:GPU:0"):
-    run_experiment_fold(exp, f, logger)
+    run_experiment_fold(exp, f)
 
 # try to evaluate it (this will only work if this is the last fold)
 try:
