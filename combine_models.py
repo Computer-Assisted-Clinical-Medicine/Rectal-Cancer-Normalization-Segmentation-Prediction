@@ -32,7 +32,7 @@ def init_argparse():
         "--path",
         metavar="path",
         type=str,
-        nargs=1,
+        nargs="?",
         help="The directory of the experiment to combine.",
     )
     return argpar
@@ -384,7 +384,6 @@ if __name__ == "__main__":
 
     parser = init_argparse()
     args = parser.parse_args()
-
     experiment_dir = Path(args.path)
 
     hparam_file = experiment_dir / "hyperparameters.csv"

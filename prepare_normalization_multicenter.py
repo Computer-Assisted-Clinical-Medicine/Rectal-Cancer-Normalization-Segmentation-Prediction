@@ -413,6 +413,7 @@ if __name__ == "__main__":
             COMMAND_COMBINE += (
                 f'$output_path=${{env:experiment_dir}} + "\\{experiment_group_name}"\n'
             )
+            COMMAND_COMBINE += "$output_path=$output_path -replace ' ', '` '\n"
             COMMAND_COMBINE += '$command="python " + ${script} + " -p ${output_path}"\n'
             COMMAND_COMBINE += "Invoke-Expression ${command}\n"
             COMMAND_COMBINE += 'read-host "Finished, press ENTER to close."'
@@ -423,6 +424,7 @@ if __name__ == "__main__":
             COMMAND_ANALYSIS += (
                 f'$output_path=${{env:experiment_dir}} + "\\{experiment_group_name}"\n'
             )
+            COMMAND_ANALYSIS += "$output_path=$output_path -replace ' ', '` '\n"
             COMMAND_ANALYSIS += '$command="python " + ${script} + " -p ${output_path}"\n'
             COMMAND_ANALYSIS += "Invoke-Expression ${command}\n"
             COMMAND_ANALYSIS += 'read-host "Finished, press ENTER to close."'
