@@ -405,7 +405,6 @@ if __name__ == "__main__":
             COMMAND_TB += f"${{env:experiment_dir}} + '\\{experiment_group_name}\"'\n"
             COMMAND_TB += "Write-Output $start\n"
             COMMAND_TB += "Invoke-Expression ${start}\n"
-            COMMAND_TB += 'read-host "Finished, press ENTER to close."'
 
             # run combine
             COMMAND_COMBINE = COMMAND
@@ -416,7 +415,6 @@ if __name__ == "__main__":
             COMMAND_COMBINE += "$output_path=$output_path -replace ' ', '` '\n"
             COMMAND_COMBINE += '$command="python " + ${script} + " -p ${output_path}"\n'
             COMMAND_COMBINE += "Invoke-Expression ${command}\n"
-            COMMAND_COMBINE += 'read-host "Finished, press ENTER to close."'
 
             # run analysis
             COMMAND_ANALYSIS = COMMAND
@@ -427,7 +425,6 @@ if __name__ == "__main__":
             COMMAND_ANALYSIS += "$output_path=$output_path -replace ' ', '` '\n"
             COMMAND_ANALYSIS += '$command="python " + ${script} + " -p ${output_path}"\n'
             COMMAND_ANALYSIS += "Invoke-Expression ${command}\n"
-            COMMAND_ANALYSIS += 'read-host "Finished, press ENTER to close."'
 
             # add the experiments
             COMMAND += '$script=${env:script_dir} + "\\run_single_experiment.py"\n'
@@ -438,7 +435,6 @@ if __name__ == "__main__":
                 for fold_num in range(K_FOLD):
                     COMMAND += f'$command="python " + ${{script}} + " -f {fold_num} -e " + \'${{output_path}}\'\n'
                     COMMAND += "Invoke-Expression ${command}\n"
-            COMMAND += 'read-host "Finished, press ENTER to close."'
 
             with open(ps_script, "w+") as powershell_file:
                 powershell_file.write(COMMAND)
