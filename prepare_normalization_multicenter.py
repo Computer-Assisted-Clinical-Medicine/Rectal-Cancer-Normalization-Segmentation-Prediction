@@ -117,6 +117,11 @@ if __name__ == "__main__":
                     "labels": data_dir / label_data["labels"],
                 }
 
+    # export dataset
+    dataset_file = experiment_dir / "dataset.yaml"
+    with open(dataset_file, "w") as f:
+        yaml.dump(dataset, f, sort_keys=False)
+
     # define the parameters that are constant
     train_parameters = {
         "l_r": 0.001,
