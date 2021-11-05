@@ -170,8 +170,8 @@ if __name__ == "__main__":
         "clipping_value": 1,
         "res_connect": True,
         "n_filters": (F_BASE * 8, F_BASE * 16, F_BASE * 32, F_BASE * 64, F_BASE * 128),
-        "do_bias": True,
-        "do_batch_normalization": False,
+        "do_bias": False,
+        "do_batch_normalization": True,
         "ratio": 2,
     }
     network_parameters_DenseTiramisu = {
