@@ -18,6 +18,7 @@ import pandas as pd
 import seaborn as sns
 import yaml
 from IPython import display
+from scipy.stats import ttest_ind
 
 from utils import gather_results
 
@@ -227,6 +228,18 @@ display_dataframe(
             + " & name != 'combined_models' & train_location != 'all'"
         )
         .groupby(["normalization", "external"])
+        .Dice.median()
+    )
+)
+
+display_markdown("All training locations except all.")
+display_dataframe(
+    pd.DataFrame(
+        results.query(
+            "version == 'best' & before_therapy & postprocessed"
+            + " & name != 'combined_models' & train_location != 'all'"
+        )
+        .groupby(["normalization", "network", "external"])
         .Dice.median()
     )
 )
@@ -537,15 +550,76 @@ for col in acquisition_params.columns:
         continue
     data = results_merged.query("normalization == 'QUANTILE' & before_therapy").copy()
 
+    N_BINS = 10
+
+    g = sns.lmplot(
+        data=data,
+        y="Dice",
+        x=col,
+        markers=["."] * data.train_location.nunique(),
+        hue="train_location",
+        truncate=True,
+        col="external",
+    )
+    g.facet_axis(0, 0).set_title(f"{col}")
+    plt.show()
+    plt.close()
+
+    fig, axes = plt.subplots(nrows=1, ncols=2, sharex=True, sharey=True, figsize=(8, 4))
+    for external, ax in zip([False, True], axes):
+        plot_data = data[data.external == external].copy()
+        bins = np.linspace(
+            start=plot_data[col].min() - 0.01,
+            stop=plot_data[col].max() + 0.01,
+            num=N_BINS + 1,
+        )
+        bin_num = pd.Series(
+            np.digitize(plot_data[col], bins),
+            index=plot_data.index,
+            name="bin_num",
+        )
+        plot_data[col + "_bin"] = bin_num
+        bin_centers = bins[:-1] + (bins[1] - bins[0]) / 2
+        plot_data[col + "_bin_center"] = bin_centers[plot_data[col + "_bin"] - 1]
+
+        groups = plot_data.Dice.groupby([plot_data.train_location, bin_num])
+        means = groups.mean()
+        stds = groups.std()
+
+        for loc in plot_data.train_location.unique():
+            ax.errorbar(
+                x=bin_centers[means.loc[loc].index - 1],
+                y=means.loc[loc],
+                yerr=stds.loc[loc],
+                label=loc,
+                capsize=5,
+                capthick=2,
+            )
+        ax.set_title(f"external = {external}")
+        ax.set_xlabel(f"{col}")
+
+    axes[1].legend()
+    axes[0].set_ylabel("Dice")
+    fig.tight_layout()
+
+    plt.show()
+    plt.close()
+
+# %%
+for col in acquisition_params.columns:
+    if not pd.api.types.is_numeric_dtype(results_merged[col].dtype):
+        continue
+    data = results_merged.query("before_therapy & normalization != 'combined'").copy()
+
     g = sns.lmplot(
         data=data,
         y="Dice",
         x=col,
         markers=["."] * 4,
-        hue="train_location",
+        hue="normalization",
         truncate=True,
+        col="external",
     )
-    g.facet_axis(0, 0).set_title(f"{col}")
     plt.show()
     plt.close()
 
@@ -563,16 +637,19 @@ for col in acquisition_params.columns:
     bin_centers = bins[:-1] + (bins[1] - bins[0]) / 2
     data[col + "_bin_center"] = bin_centers[data[col + "_bin"] - 1]
 
-    groups = data.Dice.groupby([data.train_location, bin_num])
+    groups = data.Dice.groupby([data.normalization, bin_num])
     means = groups.mean()
     stds = groups.std()
 
-    for loc in data.train_location.unique():
+    plt.figure(figsize=(8, 6))
+    for loc in data.normalization.unique():
         plt.errorbar(
-            x=means.loc[loc].index,
+            x=bin_centers[means.loc[loc].index - 1],
             y=means.loc[loc],
             yerr=stds.loc[loc],
             label=loc,
+            capsize=5,
+            capthick=2,
         )
     plt.legend()
     plt.show()
@@ -586,7 +663,7 @@ for col in acquisition_params.columns:
         data=data,
         x=col + "_bin_center",
         y="Dice",
-        hue="train_location",
+        hue="normalization",
         markers=True,
         err_style="bars",
     )
@@ -608,6 +685,12 @@ new_names = {
     "HISTOGRAM_MATCHING": "HM",
     "UNet2D": "UNet",
     "DeepLabv3plus2D": "DeepLabV3+",
+    "Frankfurt": "Center 1",
+    "Regensburg": "Center 2",
+    "Mannheim-not-from-study": "Center 3",
+    "Mannheim": "Center 4",
+    "Wuerzburg": "Center 5",
+    "Regensburg-UK": "Center 6",
 }
 norm_order = ["Perc", "Perc-HM", "HM", "M-Std"]
 
@@ -628,32 +711,172 @@ g = sns.catplot(
     kind="box",
     legend=True,
     legend_out=True,
+    height=4,
+    aspect=0.7,
 )
 titles = [
-    "Trained and evaluated on all",
-    "Trained on single center, tested on same center",
-    "Trained on single center, tested on different center",
+    "A",
+    "B",
+    "C",
 ]
 for ax, tlt in zip(g.axes[0], titles):
     ax.set_title(tlt)
 plt.show()
 plt.close()
 
-TITLE = "Performance when training on a single center vs. on all centers"
-display_markdown(TITLE)
-g = sns.catplot(
-    data=results.query(
-        "version == 'best' & before_therapy & postprocessed & name != 'combined_models' & not external"
-    ).replace({**new_names}),
-    x="Dice",
-    y="normalization",
-    # col="external",
-    hue="train_location",
-    kind="box",
-    legend=True,
-    legend_out=True,
+fig, axes = plt.subplots(nrows=1, ncols=2, sharex=False, sharey=True, figsize=(8, 4))
+
+sns.histplot(
+    data=acquisition_params.replace(new_names),
+    hue="location",
+    x="pixel_spacing",
+    multiple="stack",
+    binwidth=0.2,
+    binrange=(0, 1.8),
+    hue_order=[f"Center {i}" for i in range(1, 7)],
+    ax=axes[0],
 )
-# g.fig.suptitle(TITLE)
-# g.fig.subplots_adjust(top=0.87)
+axes[0].set_xlabel("in-plane resolution (mm)")
+
+sns.histplot(
+    data=acquisition_params.replace(new_names),
+    hue="location",
+    x="echo_time",
+    multiple="stack",
+    binwidth=10,
+    binrange=(75, 135),
+    hue_order=[f"Center {i}" for i in range(1, 7)],
+    ax=axes[1],
+    legend=False,
+)
+axes[1].set_xlabel("echo time (ms)")
+
+titles = [
+    "A",
+    "B",
+]
+for ax, tlt in zip(axes, titles):
+    ax.set_title(tlt)
+
+plt.tight_layout()
 plt.show()
 plt.close()
+
+raw_data = (
+    results.query(
+        "version == 'best' & before_therapy & postprocessed"
+        + " & name != 'combined_models'"
+    )
+    .replace(new_names)
+    .groupby(["normalization", "network"])
+)
+data = pd.DataFrame(raw_data.Dice.mean()).drop("Dice", axis="columns")
+for group in raw_data.groups:
+    group_data = raw_data.get_group(group)
+    mean_all = group_data[group_data.train_location == "all"].Dice.mean()
+    data.loc[group, "all"] = mean_all
+    mean_internal = group_data[
+        (group_data.train_location != "all") & (~group_data.external)
+    ].Dice.mean()
+    data.loc[group, "internal"] = mean_internal
+    mean_external = group_data[
+        (group_data.train_location != "all") & group_data.external
+    ].Dice.mean()
+    data.loc[group, "external"] = mean_external
+display_markdown("Models trained on one center.")
+display_dataframe(data.round(2))
+
+# %%
+display_markdown("## Compare networks")
+
+custom_names = {**new_names}
+custom_names["DeepLabv3plus2D"] = "DLv3+"
+
+raw_data = (
+    results.query(
+        "version == 'best' & before_therapy & postprocessed"
+        + " & name != 'combined_models' & train_location == 'all'"
+    )
+    .replace(custom_names)
+    .groupby(["normalization", "network"])
+    .Dice
+)
+data = pd.DataFrame(raw_data.median())
+
+display_markdown("Models trained on all images.")
+display_dataframe(data.round(2))
+differences = pd.DataFrame(index=data.index, columns=data.index)
+
+for first in data.index:
+    for second in data.index:
+        tscore, pvalue = ttest_ind(raw_data.get_group(first), raw_data.get_group(second))
+        differences.loc[first, second] = np.round(pvalue, 3)
+display_markdown("P-Values")
+display_dataframe(differences.round(2))
+display_dataframe(differences < 0.05)
+
+display_markdown("## Compare Normalization")
+
+display_markdown("### all")
+raw_data = (
+    results.query(
+        "version == 'best' & before_therapy & postprocessed"
+        + " & name != 'combined_models' & train_location == 'all' & not external"
+    )
+    .replace(custom_names)
+    .groupby(["normalization", "network"])
+    .Dice
+)
+data = pd.DataFrame(raw_data.mean())
+differences = pd.DataFrame(index=data.index, columns=data.index)
+for first in data.index:
+    for second in data.index:
+        tscore, pvalue = ttest_ind(raw_data.get_group(first), raw_data.get_group(second))
+        differences.loc[first, second] = np.round(pvalue, 3)
+display_dataframe(data.round(2))
+display_markdown("P-Values")
+display_dataframe(differences)
+display_dataframe(differences < 0.05)
+
+display_markdown("### internal")
+raw_data = (
+    results.query(
+        "version == 'best' & before_therapy & postprocessed"
+        + " & name != 'combined_models' & train_location != 'all' & not external"
+    )
+    .replace(custom_names)
+    .groupby(["normalization", "network"])
+    .Dice
+)
+data = pd.DataFrame(raw_data.mean())
+differences = pd.DataFrame(index=data.index, columns=data.index)
+for first in data.index:
+    for second in data.index:
+        tscore, pvalue = ttest_ind(raw_data.get_group(first), raw_data.get_group(second))
+        differences.loc[first, second] = np.round(pvalue, 3)
+display_dataframe(data.round(2))
+display_markdown("P-Values")
+display_dataframe(differences)
+display_dataframe(differences < 0.05)
+
+display_markdown("### external")
+raw_data = (
+    results.query(
+        "version == 'best' & before_therapy & postprocessed"
+        + " & name != 'combined_models' & train_location != 'all' & external"
+    )
+    .replace(custom_names)
+    .groupby(["normalization", "network"])
+    .Dice
+)
+data = pd.DataFrame(raw_data.mean())
+differences = pd.DataFrame(index=data.index, columns=data.index)
+for first in data.index:
+    for second in data.index:
+        tscore, pvalue = ttest_ind(raw_data.get_group(first), raw_data.get_group(second))
+        differences.loc[first, second] = np.round(pvalue, 3)
+display_dataframe(data.round(2))
+display_markdown("P-Values")
+display_dataframe(differences)
+display_dataframe(differences < 0.05)
+display_dataframe(differences < 0.01)

@@ -239,7 +239,7 @@ def combine_models(
                 referenceImage=original_image,
                 interpolator=sitk.sitkNearestNeighbor,
                 outputPixelType=sitk.sitkUInt8,
-                useNearestNeighborExtrapolator=True,
+                useNearestNeighborExtrapolator=False,
             )
 
             sitk.WriteImage(predicted_label_orig, str(pred_path.resolve()))
