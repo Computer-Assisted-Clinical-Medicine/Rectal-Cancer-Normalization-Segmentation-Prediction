@@ -112,7 +112,7 @@ if __name__ == "__main__":
                     raise Exception("Multiple labels found")
 
     # export dataset
-    dataset_file = experiment_dir / "dataset.yaml"
+    dataset_file = experiment_dir / "dataset.yaml"  # TODO: export with relative paths
     with open(dataset_file, "w") as f:
         yaml.dump(dataset, f, sort_keys=False)
 

@@ -164,20 +164,23 @@ def combine_evaluation_results_from_folds(results_path, eval_files: List):
 
     statistics_list = []
     for eval_f in eval_files:
+        if not eval_f.exists():
+            continue
         data = pd.read_csv(eval_f, sep=";")
         data["fold"] = eval_f.parent.name
         statistics_list.append(data)
 
-    # concatenate to one array
-    statistics = pd.concat(statistics_list).sort_values(["File Number", "fold"])
-    # write to file
-    statistics.to_csv(all_statistics_path, sep=";")
+    if len(statistics_list) > 0:
+        # concatenate to one array
+        statistics = pd.concat(statistics_list).sort_values(["File Number", "fold"])
+        # write to file
+        statistics.to_csv(all_statistics_path, sep=";")
 
-    mean_statistics = statistics.groupby("fold").mean()
-    mean_statistics.to_csv(eval_mean_file_path, sep=";")
+        mean_statistics = statistics.groupby("fold").mean()
+        mean_statistics.to_csv(eval_mean_file_path, sep=";")
 
-    std_statistics = statistics.groupby("fold").std()
-    std_statistics.to_csv(eval_std_file_path, sep=";")
+        std_statistics = statistics.groupby("fold").std()
+        std_statistics.to_csv(eval_std_file_path, sep=";")
 
 
 def make_boxplot_graphic(results_path: Path, result_file: Path):

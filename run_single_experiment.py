@@ -103,7 +103,7 @@ fh_debug.setFormatter(log_formatter)
 # add to loggers
 logger.addHandler(fh_debug)
 
-with tf.device("/device:GPU:0"):
+with tf.device("/device:GPU:1"):
     run_experiment_fold(exp, f)
 
 # try to evaluate it (this will only work if this is the last fold)

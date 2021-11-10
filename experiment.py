@@ -613,6 +613,9 @@ class Experiment:
 
         for file in test_files:
             prediction_path = apply_path / f"prediction-{file}-{version}{cfg.file_suffix}"
+            if not "labels" in self.data_set[file]:
+                logger.info("No labels found for %s", file)
+                continue
             label_path = self.experiment_dir / self.data_set[file]["labels"]
             if not label_path.exists():
                 logger.info("Label %s does not exists. It will be skipped", label_path)
@@ -631,11 +634,13 @@ class Experiment:
                 logger.exception(
                     "    !!! Evaluation of %s failed for %s, %s",
                     folder_name,
-                    file.name,
+                    file,
                     err,
                 )
 
         # write evaluation results
+        if len(results) == 0:
+            return
         results = pd.DataFrame(results)
         results.set_index("File Number", inplace=True)
         results.to_csv(eval_file_path, sep=";")

@@ -249,7 +249,10 @@ def combine_models(
 
         # evaluate
         label_path = testloader.get_filenames(pat)[1]
-        if Path(label_path).exists():
+        if label_path is not None:
+            if not Path(label_path).exists():
+                print(f"{label_path} not found")
+                continue
             result_metrics = {"File Number": p_id}
             evaluation.evaluate_segmentation_prediction(
                 result_metrics, str(pred_path), str(label_path)
@@ -263,13 +266,14 @@ def combine_models(
             results_post_list.append(result_metrics)
 
     # write evaluation results
-    results = pd.DataFrame(results_list)
-    results.set_index("File Number", inplace=True)
-    results.to_csv(eval_file_path, sep=";")
-    # also the postprocessed ones
-    results_post = pd.DataFrame(results_post_list)
-    results_post.set_index("File Number", inplace=True)
-    results_post.to_csv(eval_file_path_post, sep=";")
+    if len(results_list) > 0:
+        results = pd.DataFrame(results_list)
+        results.set_index("File Number", inplace=True)
+        results.to_csv(eval_file_path, sep=";")
+        # also the postprocessed ones
+        results_post = pd.DataFrame(results_post_list)
+        results_post.set_index("File Number", inplace=True)
+        results_post.to_csv(eval_file_path_post, sep=";")
 
 
 def run_combine(experiments: List[Experiment], version="best"):
