@@ -88,31 +88,35 @@ if __name__ == "__main__":
     # create dict with all points. The names have the format:
     # patient_timepoint_l{label_number}_d{diffusion_number}
     dataset: Dict[str, Dict[str, Union[List[str], str]]] = {}
-    segmented_datapoints: List[str] = []
-    for timepoint, data in found_images.items():
-        if not "T2 axial" in data:
-            continue
-        for t2_num, image in enumerate(data["T2 axial"]):
-            name = f"{timepoint}_t{t2_num}"
-            if name in ignore:
+    for timepoint, data in segmented_images.items():
+        for label_num, label_data in enumerate(data):
+            assert "T2 axial" in label_data["name"]
+            found_data = found_images[timepoint]
+            if not "ADC axial recalculated" in found_data:
                 continue
-            image_n4 = image.replace("Images", "Images registered and N4 corrected")
-            dataset[name] = {
-                "images": [data_dir / image_n4],
-            }
-            # look for label
-            if timepoint in segmented_images:
-                matching_images = [
-                    d for d in segmented_images[timepoint] if d["image"] == image
-                ]
-                if len(matching_images) == 1:
-                    dataset[name]["labels"] = data_dir / matching_images[0]["labels"]
-                    segmented_datapoints.append(name)
-                elif len(matching_images) > 1:
-                    raise Exception("Multiple labels found")
+            if not "Diff axial b800" in found_data:
+                if "Diff axial b800 recalculated" in found_data:
+                    B_NAME = "Diff axial b800 recalculated"
+                else:
+                    raise ValueError("No b800 image found but an ADC image")
+            else:
+                B_NAME = "Diff axial b800"
+            for diff_num, (adc, b800) in enumerate(
+                zip(found_data["ADC axial recalculated"], found_data[B_NAME])
+            ):
+                name = f"{timepoint}_l{label_num}_d{diff_num}"
+                if name in ignore:
+                    continue
+                image = label_data["image"].replace(
+                    "Images", "Images registered and N4 corrected"
+                )
+                dataset[name] = {
+                    "images": [data_dir / image],
+                    "labels": data_dir / label_data["labels"],
+                }
 
     # export dataset
-    dataset_file = experiment_dir / "dataset.yaml"  # TODO: export with relative paths
+    dataset_file = experiment_dir / "dataset.yaml"
     with open(dataset_file, "w") as f:
         yaml.dump(dataset, f, sort_keys=False)
 
@@ -120,7 +124,7 @@ if __name__ == "__main__":
     train_parameters = {
         "l_r": 0.001,
         "optimizer": "Adam",
-        "epochs": 50,
+        "epochs": 100,
         # parameters for saving the best model
         "best_model_decay": 0.3,
         # scheduling parameters
@@ -209,9 +213,7 @@ if __name__ == "__main__":
             "lower_q": 0.05,
             "upper_q": 0.95,
         },
-        # NORMALIZING.HISTOGRAM_MATCHING: {"mask_quantile": 0},
-        # NORMALIZING.MEAN_STD: {},
-        NORMALIZING.HM_QUANTILE: {},
+        NORMALIZING.HISTOGRAM_MATCHING: {"mask_quantile": 0},
     }
     # add all methods with their hyperparameters
     hyper_parameters_new = []
@@ -250,12 +252,28 @@ if __name__ == "__main__":
     # set config
     PREPROCESSED_DIR = Path("data_preprocessed")
 
-    for location in ["all"]:
+    for location in ["Frankfurt", "Regensburg", "Mannheim-not-from-study", "all"]:
 
-        timepoints_train = segmented_datapoints
+        timepoints_mannheim = [
+            s for s in segmented_images.keys() if s.startswith("990") and s.endswith("_1")
+        ]
+        if location in ["Regensburg", "Frankfurt"]:
+            # only use before therapy images that are segmented
+            timepoints_train = timepoints.query(
+                f"treatment_status=='before therapy' & segmented & location=='{location}'"
+            ).index
+        elif location == "all":
+            timepoints_train = (
+                list(
+                    timepoints.query("treatment_status=='before therapy' & segmented").index
+                )
+                + timepoints_mannheim
+            )
+        elif location == "Mannheim-not-from-study":
+            timepoints_train = timepoints_mannheim
 
-        EXPERIENT_GROUP_NAME = "Normalization_T2"
-        current_exp_dir = experiment_dir / EXPERIENT_GROUP_NAME
+        experiment_group_name = f"Normalization_{location}"
+        current_exp_dir = experiment_dir / experiment_group_name
 
         # set training files
         train_list = [key for key in dataset if key.partition("_l")[0] in timepoints_train]
@@ -310,15 +328,16 @@ if __name__ == "__main__":
             exp = Experiment(
                 hyper_parameters=hyp,
                 name=experiment_name,
-                output_path_rel=Path(EXPERIENT_GROUP_NAME) / experiment_name,
+                output_path_rel=Path(experiment_group_name) / experiment_name,
                 data_set=exp_dataset,
                 crossvalidation_set=train_list,
                 external_test_set=test_list,
                 folds=K_FOLD,
                 seed=42,
                 num_channels=N_CHANNELS,
-                folds_dir_rel=Path(EXPERIENT_GROUP_NAME) / "folds",
+                folds_dir_rel=Path(experiment_group_name) / "folds",
                 tensorboard_images=True,
+                versions=["best"],
             )
             experiments.append(exp)
 
@@ -385,7 +404,7 @@ if __name__ == "__main__":
             # tensorboard command (up to here, it is the same)
             COMMAND_TB = COMMAND
             COMMAND_TB += "$start='tensorboard --logdir=\"' + "
-            COMMAND_TB += f"${{env:experiment_dir}} + '\\{EXPERIENT_GROUP_NAME}\"'\n"
+            COMMAND_TB += f"${{env:experiment_dir}} + '\\{experiment_group_name}\"'\n"
             COMMAND_TB += "Write-Output $start\n"
             COMMAND_TB += "Invoke-Expression ${start}\n"
 
@@ -393,7 +412,7 @@ if __name__ == "__main__":
             COMMAND_COMBINE = COMMAND
             COMMAND_COMBINE += '$script=${env:script_dir} + "\\combine_models.py"\n'
             COMMAND_COMBINE += (
-                f'$output_path=${{env:experiment_dir}} + "\\{EXPERIENT_GROUP_NAME}"\n'
+                f'$output_path=${{env:experiment_dir}} + "\\{experiment_group_name}"\n'
             )
             COMMAND_COMBINE += "$output_path=$output_path -replace ' ', '` '\n"
             COMMAND_COMBINE += '$command="python " + ${script} + " -p ${output_path}"\n'
@@ -403,7 +422,7 @@ if __name__ == "__main__":
             COMMAND_ANALYSIS = COMMAND
             COMMAND_ANALYSIS += '$script=${env:script_dir} + "\\analyze_results.py"\n'
             COMMAND_ANALYSIS += (
-                f'$output_path=${{env:experiment_dir}} + "\\{EXPERIENT_GROUP_NAME}"\n'
+                f'$output_path=${{env:experiment_dir}} + "\\{experiment_group_name}"\n'
             )
             COMMAND_ANALYSIS += "$output_path=$output_path -replace ' ', '` '\n"
             COMMAND_ANALYSIS += '$command="python " + ${script} + " -p ${output_path}"\n'
@@ -413,7 +432,7 @@ if __name__ == "__main__":
             COMMAND += '$script=${env:script_dir} + "\\run_single_experiment.py"\n'
             for exp in experiments:
                 COMMAND += f'\n\nWrite-Output "starting with {exp.name}"\n'
-                exp_p_rel = f"\\{EXPERIENT_GROUP_NAME}\\{exp.output_path.name}"
+                exp_p_rel = f"\\{experiment_group_name}\\{exp.output_path.name}"
                 COMMAND += f'$output_path=${{env:experiment_dir}} + "{exp_p_rel}"\n'
                 for fold_num in range(K_FOLD):
                     COMMAND += f'$command="python " + ${{script}} + " -f {fold_num} -e " + \'${{output_path}}\'\n'
