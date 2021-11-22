@@ -397,5 +397,5 @@ if __name__ == "__main__":
         all_experiments.append(Experiment.from_file(param_file))
 
     # combine the models
-    run_combine(experiments=all_experiments, version="best")
-    run_combine(experiments=all_experiments, version="final")
+    for version in all_experiments[0].versions:
+        run_combine(experiments=all_experiments, version=version)
