@@ -405,10 +405,7 @@ def gather_results(
             results_all_list.append(results)
         else:
             name = Path(results_file).parent.parent.name
-            print(
-                f"Could not find the evaluation file for {name}"
-                + " (probably not finished with training yet)."
-            )
+            print(f"Could not find the evaluation file for {name} at\n{results_file}")
 
     if len(results_all_list) == 0:
         print("No files found")

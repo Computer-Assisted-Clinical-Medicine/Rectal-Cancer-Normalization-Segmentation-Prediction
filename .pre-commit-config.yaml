@@ -19,6 +19,6 @@ repos:
     - id: pylint
       args: [
         "--disable=import-error,too-many-locals,too-many-locals,too-many-branches,too-many-statements",
-        "--disable=too-many-arguments,too-many-instance-attributes"
+        "--disable=too-many-arguments,too-many-instance-attributes,duplicate-code"
       ]
       exclude: (?x)^(test_(.+)|time_(.+))$

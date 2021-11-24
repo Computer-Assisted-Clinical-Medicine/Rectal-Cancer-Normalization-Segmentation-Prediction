@@ -19,6 +19,7 @@ import seaborn as sns
 import yaml
 from IPython import display
 from scipy.stats import ttest_ind
+from sklearn.cluster import DBSCAN, KMeans
 
 from utils import gather_results
 
@@ -880,3 +881,43 @@ display_markdown("P-Values")
 display_dataframe(differences)
 display_dataframe(differences < 0.05)
 display_dataframe(differences < 0.01)
+
+# %%
+
+display_markdown("# Cluster images")
+
+to_cluster = acquisition_params.drop(["model_name", "location"], axis="columns")
+means = to_cluster.apply(pd.Series.mean)
+stds = to_cluster.apply(pd.Series.std)
+to_cluster_norm = (to_cluster - means) / stds
+clustered = acquisition_params.copy()
+
+kmeans = KMeans(n_clusters=10, random_state=0).fit(to_cluster_norm)
+clustered["KMeans"] = kmeans.labels_
+dbscan = DBSCAN(eps=0.3, min_samples=2, metric="cosine").fit(to_cluster_norm)
+clustered["DBSCAN"] = dbscan.labels_
+
+for col in to_cluster_norm:
+    g = sns.histplot(
+        x=clustered[col],
+        hue=clustered["KMeans"].astype(str),
+        hue_order=np.sort(clustered["KMeans"].unique()).astype(str),
+        multiple="stack",
+        kde=True,
+        stat="percent",
+    )
+    g.set_title(f"{col} : K-Means")
+    plt.show()
+    plt.close()
+
+    g = sns.histplot(
+        x=clustered[col],
+        hue=clustered["DBSCAN"].astype(str),
+        hue_order=np.sort(clustered["DBSCAN"].unique()).astype(str),
+        multiple="stack",
+        kde=True,
+        stat="percent",
+    )
+    g.set_title(f"{col} : DBSCAN")
+    plt.show()
+    plt.close()
