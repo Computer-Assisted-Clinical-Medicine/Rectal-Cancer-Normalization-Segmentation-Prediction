@@ -10,8 +10,6 @@ import matplotlib
 import numpy as np
 import pandas as pd
 
-from SegmentationNetworkBasis.architecture import DenseTiramisu, UNet, DeepLabv3plus
-
 # if on cluster, use other backend
 # pylint: disable=wrong-import-position, ungrouped-imports
 if "CLUSTER" in os.environ:
@@ -274,65 +272,19 @@ def generate_folder_name(parameters):
     """
     epochs = parameters["train_parameters"]["epochs"]
 
+    loss = parameters["loss"]
+    if not isinstance(loss, str):
+        if isinstance(loss, dict):
+            loss = "Multitask"
+        else:
+            loss = str(loss)
     params = [
         parameters["architecture"].get_name() + str(parameters["dimensions"]) + "D",
-        parameters["loss"],
+        loss,
     ]
-
-    # TODO: move this logic into the network
-    if parameters["architecture"] is UNet:
-        # attention parameters
-        if "encoder_attention" in parameters["network_parameters"]:
-            if parameters["network_parameters"]["encoder_attention"] is not None:
-                params.append(parameters["network_parameters"]["encoder_attention"])
-        if "attention" in parameters["network_parameters"]:
-            if parameters["network_parameters"]["attention"]:
-                params.append("Attn")
-
-        # residual connections if it is an attribute
-        if "res_connect" in parameters["network_parameters"]:
-            if parameters["network_parameters"]["res_connect"]:
-                params.append("Res")
-            else:
-                params.append("nRes")
-
-        # filter multiplier
-        params.append("f_" + str(parameters["network_parameters"]["n_filters"][0] // 8))
-
-        # batch norm
-        if parameters["network_parameters"]["do_batch_normalization"]:
-            params.append("BN")
-        else:
-            params.append("nBN")
-
-        # dropout
-        if parameters["network_parameters"]["drop_out"][0]:
-            params.append("DO")
-        else:
-            params.append("nDO")
-    elif parameters["architecture"] is DenseTiramisu:
-        params.append("gr_" + str(parameters["network_parameters"]["growth_rate"]))
-
-        params.append(
-            "nl_" + str(len(parameters["network_parameters"]["layers_per_block"]))
-        )
-    elif parameters["architecture"] is DeepLabv3plus:
-        params.append(str(parameters["network_parameters"]["backbone"]))
-
-        params.append(
-            "aspp_"
-            + "_".join([str(n) for n in parameters["network_parameters"]["aspp_rates"]])
-        )
-    else:
-        raise NotImplementedError(f'{parameters["architecture"]} not implemented')
 
     # normalization
     params.append(str(parameters["preprocessing_parameters"]["normalizing_method"].name))
-
-    # object fraction
-    params.append(
-        f'obj_{int(parameters["train_parameters"]["percent_of_object_samples"]*100):03d}%'
-    )
 
     # add epoch number
     params.append(str(epochs))
@@ -612,7 +564,7 @@ nvidia-smi
     if not filename.parent.exists():
         filename.parent.mkdir(parents=True)
     # write to file
-    with open(filename, "w+") as f:
+    with open(filename, "w+", encoding="utf8") as f:
         f.write(slurm_file)
 
 
@@ -637,7 +589,7 @@ def export_batch_file(filename, commands):
     if not filename.parent.exists():
         filename.parent.mkdir(parents=True)
     # write to file
-    with open(filename, "w+") as f:
+    with open(filename, "w+", encoding="utf8") as f:
         f.write(batch_file)
 
     # set permission

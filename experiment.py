@@ -4,26 +4,26 @@ Class to run an experiment using user-defined hyperparameters.
 import copy
 import logging
 import os
-import sys
 from pathlib import Path, PurePath
-from typing import Dict, Iterable, List, Optional
+from typing import Any, Dict, Iterable, List, Optional, OrderedDict
 
-import GPUtil
 import numpy as np
 import pandas as pd
+import scipy
 import tensorflow as tf
 import yaml
 from tqdm.autonotebook import tqdm
 
 import evaluation
 from seg_data_loader import ApplyLoader, SegLoader
-from SegmentationNetworkBasis import config as cfg
+from SegmentationNetworkBasis import config as cfg, segbasisnet
 from SegmentationNetworkBasis import postprocessing
-from utils import export_slurm_job
 
 # configure logger
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.DEBUG)
+
+# pylint: disable=too-many-lines
 
 
 class Experiment:
@@ -45,6 +45,8 @@ class Experiment:
         reinitialize_folds=False,
         folds_dir_rel=None,
         tensorboard_images=False,
+        tasks=("segmentation",),
+        mapping=None,
     ):
         """Run experiments using a fixed set of hyperparameters
 
@@ -81,8 +83,14 @@ class Experiment:
             folds_dir_rel : str, optional
                 Where the fold descripions should be saved (relative to the experiment_dir env. variable).
                 All experiments sharing the same folds should have the same directory here, by default outputdir/folds
-            self.tensorboard_images : bool, optional
+            tensorboard_images : bool, optional
                 Wether to write images to tensorboard, takes a bit, so only for debugging, by default False
+            tasks: tuple, optional
+                Which tasks to perform, the choices are segmentation, classification, regression,
+                by default ("segmentation",)
+            mapping: dict, optional
+                For classification and regression tasks, the mapping between the real values and
+                training values, by default None
         """
         # do a deep copy of the parameters, because they contain lists and dicts
         self.hyper_parameters = copy.deepcopy(hyper_parameters)
@@ -106,6 +114,9 @@ class Experiment:
         else:
             raise ValueError(f"Version should be final or best, not {versions}.")
 
+        # save the tasks
+        self.tasks = tasks
+
         # get the environmental variables
         self.experiment_dir = Path(os.environ["experiment_dir"])
 
@@ -123,11 +134,12 @@ class Experiment:
             img_path = self.experiment_dir / self.data_set[d_name]["image"]
             if not img_path.exists():
                 raise FileNotFoundError(f"The image for {d_name} does not exist.")
-            if "labels" not in self.data_set[d_name]:
+            if "labels" not in self.data_set[d_name] and "segmentation" in self.tasks:
                 raise ValueError(f"{d_name} does not have labels")
-            lbl_path = self.experiment_dir / self.data_set[d_name]["labels"]
-            if not lbl_path.exists():
-                raise FileNotFoundError(f"The labels file for {d_name} does not exist.")
+            if "segmentation" in self.tasks:
+                lbl_path = self.experiment_dir / self.data_set[d_name]["labels"]
+                if not lbl_path.exists():
+                    raise FileNotFoundError(f"The labels file for {d_name} does not exist.")
 
         if self.external_test_set is not None:
             for d_name in self.external_test_set:
@@ -138,6 +150,41 @@ class Experiment:
                 img_path = self.experiment_dir / self.data_set[d_name]["image"]
                 if not img_path.exists():
                     raise FileNotFoundError(f"The image for {d_name} does not exist.")
+
+        # export datasets for classification and regression
+        if mapping is None:
+            self.mapping = None
+            if "classification" in self.tasks:
+                self.map_classification()
+            if "regression" in self.tasks:
+                self.map_regression()
+        else:
+            self.mapping = mapping
+
+        self.train_dataset = self.convert_dataset(self.data_set)
+
+        # create the expanded task list
+        # TODO: support multiple Segmentation tasks
+        expanded_tasks = []
+        if "segmentation" in self.tasks:
+            expanded_tasks.append("segmentation")
+        if "classification" in self.tasks:
+            expanded_tasks += ["classification"] * len(self.mapping["classification"])
+        if "regression" in self.tasks:
+            expanded_tasks += ["regression"] * len(self.mapping["regression"])
+        self.hyper_parameters["network_parameters"]["tasks"] = tuple(expanded_tasks)
+
+        # get the label shapes, if the task is regression or segmentation
+        if "classification" in self.tasks or "regression" in self.tasks:
+            # for classification, output has the number of classes as shape
+            class_shapes = tuple(
+                max(val.values()) + 1 for val in self.mapping["classification"].values()
+            )
+            # for regression, output has shape 1
+            reg_shapes = (1,) * len(self.mapping["regression"])
+            self.hyper_parameters["network_parameters"]["label_shapes"] = (
+                class_shapes + reg_shapes
+            )
 
         if output_path_rel is None:
             self.output_path_rel = PurePath("Experiments", self.name)
@@ -214,6 +261,9 @@ class Experiment:
         """
         self.set_seed()
 
+        if "number_of_vald" in self.hyper_parameters["train_parameters"]:
+            cfg.number_of_vald = self.hyper_parameters["train_parameters"]["number_of_vald"]
+
         all_indices = np.random.permutation(range(0, data_set.size))
         # split the data into self.folds sections
         if self.folds > 1:
@@ -258,15 +308,15 @@ class Experiment:
         # use this to write less
         hp_train = self.hyper_parameters["train_parameters"]
 
+        if "number_of_vald" in hp_train:
+            cfg.number_of_vald = hp_train["number_of_vald"]
+
         # set sampling parameters
         cfg.percent_of_object_samples = hp_train["percent_of_object_samples"]
         cfg.samples_per_volume = hp_train["samples_per_volume"]
         cfg.background_label_percentage = hp_train["background_label_percentage"]
 
-        # determine batch size if not set
-        if "batch_size" not in hp_train:
-            batch_size = self.estimate_batch_size()
-            hp_train["batch_size"] = int(batch_size)
+        assert "batch_size" in hp_train
 
         # set noise parameters
         # noise
@@ -282,17 +332,13 @@ class Experiment:
         cfg.max_resolution_augment = hp_train["max_resolution_augment"]
 
         cfg.num_channels = self.num_channels
-        if self.hyper_parameters["architecture"].get_name() == "UNet":
-            cfg.train_dim = 128  # the resolution in plane
-        elif self.hyper_parameters["architecture"].get_name() == "DenseTiramisu":
-            cfg.train_dim = 64  # the resolution in plane
-        elif self.hyper_parameters["architecture"].get_name() == "DeepLabv3plus":
-            cfg.train_dim = 256  # the resolution in plane
-        else:
-            raise ValueError("Unrecognized network")
+        assert "in_plane_dimension" in hp_train
+        cfg.train_dim = int(hp_train["in_plane_dimension"])
         cfg.num_slices_train = 32  # the resolution in z-direction
 
         cfg.batch_size_train = hp_train["batch_size"]
+        if cfg.batch_size_train < 4:
+            raise Warning("Batch size is below 4, which is pretty small.")
         cfg.batch_size_valid = cfg.batch_size_train
 
         # set shape according to the dimension
@@ -315,17 +361,6 @@ class Experiment:
 
         elif dim == 3:
             # set shape
-            # if batch size too small, decrease z-extent
-            if (
-                cfg.batch_size_train < 4
-                and self.hyper_parameters["architecture"].get_name() == "UNet"
-            ):
-                cfg.num_slices_train = cfg.num_slices_train // 2
-                cfg.batch_size_train = cfg.batch_size_train * 2
-                # if still to small, decrease patch extent in plane
-                if cfg.batch_size_train < 4:
-                    cfg.train_dim = cfg.train_dim // 2
-                    cfg.batch_size_train = cfg.batch_size_train * 2
             cfg.train_input_shape = [
                 cfg.num_slices_train,
                 cfg.train_dim,
@@ -357,82 +392,89 @@ class Experiment:
             4 * cfg.samples_per_volume
         )  # chosen as multiple of samples per volume
 
-    def estimate_batch_size(self):
-        """The batch size estimation is basically trail and error. So far tested
-        with 128x128x2 patches in 2D and 128x128x32x2 in 3D, if using different
-        values, guesstimate the relation to the memory.
+    def map_classification(self):
+        """Map the categorical columns to numerical values, which will be used
+        for one-hot encoding
+        """
+        classification_df = pd.DataFrame.from_dict(
+            {k: v["classification"] for k, v in self.data_set.items()}, orient="index"
+        )
+        if self.mapping is None:
+            self.mapping = {}
+        self.mapping["classification"] = OrderedDict()
+        for col in classification_df:
+            col_data = pd.Categorical(classification_df[col])
+            self.mapping["classification"][col] = {
+                cat: i for i, cat in enumerate(col_data.categories)
+            }
+
+    def map_regression(self):
+        """Map the regression columns to numerical values between 0 and 1, which
+        will be used as network output
+        """
+        classification_df = pd.DataFrame.from_dict(
+            {k: v["regression"] for k, v in self.data_set.items()}, orient="index"
+        )
+        if self.mapping is None:
+            self.mapping = {}
+        self.mapping["regression"] = OrderedDict()
+        for col in classification_df:
+            col_data = classification_df[col]
+            col_min = col_data.min()
+            col_max = col_data.max()
+            self.mapping["regression"][col] = {
+                0: float(col_min),
+                1: float(col_max),
+            }
+
+    def convert_dataset(self, dataset: Dict) -> Dict:
+        """Convert the dataset to a format that can be used to train the neural
+        network. The classification columns will be converted to one-hot encoding
+        and the regression columns to a normalized numeric value. The image and
+        labels will be kept as is.
+
+        Parameters
+        ----------
+        dataset : Dict
+            The dataset to convert. There can be entries for image, labels, classification
+            abd regression. The last Two should be a dict themselves with the individual
+            categories as keys.
 
         Returns
         -------
-        int
-            The recommended batch size
+        Dict
+            The converted dict with the same keys as the input. Only classification
+            and regression will be changed to a list of numpy arrays.
         """
+        # generate the classification mapping
+        class_map = OrderedDict()
+        for feature, values in self.mapping["classification"].items():
+            matrix = np.eye(max(values.values()) + 1)
+            class_map[feature] = {k: matrix[v] for k, v in values.items()}
+        # and the regression mapping
+        reg_map = OrderedDict()
+        for feature, values in self.mapping["regression"].items():
+            reg_map[feature] = scipy.interpolate.interp1d(
+                list(values.values()), list(values.keys())
+            )
 
-        # TODO: this should be moved into the individual models.
-
-        # set batch size
-        # determine GPU memory (in MB)
-        if len(tf.test.gpu_device_name()) > 0:
-            gpu_number = int(tf.test.gpu_device_name()[-1])
-            gpu_memory = int(np.round(GPUtil.getGPUs()[gpu_number].memoryTotal))
-        else:
-            # if no GPU was found, use 8 GB
-            gpu_memory = 1024 * 1024 * 8
-
-        a_name = self.hyper_parameters["architecture"].get_name()
-        dim = self.hyper_parameters["dimensions"]
-
-        if a_name == "UNet":
-            # filters scale after the first filter, so use that for estimation
-            first_f = self.hyper_parameters["network_parameters"]["n_filters"][0]
-            if dim == 2:
-                # this was determined by trail and error for 128x128x2 patches
-                memory_consumption_guess = 4 * first_f
-            elif dim == 3:
-                # this was determined by trail and error for 128x128x32x2 patches
-                memory_consumption_guess = 128 * first_f
-            if "attention" in self.hyper_parameters["network_parameters"]:
-                if (
-                    self.hyper_parameters["network_parameters"]["attention"]
-                    or self.hyper_parameters["network_parameters"]["encoder_attention"]
-                    is not None
-                ):
-                    memory_consumption_guess *= 2
-        elif a_name == "DenseTiramisu":
-            if dim == 2:
-                memory_consumption_guess = 512
-            if dim == 3:
-                memory_consumption_guess = 4096
-        elif a_name == "DeepLabv3plus":
-            backbone = self.hyper_parameters["network_parameters"]["backbone"]
-            if dim == 2:
-                if backbone == "resnet50":
-                    memory_consumption_guess = 1024
-                elif backbone == "resnet101":
-                    memory_consumption_guess = 1024
-                elif backbone == "resnet152":
-                    memory_consumption_guess = 1024
-                elif backbone == "mobilenet_v2":
-                    memory_consumption_guess = 512
-                elif backbone == "densenet121":
-                    memory_consumption_guess = 1024
-                elif backbone == "densenet169":
-                    memory_consumption_guess = 1024
-                elif backbone == "densenet201":
-                    memory_consumption_guess = 1024
-                elif backbone == "efficientnetB0":
-                    memory_consumption_guess = 1024
-                else:
-                    raise NotImplementedError(
-                        f"No heuristic implemented for backbone {backbone}."
-                    )
-            if dim == 3:
-                raise NotImplementedError("3D Deeplab not implemented")
-        else:
-            raise NotImplementedError("No heuristic implemented for this network.")
-
-        # return estimated recommended batch number
-        return int(np.ceil(gpu_memory / memory_consumption_guess))
+        train_dataset = {}
+        for patient, data in dataset.items():
+            train_dataset[patient] = {}
+            if "image" in data:
+                train_dataset[patient]["image"] = data["image"]
+            if "labels" in data:
+                train_dataset[patient]["labels"] = data["labels"]
+            if "classification" in data:
+                train_dataset[patient]["classification"] = [
+                    f_map[data["classification"][f_name]]
+                    for f_name, f_map in class_map.items()
+                ]
+            if "regression" in data:
+                train_dataset[patient]["regression"] = [
+                    f_map(data["regression"][f_name]) for f_name, f_map in reg_map.items()
+                ]
+        return train_dataset
 
     def training(self, folder_name: str, train_files: List, vald_files: List):
         """Do the actual training
@@ -454,7 +496,7 @@ class Experiment:
         # generate loader
         training_dataset = SegLoader(
             name="training_loader",
-            file_dict=self.data_set,
+            file_dict=self.train_dataset,
             frac_obj=self.hyper_parameters["train_parameters"]["percent_of_object_samples"],
         )(
             train_files,
@@ -465,7 +507,7 @@ class Experiment:
         validation_dataset = SegLoader(
             mode=SegLoader.MODES.VALIDATE,
             name="validation_loader",
-            file_dict=self.data_set,
+            file_dict=self.train_dataset,
             frac_obj=self.hyper_parameters["train_parameters"]["percent_of_object_samples"],
         )(
             vald_files,
@@ -475,11 +517,15 @@ class Experiment:
         )
 
         # just use one sample with the foreground class using the validation files
+        if "segmentation" in self.tasks:
+            frac_obj_val = 1
+        else:
+            frac_obj_val = 0
         if self.tensorboard_images:
             visualization_dataset = SegLoader(
                 name="visualization",
-                file_dict=self.data_set,
-                frac_obj=1,
+                file_dict=self.train_dataset,
+                frac_obj=frac_obj_val,
                 samples_per_volume=5,
                 shuffle=False,
             )(
@@ -494,8 +540,8 @@ class Experiment:
         # only do a graph for the first fold
         write_graph = folder_name == "fold-0"
 
-        net = self.hyper_parameters["architecture"](
-            self.hyper_parameters["loss"],
+        net: segbasisnet.SegBasisNet = self.hyper_parameters["architecture"](
+            loss_name=self.hyper_parameters["loss"],
             # add initialization parameters
             **self.hyper_parameters["network_parameters"],
         )
@@ -508,6 +554,7 @@ class Experiment:
             validation_dataset=validation_dataset,
             visualization_dataset=visualization_dataset,
             write_graph=write_graph,
+            visualize_labels="segmentation" in self.tasks,
             # add training parameters
             **(self.hyper_parameters["train_parameters"]),
         )
@@ -533,7 +580,7 @@ class Experiment:
         # set data dir
         cfg.data_base_dir = self.experiment_dir
 
-        testloader = ApplyLoader(name="test_loader", file_dict=self.data_set)
+        testloader = ApplyLoader(name="test_loader", file_dict=self.train_dataset)
 
         net = self.hyper_parameters["architecture"](
             self.hyper_parameters["loss"],
@@ -545,6 +592,8 @@ class Experiment:
         logger.info("Started applying %s to test datset.", folder_name)
 
         apply_path = self.output_path / folder_name / apply_name
+        if not apply_path.exists():
+            apply_path.mkdir()
         for file in tqdm(
             test_files, desc=f'{folder_name} ({apply_name.replace("_", " ")})', unit="file"
         ):
@@ -552,15 +601,18 @@ class Experiment:
 
             # do inference
             result_image = apply_path / f"prediction-{f_name}-{version}{cfg.file_suffix}"
-            if not result_image.exists():
+            result_table = apply_path / f"prediction-{f_name}-{version}.csv"
+            if not (result_image.exists() or result_table.exists()):
                 net.apply(testloader, file, apply_path=apply_path)
 
             # postprocess the image
-            postprocessed_image = (
-                apply_path / f"prediction-{f_name}-{version}-postprocessed{cfg.file_suffix}"
-            )
-            if not postprocessed_image.exists():
-                self.postprocess(result_image, postprocessed_image)
+            if "segmentation" in self.tasks:
+                postprocessed_image = (
+                    apply_path
+                    / f"prediction-{f_name}-{version}-postprocessed{cfg.file_suffix}"
+                )
+                if not postprocessed_image.exists():
+                    self.postprocess(result_image, postprocessed_image)
 
         tf.keras.backend.clear_session()
 
@@ -602,52 +654,148 @@ class Experiment:
         if not apply_path.exists():
             raise FileNotFoundError(f"The apply path {apply_path} does not exist.")
 
-        eval_file_path = (
-            self.output_path
-            / folder_name
-            / f"evaluation-{folder_name}-{version}_{name}.csv"
-        )
+        for task in self.tasks:
 
-        # remember the results
-        results = []
+            # only evaluate postprocessed files for segmentation
+            if task in ("classification", "regression"):
+                if "postprocessed" in version:
+                    continue
 
-        for file in test_files:
-            prediction_path = apply_path / f"prediction-{file}-{version}{cfg.file_suffix}"
-            if not "labels" in self.data_set[file]:
-                logger.info("No labels found for %s", file)
+            eval_name = f"evaluation-{folder_name}-{version}_{name}-{task}.csv"
+            eval_file_path = self.output_path / folder_name / eval_name
+
+            # remember the results
+            results = []
+
+            if task == "segmentation":
+                suffix = cfg.file_suffix
+            else:
+                suffix = ".json"
+
+            for file in test_files:
+                prediction_path = apply_path / f"prediction-{file}-{version}{suffix}"
+                if not prediction_path.exists():
+                    raise FileNotFoundError(f"{prediction_path} was not found.")
+                if task == "segmentation":
+                    file_metrics = self.evaluate_segmentation(file, prediction_path)
+                elif task == "classification":
+                    file_metrics = self.evaluate_classification(file, prediction_path)
+                elif task == "regression":
+                    file_metrics = self.evaluate_regression(file, prediction_path)
+                else:
+                    raise ValueError(f"Task {task} unknown")
+                if file_metrics is not None:
+                    file_metrics["File Number"] = file
+                    results.append(file_metrics)
+
+            # write evaluation results
+            if len(results) == 0:
                 continue
-            label_path = self.experiment_dir / self.data_set[file]["labels"]
-            if not label_path.exists():
-                logger.info("Label %s does not exists. It will be skipped", label_path)
-                continue
-            try:
-                result_metrics = {"File Number": file}
+            results = pd.DataFrame(results)
+            results.set_index("File Number", inplace=True)
+            results.to_csv(eval_file_path, sep=";")
 
-                result_metrics = evaluation.evaluate_segmentation_prediction(
-                    result_metrics, str(prediction_path), str(label_path)
+    def evaluate_segmentation(self, file: str, prediction_path: Path) -> Dict[str, Any]:
+        """Evaluate the segmentation of a single image
+
+        Parameters
+        ----------
+        file : str
+            The file identifier to analyse
+        prediction_path : Path
+            The path of the prediction
+
+        Returns
+        -------
+        Dict[str, Any]
+            The resulting metrics as a dictionary with each metric as one entry
+        """
+        # see that the labels are there
+        if not "labels" in self.data_set[file]:
+            logger.info("No labels found for %s", file)
+            return None
+        label_path = self.experiment_dir / self.data_set[file]["labels"]
+        if not label_path.exists():
+            logger.info("Label %s does not exists. It will be skipped", label_path)
+            raise FileNotFoundError(f"Labels {label_path} not found.")
+        # do the evaluation
+        try:
+            result_metrics = evaluation.evaluate_segmentation_prediction(
+                str(prediction_path), str(label_path)
+            )
+            logger.info("        Finished Evaluation for %s", file)
+        except RuntimeError as err:
+            logger.exception("Evaluation failed for %s, %s", file, err)
+        return result_metrics
+
+    def evaluate_classification(self, file: str, prediction_path: Path) -> Dict[str, Any]:
+        """Evaluate the classification of a single image
+
+        Parameters
+        ----------
+        file : str
+            The file identifier to analyse
+        prediction_path : Path
+            The path of the prediction
+
+        Returns
+        -------
+        Dict[str, Any]
+            The resulting metrics as a dictionary with each metric as one entry
+        """
+        # get the dictionaries
+        class_dict = self.data_set[file]["classification"]
+        results = pd.read_json(prediction_path)
+        mapping = self.mapping["classification"]
+        # only use the classification columns
+        results_class = results[results.columns[: len(mapping)]]
+        result_metrics = {}
+        # do the evaluation
+        for col, (col_name, map_dict) in zip(results_class, mapping.items()):
+            results_col = results_class[col]
+            ground_truth = map_dict[class_dict[col_name]]
+            col_metrics = evaluation.evaluate_classification(results_col, ground_truth)
+            for key, value in col_metrics.items():
+                result_metrics[f"{col_name}_{key}"] = value
+        return result_metrics
+
+    def evaluate_regression(self, file: str, prediction_path: Path) -> Dict[str, Any]:
+        """Evaluate the regression of a single image
+
+        Parameters
+        ----------
+        file : str
+            The file identifier to analyse
+        prediction_path : Path
+            The path of the prediction
+
+        Returns
+        -------
+        Dict[str, Any]
+            The resulting metrics as a dictionary with each metric as one entry
+        """
+        # get the dictionaries
+        class_dict = self.data_set[file]["regression"]
+        results = pd.read_json(prediction_path)
+        mapping = self.mapping["regression"]
+        # only use the regression columns
+        results_class = results[results.columns[-len(mapping) :]]
+        result_metrics = {}
+        # do the evaluation
+        for col, (col_name, map_dict) in zip(results_class, mapping.items()):
+            results_col = results_class[col]
+            ground_truth = float(
+                scipy.interpolate.interp1d(list(map_dict.values()), list(map_dict.keys()))(
+                    class_dict[col_name]
                 )
-
-                # append result to eval file
-                results.append(result_metrics)
-                logger.info("        Finished Evaluation for %s", file)
-            except RuntimeError as err:
-                logger.exception(
-                    "    !!! Evaluation of %s failed for %s, %s",
-                    folder_name,
-                    file,
-                    err,
-                )
-
-        # write evaluation results
-        if len(results) == 0:
-            return
-        results = pd.DataFrame(results)
-        results.set_index("File Number", inplace=True)
-        results.to_csv(eval_file_path, sep=";")
+            )
+            col_metrics = evaluation.evaluate_regression(results_col, ground_truth)
+            for key, value in col_metrics.items():
+                result_metrics[f"{col_name}_{key}"] = value
+        return result_metrics
 
     def run_all_folds(self):
         """This is just a wrapper for run_fold and runs it for all folds"""
-        self.hyper_parameters["evaluate_on_finetuned"] = False
         self.set_seed()
 
         for (fold,) in range(0, self.folds):
@@ -781,23 +929,27 @@ class Experiment:
 
         # use all versions plus their postprocessed versions
         for version in [v + p for p in ["", "-postprocessed"] for v in self.versions]:
-            # set eval files
-            eval_files = []
-            for f_name in self.fold_dir_names:
-                eval_files.append(
-                    self.output_path / f_name / f"evaluation-{f_name}-{version}_{name}.csv"
-                )
-            if not np.all([f.exists() for f in eval_files]):
-                raise FileNotFoundError("Eval file not found")
-            # combine previous evaluations
-            output_path = self.output_path / f"results_{name}_{version}"
-            if not output_path.exists():
-                output_path.mkdir()
-            evaluation.combine_evaluation_results_from_folds(output_path, eval_files)
-            # make plots
-            evaluation.make_boxplot_graphic(
-                output_path, output_path / "evaluation-all-files.csv"
-            )
+            for task in self.tasks:
+                # set eval files
+                eval_files = []
+                for f_name in self.fold_dir_names:
+                    eval_files.append(
+                        self.output_path
+                        / f_name
+                        / f"evaluation-{f_name}-{version}_{name}-{task}.csv"
+                    )
+                if not np.all([f.exists() for f in eval_files]):
+                    raise FileNotFoundError("Eval file not found")
+                # combine previous evaluations
+                output_path = self.output_path / f"results_{name}_{version}_{task}"
+                if not output_path.exists():
+                    output_path.mkdir()
+                evaluation.combine_evaluation_results_from_folds(output_path, eval_files)
+                # make plots
+                if task == "segmentation":
+                    evaluation.make_boxplot_graphic(
+                        output_path, output_path / "evaluation-all-files.csv"
+                    )
 
     def evaluate_external_testset(self):
         """evaluate the external testset, this just call evaluate for this set."""
@@ -812,7 +964,6 @@ class Experiment:
         overwrite : bool, optional
             If the existing file should be overwritten, by default False
         """
-        # do not overwrite it
         if not overwrite and self.experiment_file.exists():
             return
         experiment_dict = {
@@ -829,12 +980,14 @@ class Experiment:
             "crossvalidation_set": [str(f) for f in self.crossvalidation_set],
             "data_set": self.data_set,
             "versions": self.versions,
+            "tasks": self.tasks,
+            "mapping": self.mapping,
         }
         if hasattr(self, "external_test_set"):
             if self.external_test_set is not None:
                 ext_set = [str(f) for f in self.external_test_set]
                 experiment_dict["external_test_set"] = ext_set
-        with open(self.experiment_file, "w") as f:
+        with open(self.experiment_file, "w", encoding="utf8") as f:
             yaml.dump(experiment_dict, f, sort_keys=False)
         return
 
@@ -852,50 +1005,6 @@ class Experiment:
         Experiment
             The experiment as object
         """
-        with open(file, "r") as f:
+        with open(file, "r", encoding="utf8") as f:
             parameters = yaml.load(f, Loader=yaml.Loader)
         return cls(**parameters)
-
-    def export_slurm_file(self, working_dir) -> Path:
-        """Export the slurm files needed to start the training on the cluster.
-
-        Parameters
-        ----------
-        working_dir : PathLike
-            The current working directory
-
-        Returns
-        -------
-        Path
-            The location of the slurm file
-        """
-        run_script = Path(sys.argv[0]).resolve().parent / "run_single_experiment.py"
-        job_dir = Path(os.environ["experiment_dir"]) / "slurm_jobs"
-        if not job_dir.exists():
-            job_dir.mkdir()
-        log_dir = self.output_path / "slurm_logs"
-        if not log_dir.exists():
-            log_dir.mkdir(parents=True)
-        job_file = job_dir / f"run_{self.name}.sh"
-        if self.hyper_parameters["dimensions"] == 3:
-            gpu_type = "GPU_no_K80"
-        else:
-            gpu_type = "GPU"
-        export_slurm_job(
-            filename=job_file,
-            command=f"python {run_script} -f $SLURM_ARRAY_TASK_ID -e {self.output_path}",
-            job_name=self.name,
-            venv_dir=Path(sys.argv[0]).resolve().parent / "venv",
-            workingdir=working_dir,
-            job_type=gpu_type,
-            hours=24,
-            minutes=0,
-            log_dir=log_dir,
-            array_job=True,
-            array_range=f"0-{self.folds-1}",
-            variables={
-                "data_dir": os.environ["data_dir"],
-                "experiment_dir": os.environ["experiment_dir"],
-            },
-        )
-        return job_file
