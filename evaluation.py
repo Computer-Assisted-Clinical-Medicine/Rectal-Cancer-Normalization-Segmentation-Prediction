@@ -11,8 +11,7 @@ import numpy as np
 import pandas as pd
 import SimpleITK as sitk
 
-import SegmentationNetworkBasis.NetworkBasis.image as Image
-import SegmentationNetworkBasis.NetworkBasis.metric as Metric
+import SegmentationNetworkBasis.metric as Metric
 
 # configure logger
 logger = logging.getLogger(__name__)
@@ -38,17 +37,16 @@ def evaluate_segmentation_prediction(prediction_path: str, label_path: str) -> d
         The dict with the resulting metrics
     """
     pred_img = sitk.ReadImage(prediction_path)
-    data_info = Image.get_data_info(pred_img)
     result_metrics = {}
-    result_metrics["Slices"] = data_info["orig_size"][2]
+    result_metrics["Slices"] = pred_img.getSize()[2]
 
     # load label for evaluation
     label_img = sitk.ReadImage(label_path)
 
     # This is necessary as in some data sets this is incorrect.
-    label_img.SetDirection(data_info["orig_direction"])
-    label_img.SetOrigin(data_info["orig_origin"])
-    label_img.SetSpacing(data_info["orig_spacing"])
+    label_img.SetDirection(pred_img.GetDirection())
+    label_img.SetOrigin(pred_img.GetOrigin())
+    label_img.SetSpacing(pred_img.GetSpacing())
 
     # check types and if not equal, convert output to target
     if pred_img.GetPixelID() != label_img.GetPixelID():
