@@ -250,7 +250,9 @@ if __name__ == "__main__":
             # only use before therapy images that are segmented
             timepoints_train = timepoints.query(f"location=='{location}'").index
         elif location == "all":
-            timepoints_train = list(timepoints.index) + timepoints_mannheim
+            timepoints_train = (
+                list(timepoints.index) + timepoints_mannheim
+            )  # pylint: disable=no-member
         elif location == "Mannheim-not-from-study":
             timepoints_train = timepoints_mannheim
 

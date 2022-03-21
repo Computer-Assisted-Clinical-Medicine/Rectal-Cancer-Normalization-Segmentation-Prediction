@@ -502,7 +502,6 @@ class Experiment:
             train_files,
             batch_size=cfg.batch_size_train,
             n_epochs=self.hyper_parameters["train_parameters"]["epochs"],
-            read_threads=cfg.train_reader_instances,
         )
         validation_dataset = SegLoader(
             mode=SegLoader.MODES.VALIDATE,
@@ -512,7 +511,6 @@ class Experiment:
         )(
             vald_files,
             batch_size=cfg.batch_size_valid,
-            read_threads=cfg.vald_reader_instances,
             n_epochs=self.hyper_parameters["train_parameters"]["epochs"],
         )
 
@@ -531,7 +529,6 @@ class Experiment:
             )(
                 vald_files,
                 batch_size=cfg.batch_size_train,
-                read_threads=1,
                 n_epochs=self.hyper_parameters["train_parameters"]["epochs"],
             )
         else:
@@ -603,7 +600,12 @@ class Experiment:
             result_image = apply_path / f"prediction-{f_name}-{version}{cfg.file_suffix}"
             result_table = apply_path / f"prediction-{f_name}-{version}.csv"
             if not (result_image.exists() or result_table.exists()):
-                net.apply(testloader, file, apply_path=apply_path)
+                net.apply(
+                    version=version,
+                    application_dataset=testloader,
+                    filename=file,
+                    apply_path=apply_path,
+                )
 
             # postprocess the image
             if "segmentation" in self.tasks:

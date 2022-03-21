@@ -9,7 +9,7 @@ class Model(tf.keras.models.Model):
 """
 import logging
 
-from tensorflow.keras.models import Model
+from tensorflow.keras.models import Model  # pylint: disable=no-name-in-module
 
 from SegmentationArchitectures import densenets
 from SegmentationArchitectures import deeplab

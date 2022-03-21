@@ -261,7 +261,7 @@ def make_boxplot_graphic(results_path: Path, result_file: Path):
 
     for met in metrics:
 
-        groups = results.groupby("fold")
+        groups = results.groupby("fold")  # pylint: disable=no-member
         labels = list(groups.groups.keys())
         data = groups[met].apply(list).values
 

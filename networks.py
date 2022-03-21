@@ -138,7 +138,7 @@ class SimpleModel(SegBasisNet):
         )
         self.options["out_channels"] = 1
 
-    def _run_apply(self, version, model_path, application_dataset, filename, apply_path):
+    def apply(self, version, application_dataset, filename, apply_path):
 
         n_outputs = len(self.model.outputs)
         results = []
