@@ -15,6 +15,7 @@ import tensorflow as tf
 
 from experiment import Experiment
 from utils import configure_logging, plot_hparam_comparison
+from SegmentationNetworkBasis.utils import get_gpu
 
 
 def init_argparse():
@@ -103,7 +104,10 @@ fh_debug.setFormatter(log_formatter)
 # add to loggers
 logger.addHandler(fh_debug)
 
-with tf.device("/device:GPU:1"):
+# get the GPU
+gpu = tf.device(get_gpu(memory_limit=4000))
+
+with gpu:
     run_experiment_fold(exp, f)
 
 # try to evaluate it (this will only work if this is the last fold)

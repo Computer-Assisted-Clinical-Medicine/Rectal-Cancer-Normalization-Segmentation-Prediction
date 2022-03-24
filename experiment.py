@@ -165,14 +165,16 @@ class Experiment:
 
         # create the expanded task list
         # TODO: support multiple Segmentation tasks
-        expanded_tasks = []
+        self.expanded_tasks = OrderedDict()
         if "segmentation" in self.tasks:
-            expanded_tasks.append("segmentation")
+            self.expanded_tasks["seg"] = "segmentation"
         if "classification" in self.tasks:
-            expanded_tasks += ["classification"] * len(self.mapping["classification"])
+            for field in self.mapping["classification"].keys():
+                self.expanded_tasks[field] = "classification"
         if "regression" in self.tasks:
-            expanded_tasks += ["regression"] * len(self.mapping["regression"])
-        self.hyper_parameters["network_parameters"]["tasks"] = tuple(expanded_tasks)
+            for field in self.mapping["regression"].keys():
+                self.expanded_tasks[field] = "regression"
+        self.hyper_parameters["network_parameters"]["tasks"] = self.expanded_tasks
 
         # get the label shapes, if the task is regression or segmentation
         if "classification" in self.tasks or "regression" in self.tasks:
@@ -306,7 +308,7 @@ class Experiment:
         """
 
         # use this to write less
-        hp_train = self.hyper_parameters["train_parameters"]
+        hp_train: dict = self.hyper_parameters["train_parameters"]
 
         if "number_of_vald" in hp_train:
             cfg.number_of_vald = hp_train["number_of_vald"]
@@ -333,8 +335,10 @@ class Experiment:
 
         cfg.num_channels = self.num_channels
         assert "in_plane_dimension" in hp_train
-        cfg.train_dim = int(hp_train["in_plane_dimension"])
-        cfg.num_slices_train = 32  # the resolution in z-direction
+        p_dim = int(hp_train["in_plane_dimension"])
+        cfg.train_dim = p_dim
+        z_dim = hp_train.get("number_slices", 32)  # the resolution in z-direction
+        cfg.num_slices_train = z_dim
 
         cfg.batch_size_train = hp_train["batch_size"]
         if cfg.batch_size_train < 4:
@@ -343,12 +347,12 @@ class Experiment:
 
         # set shape according to the dimension
         dim = self.hyper_parameters["dimensions"]
+        n_cls_seg = cfg.num_classes_seg
         if dim == 2:
             # set shape
-            cfg.train_input_shape = [cfg.train_dim, cfg.train_dim, cfg.num_channels]
-            cfg.train_label_shape = [cfg.train_dim, cfg.train_dim, cfg.num_classes_seg]
+            cfg.train_input_shape = [p_dim, p_dim, self.num_channels]
+            cfg.train_label_shape = [p_dim, p_dim, n_cls_seg]
 
-            # set sample numbers
             # there are 10-30 layers per image containing foreground data. Half the
             # samples are taken from the foreground, so take about 64 samples
             # to cover all the foreground pixels at least once on average, but
@@ -358,23 +362,20 @@ class Experiment:
                 cfg.train_input_shape,
                 cfg.train_label_shape,
             )
-
         elif dim == 3:
-            # set shape
             cfg.train_input_shape = [
-                cfg.num_slices_train,
-                cfg.train_dim,
-                cfg.train_dim,
-                cfg.num_channels,
+                z_dim,
+                p_dim,
+                p_dim,
+                self.num_channels,
             ]
             cfg.train_label_shape = [
-                cfg.num_slices_train,
-                cfg.train_dim,
-                cfg.train_dim,
-                cfg.num_classes_seg,
+                z_dim,
+                p_dim,
+                p_dim,
+                n_cls_seg,
             ]
 
-            # set sample numbers
             cfg.samples_per_volume = 8
             logger.debug(
                 "   Train Shapes: %s (input), %s (labels)",
@@ -388,9 +389,7 @@ class Experiment:
         if cfg.samples_per_volume * cfg.number_of_vald <= cfg.batch_size_valid:
             cfg.batch_size_valid = cfg.samples_per_volume * cfg.number_of_vald
 
-        cfg.batch_capacity_train = (
-            4 * cfg.samples_per_volume
-        )  # chosen as multiple of samples per volume
+        cfg.batch_capacity_train = 4 * cfg.samples_per_volume
 
     def map_classification(self):
         """Map the categorical columns to numerical values, which will be used
@@ -597,9 +596,9 @@ class Experiment:
             f_name = Path(file).name
 
             # do inference
+            result_npz = apply_path / f"prediction-{f_name}-{version}.npz"
             result_image = apply_path / f"prediction-{f_name}-{version}{cfg.file_suffix}"
-            result_table = apply_path / f"prediction-{f_name}-{version}.csv"
-            if not (result_image.exists() or result_table.exists()):
+            if not result_npz.exists():
                 net.apply(
                     version=version,
                     application_dataset=testloader,
@@ -669,13 +668,8 @@ class Experiment:
             # remember the results
             results = []
 
-            if task == "segmentation":
-                suffix = cfg.file_suffix
-            else:
-                suffix = ".json"
-
             for file in test_files:
-                prediction_path = apply_path / f"prediction-{file}-{version}{suffix}"
+                prediction_path = apply_path / f"prediction-{file}-{version}.npz"
                 if not prediction_path.exists():
                     raise FileNotFoundError(f"{prediction_path} was not found.")
                 if task == "segmentation":
@@ -747,14 +741,12 @@ class Experiment:
         """
         # get the dictionaries
         class_dict = self.data_set[file]["classification"]
-        results = pd.read_json(prediction_path)
+        results = np.load(prediction_path)
         mapping = self.mapping["classification"]
-        # only use the classification columns
-        results_class = results[results.columns[: len(mapping)]]
         result_metrics = {}
         # do the evaluation
-        for col, (col_name, map_dict) in zip(results_class, mapping.items()):
-            results_col = results_class[col]
+        for col_name, map_dict in mapping.items():
+            results_col = results[col_name]
             ground_truth = map_dict[class_dict[col_name]]
             col_metrics = evaluation.evaluate_classification(results_col, ground_truth)
             for key, value in col_metrics.items():
@@ -778,14 +770,12 @@ class Experiment:
         """
         # get the dictionaries
         class_dict = self.data_set[file]["regression"]
-        results = pd.read_json(prediction_path)
+        results = np.load(prediction_path)
         mapping = self.mapping["regression"]
-        # only use the regression columns
-        results_class = results[results.columns[-len(mapping) :]]
         result_metrics = {}
         # do the evaluation
-        for col, (col_name, map_dict) in zip(results_class, mapping.items()):
-            results_col = results_class[col]
+        for col_name, map_dict in mapping.items():
+            results_col = results[col_name]
             ground_truth = float(
                 scipy.interpolate.interp1d(list(map_dict.values()), list(map_dict.keys()))(
                     class_dict[col_name]

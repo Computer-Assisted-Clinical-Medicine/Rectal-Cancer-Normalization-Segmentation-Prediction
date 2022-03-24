@@ -1,9 +1,7 @@
 """Models for the classification of the acquisition parameters
 """
-from pathlib import Path
-from typing import Collection, Union
+from typing import Callable, Collection, Union
 
-import pandas as pd
 import tensorflow as tf
 from tensorflow.keras import Model, layers
 
@@ -15,7 +13,7 @@ def simple_model(
     inputs: tf.keras.Input,
     label_shapes: Collection[Union[tuple, int]],
     n_conv=5,
-    global_pool=True,
+    global_pool=False,
 ) -> tf.keras.Model:
     """Build a simple model for classification
 
@@ -33,37 +31,35 @@ def simple_model(
         The resulting keras model
     """
     # first convolution
-    x = layers.Conv2D(filters=12, kernel_size=3, padding="same", name="input_conv")(inputs)
+    x = layers.Conv2D(filters=3, kernel_size=3, padding="same", name="input_conv")(inputs)
     x = layers.BatchNormalization(name="input_conv/bn")(x)
     x = layers.Activation("elu", name="input_conv/act")(x)
 
     # scale down multiple times
-    for i in range(n_conv):
-        filters = 12 * (2 ** (i + 1))
+    for i in range(n_conv - 1):
+        filters = 6 * (2 ** (i + 1))
         x = layers.Conv2D(
             filters=filters, kernel_size=3, padding="same", name=f"red{i}/conv"
         )(x)
         x = layers.BatchNormalization(name=f"red{i}/bn")(x)
         x = layers.Activation("elu", name=f"red{i}/act")(x)
-        x = layers.SpatialDropout2D(rate=0.2, name=f"red{i}/dropout")(x)
         x = layers.MaxPool2D(pool_size=(2, 2), padding="same", name=f"red{i}/pool")(x)
 
     # get the different outputs
     outputs = []
 
     for i, shape in enumerate(label_shapes):
-        out = layers.Conv2D(filters=shape, kernel_size=1, activation=None)(x)
-        out = tf.keras.layers.Dropout(0.2)(out)
-        out = tf.keras.layers.BatchNormalization()(out)
+        out = layers.Conv2D(
+            filters=shape, kernel_size=1, activation=None, name=f"final/label_{i}_conv"
+        )(x)
         if global_pool:
-            out = tf.keras.layers.GlobalMaxPooling2D()(out)
+            out = tf.keras.layers.GlobalMaxPooling2D(name=f"final/label_{i}_maxpool")(out)
         if shape == 1:
-            final_act = None
+            pred = tf.keras.layers.Activation(None, name=f"output_{i}")(out)
         elif shape > 1:
-            final_act = "softmax"
+            pred = tf.keras.layers.Softmax(name=f"output_{i}", axis=-1)(out)
         else:
             raise ValueError("Shape cannot be 0")
-        pred = tf.keras.layers.Activation(final_act, name=f"output_{i}")(out)
         outputs.append(pred)
 
     return Model(inputs=inputs, outputs=tuple(outputs))
@@ -113,6 +109,8 @@ class SimpleModel(SegBasisNet):
             **kwargs,
         )
 
+        self.divisible_by = 1
+
     @staticmethod
     def get_name():
         return "SimpleModel"
@@ -120,11 +118,28 @@ class SimpleModel(SegBasisNet):
     def _build_model(self) -> Model:
         """Builds Model"""
 
-        # only do global pooling when training the model
         return simple_model(
             inputs=self.inputs["x"],
             label_shapes=self.options["label_shapes"],
+            n_conv=self.options["n_conv"],
         )
+
+    def get_hyperparameter_dict(self):
+        """This function reads the hyperparameters from options and writes them to a dict of
+        hyperparameters, which can then be read using tensorboard.
+
+        Returns
+        -------
+        dict
+            the hyperparameters as a dictionary
+        """
+        hyp = {
+            "dimension": self.options.get("rank"),
+            "loss": self.options["loss_name"],
+            "n_conv": self.options["n_conv"],
+        }
+        hyperparameters = {key: str(value) for key, value in hyp.items()}
+        return hyperparameters
 
     def _set_up_inputs(self):
         """setup the inputs. Inputs are taken from the config file."""
@@ -138,29 +153,44 @@ class SimpleModel(SegBasisNet):
         )
         self.options["out_channels"] = 1
 
-    def apply(self, version, application_dataset, filename, apply_path):
+    def get_loss(self, loss_name: str, task="segmentation") -> Callable:
+        loss_func = super().get_loss(loss_name, task)
+        # because the network is fully convolutional, the spatial dimension need ot be reduced
+        if task in ("classification", "regression"):
+            assert hasattr(loss_func, "__call__")
+            axes = tuple(range(1, self.options["rank"] + 1))
 
-        n_outputs = len(self.model.outputs)
-        results = []
-        for sample in application_dataset(filename):
-            # add batch dimension
-            res = self.model(sample.reshape((1,) + sample.shape))
-            results.append(res)
+            def loss_func_red(y, y_pred):
+                # scale y up to the size of y_pred
+                y_up = y
+                for ax in axes:
+                    y_up = tf.expand_dims(y_up, ax)
+                    y_up = tf.repeat(y_up, repeats=y_pred.shape[ax], axis=ax)
+                loss_val = loss_func(y_up, y_pred)
+                return loss_val
 
-        # separate into multiple lists
-        output = [[row[out] for row in results] for out in range(n_outputs)]
-        # and concatenate them
-        output = [tf.concat(out, 0).numpy().squeeze() for out in output]
+            if isinstance(loss_name, str):
+                loss_func_red.name = loss_name
+            return loss_func_red
+        else:
+            return loss_func
 
-        # write the output to a file
-        output_df = pd.DataFrame(columns=pd.RangeIndex(n_outputs))
-        for col, values in zip(output_df, output):
-            output_df[col] = list(values)
+    def get_metric(self, metric, task="segmentation"):
+        metric_func = super().get_metric(metric, task)
+        if task in ("classification", "regression"):
+            assert hasattr(metric_func, "__call__")
+            axes = tuple(range(1, self.options["rank"] + 1))
 
-        name = Path(filename).name
-        output_path = Path(apply_path) / f"prediction-{name}-{version}.json"
-        output_df.index.rename("Slice", inplace=True)
-        output_df.to_json(output_path, indent=1)
-        output_df.to_csv(output_path.with_suffix(".csv"), sep=";")
+            def metric_func_red(y, y_pred):
+                # scale y up to the size of y_pred
+                y_up = y
+                for ax in axes:
+                    y_up = tf.expand_dims(y_up, ax)
+                    y_up = tf.repeat(y_up, repeats=y_pred.shape[ax], axis=ax)
+                metric_val = metric_func(y_up, y_pred)
+                return metric_val
 
-        return output
+            metric_func_red.name = metric_func.name
+            return metric_func_red
+        else:
+            return metric_func

@@ -266,34 +266,6 @@ def compare_hyperparameters(experiments, experiment_dir, version="best"):
     hparams_changed.to_csv(hyperparameter_changed_file, sep=";")
 
 
-def generate_folder_name(parameters):
-    """
-    Make a name summarizing the hyperparameters.
-    """
-    epochs = parameters["train_parameters"]["epochs"]
-
-    loss = parameters["loss"]
-    if not isinstance(loss, str):
-        if isinstance(loss, dict):
-            loss = "Multitask"
-        else:
-            loss = str(loss)
-    params = [
-        parameters["architecture"].get_name() + str(parameters["dimensions"]) + "D",
-        loss,
-    ]
-
-    # normalization
-    params.append(str(parameters["preprocessing_parameters"]["normalizing_method"].name))
-
-    # add epoch number
-    params.append(str(epochs))
-
-    folder_name = "-".join(params)
-
-    return folder_name
-
-
 def gather_results(
     experiment_dir: os.PathLike,
     external=False,

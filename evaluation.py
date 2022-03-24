@@ -134,15 +134,13 @@ def evaluate_segmentation_prediction(prediction_path: str, label_path: str) -> d
     return result_metrics
 
 
-def evaluate_classification(
-    predictions: pd.Series(), ground_truth: int
-) -> Dict[str, float]:
+def evaluate_classification(predictions: np.ndarray, ground_truth: int) -> Dict[str, float]:
     """Evaluate a classification task
 
     Parameters
     ----------
-    predictions : pd.Series
-        The predictions to evaluate as pd.Series of np.arrays
+    predictions : np.ndarray
+        The predictions to evaluate as np.array
     ground_truth : int
         The ground truth as integer
 
@@ -152,19 +150,20 @@ def evaluate_classification(
         The resulting metric with one entry per metric
     """
     metrics = {}
-    class_prediction = predictions.apply(np.argmax)
+    class_prediction = np.argmax(predictions, axis=-1)
     metrics["accuracy"] = (class_prediction == ground_truth).mean()
+    metrics["mean_prediction"] = class_prediction.mean()
     metrics["std"] = class_prediction.std()
     return metrics
 
 
-def evaluate_regression(predictions: pd.Series(), ground_truth: float) -> Dict[str, float]:
+def evaluate_regression(predictions: np.ndarray, ground_truth: float) -> Dict[str, float]:
     """Evaluate a regression task
 
     Parameters
     ----------
-    predictions : pd.Series
-        The predictions to evaluate as pd.Series of floats
+    predictions : np.ndarray
+        The predictions to evaluate as np.ndarray
     ground_truth : float
         The ground truth as float between 0 and 1
 
@@ -179,6 +178,7 @@ def evaluate_regression(predictions: pd.Series(), ground_truth: float) -> Dict[s
     metrics["median_absolute_error"] = np.median(np.abs((predictions - ground_truth)))
     metrics["largest_absolute_error"] = np.max(np.abs((predictions - ground_truth)))
     metrics["smallest_absolute_error"] = np.min(np.abs((predictions - ground_truth)))
+    metrics["mean_prediction"] = predictions.mean()
     metrics["std"] = predictions.std()
     return metrics
 

@@ -21,7 +21,7 @@ import networks
 from experiment import Experiment
 from SegmentationNetworkBasis.normalization import NORMALIZING
 from SegmentationNetworkBasis.preprocessing import preprocess_dataset
-from utils import compare_hyperparameters, export_batch_file, generate_folder_name
+from utils import compare_hyperparameters, export_batch_file
 
 # set tf thread mode
 os.environ["TF_GPU_THREAD_MODE"] = "gpu_private"
@@ -157,9 +157,9 @@ if __name__ == "__main__":
     train_parameters = {
         "l_r": 0.001,
         "optimizer": "Adam",
-        "epochs": 50,
+        "epochs": 100,
         "batch_size": 256,
-        "in_plane_dimension": 32,
+        "in_plane_dimension": 64,
         # parameters for saving the best model
         "best_model_decay": 0.3,
         # scheduling parameters
@@ -206,15 +206,14 @@ if __name__ == "__main__":
 
     ### architecture ###
     network_parameters = {}
-    network_parameters = [network_parameters]
-    architectures = [networks.SimpleModel]
 
     hyper_parameters_new = []
     for hyp in hyper_parameters:
-        for arch, network_params in zip(architectures, network_parameters):
+        for n_conv in range(1, 7):
             hyp_new = copy.deepcopy(hyp)
-            hyp_new["architecture"] = arch
-            hyp_new["network_parameters"] = network_params
+            hyp_new["architecture"] = networks.SimpleModel
+            hyp_new["network_parameters"] = network_parameters.copy()
+            hyp_new["network_parameters"]["n_conv"] = n_conv
             hyper_parameters_new.append(hyp_new)
     hyper_parameters = hyper_parameters_new
 
@@ -236,6 +235,31 @@ if __name__ == "__main__":
             hyper_parameters_new.append(hyp_new)
     hyper_parameters = hyper_parameters_new
 
+    def generate_folder_name(parameters):
+        """
+        Make a name summarizing the hyperparameters.
+        """
+        epochs = parameters["train_parameters"]["epochs"]
+
+        param_names = [
+            parameters["architecture"].get_name() + str(parameters["dimensions"]) + "D",
+        ]
+
+        # number of convolutions
+        param_names.append("n_conv_" + str(parameters["network_parameters"]["n_conv"]))
+
+        # normalization
+        param_names.append(
+            str(parameters["preprocessing_parameters"]["normalizing_method"].name)
+        )
+
+        # add epoch number
+        param_names.append(str(epochs))
+
+        folder_name = "-".join(param_names)
+
+        return folder_name
+
     # generate tensorflow command
     tensorboard_command = f'tensorboard --logdir="{experiment_dir.resolve()}"'
     print(f"To see the progress in tensorboard, run:\n{tensorboard_command}")
@@ -243,68 +267,60 @@ if __name__ == "__main__":
     # set config
     PREPROCESSED_DIR = Path("data_preprocessed")
 
-    for location in ["all"]:
+    timepoints_mannheim = [s.partition("_t")[0] for s in dataset if s.startswith("990")]
+    timepoints_train = (
+        list(timepoints.index) + timepoints_mannheim  # pylint: disable=no-member
+    )
 
-        timepoints_mannheim = [s.partition("_t")[0] for s in dataset if s.startswith("990")]
-        if location in ["Regensburg", "Frankfurt"]:
-            # only use before therapy images that are segmented
-            timepoints_train = timepoints.query(f"location=='{location}'").index
-        elif location == "all":
-            timepoints_train = (
-                list(timepoints.index) + timepoints_mannheim
-            )  # pylint: disable=no-member
-        elif location == "Mannheim-not-from-study":
-            timepoints_train = timepoints_mannheim
+    EXPERIMENT_GROUP = "Classify_Simple_Network"
+    current_exp_dir = experiment_dir / EXPERIMENT_GROUP
 
-        experiment_group_name = f"Normalization_{location}"
-        current_exp_dir = experiment_dir / experiment_group_name
+    # set training files
+    train_list = [key for key in dataset if key.partition("_t")[0] in timepoints_train]
 
-        # set training files
-        train_list = [key for key in dataset if key.partition("_t")[0] in timepoints_train]
+    # set test files (just use the rest)
+    test_list: List[str] = list(set(dataset.keys()) - set(train_list))
 
-        # set test files (just use the rest)
-        test_list: List[str] = list(set(dataset.keys()) - set(train_list))
+    # set up all experiments
+    experiments: List[Experiment] = []
+    for hyp in hyper_parameters:
 
-        # set up all experiments
-        experiments: List[Experiment] = []
-        for hyp in hyper_parameters:
+        # define experiment (not a constant)
+        experiment_name = generate_folder_name(hyp)  # pylint: disable=invalid-name
 
-            # define experiment (not a constant)
-            experiment_name = generate_folder_name(hyp)  # pylint: disable=invalid-name
+        # set a name for the preprocessing dir
+        # so the same method will also use the same directory
+        preprocessing_name = hyp["preprocessing_parameters"]["normalizing_method"].name
 
-            # set a name for the preprocessing dir
-            # so the same method will also use the same directory
-            preprocessing_name = hyp["preprocessing_parameters"]["normalizing_method"].name
+        # set number of validation files
+        hyp["train_parameters"]["number_of_vald"] = len(train_list) // 10
 
-            # set number of validation files
-            hyp["train_parameters"]["number_of_vald"] = len(train_list) // 10
+        # preprocess data (only do that once for all experiments)
+        exp_dataset = preprocess_dataset(
+            data_set=dataset,
+            num_channels=N_CHANNELS,
+            base_dir=experiment_dir,
+            preprocessed_dir=PREPROCESSED_DIR / preprocessing_name,
+            train_dataset=train_list,
+            preprocessing_parameters=hyp["preprocessing_parameters"],
+        )
 
-            # preprocess data (only do that once for all experiments)
-            exp_dataset = preprocess_dataset(
-                data_set=dataset,
-                num_channels=N_CHANNELS,
-                base_dir=experiment_dir,
-                preprocessed_dir=PREPROCESSED_DIR / preprocessing_name,
-                train_dataset=train_list,
-                preprocessing_parameters=hyp["preprocessing_parameters"],
-            )
-
-            exp = Experiment(
-                hyper_parameters=hyp,
-                name=experiment_name,
-                output_path_rel=Path(experiment_group_name) / experiment_name,
-                data_set=exp_dataset,
-                crossvalidation_set=train_list,
-                external_test_set=test_list,
-                folds=K_FOLD,
-                seed=42,
-                num_channels=N_CHANNELS,
-                folds_dir_rel=Path(experiment_group_name) / "folds",
-                tensorboard_images=True,
-                versions=["best", "final"],
-                tasks=("classification", "regression"),
-            )
-            experiments.append(exp)
+        exp = Experiment(
+            hyper_parameters=hyp,
+            name=experiment_name,
+            output_path_rel=Path(EXPERIMENT_GROUP) / experiment_name,
+            data_set=exp_dataset,
+            crossvalidation_set=train_list,
+            external_test_set=test_list,
+            folds=K_FOLD,
+            seed=42,
+            num_channels=N_CHANNELS,
+            folds_dir_rel=Path(EXPERIMENT_GROUP) / "folds",
+            tensorboard_images=True,
+            versions=["best", "final"],
+            tasks=("classification", "regression"),
+        )
+        experiments.append(exp)
 
         # export all hyperparameters
         compare_hyperparameters(experiments, current_exp_dir)
@@ -369,7 +385,7 @@ if __name__ == "__main__":
             # tensorboard command (up to here, it is the same)
             COMMAND_TB = COMMAND
             COMMAND_TB += "$start='tensorboard --logdir=\"' + "
-            COMMAND_TB += f"${{env:experiment_dir}} + '\\{experiment_group_name}\"'\n"
+            COMMAND_TB += f"${{env:experiment_dir}} + '\\{EXPERIMENT_GROUP}\"'\n"
             COMMAND_TB += "Write-Output $start\n"
             COMMAND_TB += "Invoke-Expression ${start}\n"
 
@@ -377,7 +393,7 @@ if __name__ == "__main__":
             COMMAND_COMBINE = COMMAND
             COMMAND_COMBINE += '$script=${env:script_dir} + "\\combine_models.py"\n'
             COMMAND_COMBINE += (
-                f'$output_path=${{env:experiment_dir}} + "\\{experiment_group_name}"\n'
+                f'$output_path=${{env:experiment_dir}} + "\\{EXPERIMENT_GROUP}"\n'
             )
             COMMAND_COMBINE += "$output_path=$output_path -replace ' ', '` '\n"
             COMMAND_COMBINE += '$command="python " + ${script} + " -p ${output_path}"\n'
@@ -387,7 +403,7 @@ if __name__ == "__main__":
             COMMAND_ANALYSIS = COMMAND
             COMMAND_ANALYSIS += '$script=${env:script_dir} + "\\analyze_results.py"\n'
             COMMAND_ANALYSIS += (
-                f'$output_path=${{env:experiment_dir}} + "\\{experiment_group_name}"\n'
+                f'$output_path=${{env:experiment_dir}} + "\\{EXPERIMENT_GROUP}"\n'
             )
             COMMAND_ANALYSIS += "$output_path=$output_path -replace ' ', '` '\n"
             COMMAND_ANALYSIS += '$command="python " + ${script} + " -p ${output_path}"\n'
@@ -397,7 +413,7 @@ if __name__ == "__main__":
             COMMAND += '$script=${env:script_dir} + "\\run_single_experiment.py"\n'
             for exp in experiments:
                 COMMAND += f'\n\nWrite-Output "starting with {exp.name}"\n'
-                exp_p_rel = f"\\{experiment_group_name}\\{exp.output_path.name}"
+                exp_p_rel = f"\\{EXPERIMENT_GROUP}\\{exp.output_path.name}"
                 COMMAND += f'$output_path=${{env:experiment_dir}} + "{exp_p_rel}"\n'
                 for fold_num in range(K_FOLD):
                     COMMAND += f'$command="python " + ${{script}} + " -f {fold_num} -e " + \'${{output_path}}\'\n'
