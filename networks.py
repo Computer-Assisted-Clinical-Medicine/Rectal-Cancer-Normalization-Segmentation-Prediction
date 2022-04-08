@@ -49,13 +49,15 @@ def simple_model(
     outputs = []
 
     for i, shape in enumerate(label_shapes):
-        out = layers.Conv2D(
-            filters=shape, kernel_size=1, activation=None, name=f"final/label_{i}_conv"
-        )(x)
+        if shape == 1:
+            name = f"output_{i}"
+        else:
+            name = f"final/label_{i}_conv"
+        out = layers.Conv2D(filters=shape, kernel_size=1, activation=None, name=name)(x)
         if global_pool:
             out = tf.keras.layers.GlobalMaxPooling2D(name=f"final/label_{i}_maxpool")(out)
         if shape == 1:
-            pred = tf.keras.layers.Activation(None, name=f"output_{i}")(out)
+            pred = out
         elif shape > 1:
             pred = tf.keras.layers.Softmax(name=f"output_{i}", axis=-1)(out)
         else:

@@ -224,6 +224,8 @@ if __name__ == "__main__":
             "lower_q": 0.05,
             "upper_q": 0.95,
         },
+        NORMALIZING.HISTOGRAM_MATCHING: {"mask_quantile": 0},
+        NORMALIZING.HM_QUANTILE: {},
     }
     # add all methods with their hyperparameters
     hyper_parameters_new = []
