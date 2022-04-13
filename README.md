@@ -10,7 +10,7 @@ To try something out, different experiments can be created, which can be trained
 
 ### Prerequisites
 
-- The conda environment is described in the requirements.txt.
+- The pip environment is described in the requirements.txt.
 - The environmental variable "data_dir" should point to the data directory. train_IDs.csv should contain the test files, dataset.json additional description. Prepare Data Rectal cancer contains classes to write different Dataset formats.
 - The variable "experiment_dir" should point to the directory, where the output is saved. The variables can be set in the IDE and are to make everything machine independent.
 

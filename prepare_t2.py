@@ -18,10 +18,10 @@ os.environ["TF_CPP_MIN_LOG_LEVEL"] = "3"
 # pylint: disable=wrong-import-position, unused-import
 
 import networks
-from experiment import Experiment
+from SegmentationNetworkBasis.experiment import Experiment
 from SegmentationNetworkBasis.normalization import NORMALIZING
 from SegmentationNetworkBasis.preprocessing import preprocess_dataset
-from utils import compare_hyperparameters, export_batch_file
+from utils import export_experiments, export_batch_file
 
 # set tf thread mode
 os.environ["TF_GPU_THREAD_MODE"] = "gpu_private"
@@ -325,7 +325,7 @@ if __name__ == "__main__":
         experiments.append(exp)
 
         # export all hyperparameters
-        compare_hyperparameters(experiments, current_exp_dir)
+        export_experiments(experiments, current_exp_dir)
 
         # if on cluster, export slurm files
         if "CLUSTER" in os.environ:

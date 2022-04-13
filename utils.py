@@ -44,6 +44,7 @@ def configure_logging(tf_logger: logging.Logger) -> logging.Logger:
 
 def plot_hparam_comparison(
     current_experiment: os.PathLike,
+    task: str,
     metrics=None,
     external=False,
     postprocessed=False,
@@ -59,7 +60,7 @@ def plot_hparam_comparison(
     if metrics is None:
         metrics = ["Dice"]
 
-    hparam_file = current_experiment / "hyperparameters.csv"
+    exp_file = current_experiment / "experiments.csv"
     hparam_changed_file = current_experiment / "hyperparameters_changed.csv"
 
     result_name = f"hy_comp_{version}"
@@ -70,11 +71,11 @@ def plot_hparam_comparison(
     # add pdf
     result_name += ".pdf"
 
-    hparams: pd.DataFrame = pd.read_csv(hparam_file, sep=";")
+    hparams: pd.DataFrame = pd.read_csv(exp_file, sep=";")
     hparams_changed: pd.DataFrame = pd.read_csv(hparam_changed_file, sep=";")
     changed_params = hparams_changed.columns[1:]
 
-    res_path = generate_res_path(version, external, postprocessed)
+    res_path = generate_res_path(version, external, postprocessed, task)
 
     # type is incorrectly detected
     # pylint: disable=no-member,unsubscriptable-object
@@ -186,25 +187,25 @@ def plot_hparam_comparison(
     plt.close()
 
 
-def generate_res_path(version: str, external: bool, postprocessed: bool):
+def generate_res_path(version: str, external: bool, postprocessed: bool, task: str):
     """For a given path, generate the relative path to the result file"""
     if external:
-        folder_name = f"results_external_testset_{version}"
+        folder_name = f"results_external_testset_{version}_{task}"
     else:
-        folder_name = f"results_test_{version}"
+        folder_name = f"results_test_{version}_{task}"
     if postprocessed:
         folder_name += "-postprocessed"
     res_path = Path(folder_name) / "evaluation-all-files.csv"
     return res_path
 
 
-def compare_hyperparameters(experiments, experiment_dir, version="best"):
+def export_experiments(experiments, experiment_dir):
     """
-    Compare the hyperparameters of all experiments and collect the ones that
-    were changed.
+    Export a summary of the experiments and compare the hyperparameters of all experiments
+    and collect the ones that were changed.
     """
     # export the hyperparameters
-    hyperparameter_file = experiment_dir / "hyperparameters.csv"
+    experiments_file = experiment_dir / "experiments.csv"
     hyperparameter_changed_file = experiment_dir / "hyperparameters_changed.csv"
     # collect all results
     hparams = []
@@ -262,12 +263,13 @@ def compare_hyperparameters(experiments, experiment_dir, version="best"):
                 if np.all(arch_params[col] == 1):
                     hparams_changed.drop(columns=col, inplace=True)
 
-    hparams.to_csv(hyperparameter_file, sep=";")
+    hparams.to_csv(experiments_file, sep=";")
     hparams_changed.to_csv(hyperparameter_changed_file, sep=";")
 
 
 def gather_results(
     experiment_dir: os.PathLike,
+    task: str,
     external=False,
     postprocessed=False,
     combined=True,
@@ -280,6 +282,8 @@ def gather_results(
     ----------
     experiment_dir : Pathlike
         The path where the experiments are located
+    task : str
+        The task to analyze, choices are segmentation, classification and regression
     external : bool, optional
         If the external testset should be evaluated, by default False
     postprocessed : bool, optional
@@ -295,7 +299,7 @@ def gather_results(
         The results with all metrics for all files
     """
     experiment_dir = Path(experiment_dir)
-    hparam_file = experiment_dir / "hyperparameters.csv"
+    experiments_file = experiment_dir / "experiments.csv"
 
     if external:
         file_field = "results_file_external_testset"
@@ -305,9 +309,9 @@ def gather_results(
     if postprocessed:
         file_field += "_postprocessed"
 
-    res_path = generate_res_path(version, external, postprocessed)
+    res_path = generate_res_path(version, external, postprocessed, task)
 
-    hparams = pd.read_csv(hparam_file, sep=";")
+    hparams = pd.read_csv(experiments_file, sep=";", index_col=0)
     # type is incorrectly detected
     # pylint: disable=no-member
 
@@ -318,6 +322,9 @@ def gather_results(
         hparams.loc[loc] = "Combined"
         hparams.loc[loc, "path"] = c_path
 
+    # ignore some fields
+    ignore = ["tasks", "label_shapes", "path"]
+
     results_all_list = []
     for _, row in hparams.iterrows():
         results_file = experiment_dir.parent / row["path"] / res_path
@@ -325,6 +332,11 @@ def gather_results(
             results = pd.read_csv(results_file, sep=";")
             # set the model
             results["name"] = Path(row["path"]).name
+            # set the other parameters
+            for name, val in row.iteritems():
+                if name in ignore:
+                    continue
+                results[name] = val
             # save results
             results_all_list.append(results)
         else:

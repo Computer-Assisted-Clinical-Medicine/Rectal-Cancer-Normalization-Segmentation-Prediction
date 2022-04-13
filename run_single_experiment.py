@@ -11,11 +11,8 @@ tf_logger = logging.getLogger("tensorflow")
 os.environ["TF_CPP_MIN_LOG_LEVEL"] = "3"
 # pylint: disable=wrong-import-position
 
-import tensorflow as tf
-
-from experiment import Experiment
-from utils import configure_logging, plot_hparam_comparison
-from SegmentationNetworkBasis.utils import get_gpu
+from SegmentationNetworkBasis.experiment import Experiment
+from utils import configure_logging
 
 
 def init_argparse():
@@ -104,11 +101,7 @@ fh_debug.setFormatter(log_formatter)
 # add to loggers
 logger.addHandler(fh_debug)
 
-# get the GPU
-gpu = tf.device(get_gpu(memory_limit=4000))
-
-with gpu:
-    run_experiment_fold(exp, f)
+run_experiment_fold(exp, f)
 
 # try to evaluate it (this will only work if this is the last fold)
 try:
@@ -126,24 +119,3 @@ if exp.external_test_set is not None:
         print("Could not evaluate the experiment (happens if not all folds are finished).")
     else:
         print("Evaluation finished.")
-
-try:
-    for version in ["best", "final"]:
-        plot_hparam_comparison(exp.output_path.parent, version=version)
-        plot_hparam_comparison(exp.output_path.parent, postprocessed=True, version=version)
-except FileNotFoundError:
-    print("Plotting of hyperparameter comparison failed.")
-else:
-    print("Hyperparameter comparison was plotted.")
-
-try:
-    for version in ["best", "final"]:
-        if exp.external_test_set is not None:
-            plot_hparam_comparison(exp.output_path.parent, external=True, version=version)
-            plot_hparam_comparison(
-                exp.output_path.parent, external=True, postprocessed=True, version=version
-            )
-except FileNotFoundError:
-    print("Plotting of hyperparameter comparison on the external testset failed.")
-else:
-    print("Hyperparameter comparison on the external testset was plotted.")
