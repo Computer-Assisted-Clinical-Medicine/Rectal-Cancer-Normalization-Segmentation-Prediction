@@ -2,10 +2,13 @@
 # %%
 import os
 from pathlib import Path
+from matplotlib import pyplot as plt
 
 import pandas as pd
-import seaborn as sns
 
+# import seaborn as sns
+
+from SegmentationNetworkBasis import evaluation
 from utils import gather_results
 
 # %%
@@ -50,26 +53,78 @@ for res in [results_class, results_reg]:
         }
     )
 
+# %%
+# analyze classification
+
 class_tasks = ["model_name", "sequence_variant", "field_strength", "location"]
 for class_tsk in class_tasks:
-    sns.catplot(
-        data=results_class,
-        kind="bar",
-        y=f"{class_tsk}_accuracy",
-        hue="version",
-        x="n_conv",
-        row="normalizing_method",
-    )
+    # sns.catplot(
+    #     data=results_class,
+    #     kind="bar",
+    #     y=f"{class_tsk}_accuracy",
+    #     hue="version",
+    #     x="n_conv",
+    #     row="normalizing_method",
+    # )
+    # plt.show()
+    # plt.close()
 
-    sns.catplot(
-        data=results_class,
-        kind="bar",
-        y=f"{class_tsk}_accuracy",
-        x="n_conv",
-    )
+    groups = results_class.groupby(["n_conv", "normalizing_method", "version"])
 
-    y_pred = results_class[f"{class_tsk}_top_prediction"]
-    y = results_class[f"{class_tsk}_ground_truth"]
+    def metric_func_class(dataframe, col):
+        pred = dataframe[f"{col}_top_prediction"]
+        truth = dataframe[f"{col}_ground_truth"]
+        prob_cols = [c for c in dataframe.columns if c.startswith(f"{col}_probability_")]
+        return pd.Series(
+            evaluation.calculate_classification_metrics(
+                prediction=pred,
+                ground_truth=truth,
+                probabilities=dataframe[prob_cols].values,
+                labels=[l.partition("_probability_")[-1] for l in prob_cols],
+            )
+        )
+
+    eval_metrics = groups.apply(metric_func_class, class_tsk)
+    # plot it
+    metrics = [
+        "accuracy",
+        "top_3_accuracy",
+        "precision_mean",
+        "recall_mean",
+        "auc_ovo",
+        "auc_ovr",
+    ]
+    metrics = [m for m in metrics if m in eval_metrics.columns]
+    fig, axes = plt.subplots(
+        nrows=len(metrics),
+        ncols=len(eval_metrics.index.unique(level="normalizing_method")),
+        sharex=True,
+        sharey=True,
+        figsize=(10, 2 + 2 * len(metrics)),
+    )
+    FIRST = True
+    for met, ax_line in zip(metrics, axes):
+        ax_line[0].set_ylabel(met.replace("_", " "))
+        for norm, ax in zip(eval_metrics.index.unique(level="normalizing_method"), ax_line):
+            if FIRST:
+                ax.set_title(norm.replace("_", " "))
+            for version in eval_metrics.index.unique(level="version"):
+                data = eval_metrics.loc[(slice(None), norm, version), :]
+                ax.plot(
+                    data.index.get_level_values("n_conv"),
+                    data[met],
+                    label=f"{version}",
+                )
+        FIRST = False
+    for ax in axes[-1]:
+        ax.set_xlabel("Num conv")
+    axes[0, -1].legend(bbox_to_anchor=(1, 1), loc="upper left")
+    fig.suptitle(class_tsk.replace("_", " "))
+    plt.tight_layout()
+    plt.show()
+    plt.close()
+
+# %%
 
 reg_tasks = [
     "slice_thickness",
@@ -80,13 +135,59 @@ reg_tasks = [
     "pixel_spacing",
 ]
 for reg_tsk in reg_tasks:
-    sns.catplot(
-        data=results_reg,
-        kind="box",
-        y=f"{reg_tsk}_rmse",
-        col="version",
-        x="n_conv",
-        row="normalizing_method",
+    # sns.catplot(
+    #     data=results_reg,
+    #     kind="box",
+    #     y=f"{reg_tsk}_rmse",
+    #     col="version",
+    #     x="n_conv",
+    #     row="normalizing_method",
+    # )
+    # plt.show()
+    # plt.close()
+
+    groups = results_reg.groupby(["n_conv", "normalizing_method", "version"])
+
+    def metric_func_reg(dataframe, col):
+        pred = dataframe[f"{col}_mean_prediction"]
+        truth = dataframe[f"{col}_ground_truth"]
+        return pd.Series(
+            evaluation.calculate_regression_metrics(
+                prediction=pred,
+                ground_truth=truth,
+            )
+        )
+
+    eval_metrics = groups.apply(metric_func_reg, reg_tsk)
+    # plot it
+    metrics = ["rmse", "std", "max_absolute_error"]
+    fig, axes = plt.subplots(
+        nrows=len(metrics),
+        ncols=len(eval_metrics.index.unique(level="normalizing_method")),
+        sharex=True,
+        sharey="row",
+        figsize=(10, 2 + 2 * len(metrics)),
     )
+    FIRST = True
+    for met, ax_line in zip(metrics, axes):
+        ax_line[0].set_ylabel(met.replace("_", " "))
+        for norm, ax in zip(eval_metrics.index.unique(level="normalizing_method"), ax_line):
+            if FIRST:
+                ax.set_title(norm.replace("_", " "))
+            for version in eval_metrics.index.unique(level="version"):
+                data = eval_metrics.loc[(slice(None), norm, version), :]
+                ax.plot(
+                    data.index.get_level_values("n_conv"),
+                    data[met],
+                    label=f"{version}",
+                )
+        FIRST = False
+    for ax in axes[-1]:
+        ax.set_xlabel("Num conv")
+    axes[0, -1].legend(bbox_to_anchor=(1, 1), loc="upper left")
+    fig.suptitle(reg_tsk.replace("_", " "))
+    plt.tight_layout()
+    plt.show()
+    plt.close()
 
 # %%

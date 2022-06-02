@@ -40,7 +40,7 @@ def init_argparse():
 
 
 def run_experiment_fold(experiment: Experiment, fold: int):
-    """Run the fold of a singel experiment, this function mainly handles the
+    """Run the fold of a single experiment, this function mainly handles the
     logging and then calls experiment.run_fold(fold)
 
     Parameters
@@ -76,7 +76,7 @@ param_file = current_experiment_dir / "parameters.yaml"
 assert param_file.exists(), f"Parameter file {param_file} does not exist."
 exp = Experiment.from_file(param_file)
 
-assert f < exp.folds, f"Fold number {f} is higher than the maximim number {exp.folds}."
+assert f < exp.folds, f"Fold number {f} is higher than the maximum number {exp.folds}."
 
 # add more detailed logger for each network, when problems arise, use debug
 log_dir = exp.output_path / exp.fold_dir_names[f]

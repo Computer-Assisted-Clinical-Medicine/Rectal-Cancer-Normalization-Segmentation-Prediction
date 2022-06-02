@@ -23,7 +23,7 @@ def simple_model(
         The input to the network
     label_shapes : Collection[Union[tuple, int]]
         The shapes of the labels, a tuple implies classification with the label shape
-        and an int imples a regression task
+        and an int implies a regression task
 
     Returns
     -------
@@ -76,11 +76,11 @@ class SimpleModel(SegBasisNet):
         The loss that should be used
     label_shapes : Collection[Union[tuple, int]]
         The shapes of the labels, a tuple implies classification with the label shape
-        and an int imples a regression task
+        and an int implies a regression task
     is_training : bool
         If training should be performed
     do_finetune : bool
-        If finetuning should be done
+        If fine tuning should be done
     model_path : str
         The path where the files are located
     regularize : Tuple[bool, str, Any]

@@ -168,7 +168,7 @@ if __name__ == "__main__":
         "reduce_lr_on_plateau": False,
         "patience_lr_plat": 10,
         "factor_lr_plat": 0.5,
-        # finetuning parameters
+        # fine tuning parameters
         "finetune_epoch": 0,
         "finetune_layers": "all",
         "finetune_lr": 0.001,
@@ -209,7 +209,7 @@ if __name__ == "__main__":
 
     hyper_parameters_new = []
     for hyp in hyper_parameters:
-        for n_conv in range(1, 7):
+        for n_conv in range(1, 8):
             hyp_new = copy.deepcopy(hyp)
             hyp_new["architecture"] = networks.SimpleModel
             hyp_new["network_parameters"] = network_parameters.copy()
@@ -440,4 +440,4 @@ if __name__ == "__main__":
 
             print(f"To run the training, execute {ps_script}")
             print(f"To run tensorboard, execute {ps_script_tb}")
-            print(f"To analyse the results, execute {ps_script_analysis}")
+            print(f"To analyze the results, execute {ps_script_analysis}")

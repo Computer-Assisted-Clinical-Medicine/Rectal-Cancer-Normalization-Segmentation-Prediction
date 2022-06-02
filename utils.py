@@ -178,7 +178,7 @@ def plot_hparam_comparison(
             # set the legend with title
             ax.legend(title=str(tuple(str(c)[:5] for c in unused_columns)))
 
-    fig.suptitle("Hypereparameter Comparison")
+    fig.suptitle("Hyperparameter Comparison")
     plt.tight_layout()
     result_dir = current_experiment / "analysis" / "hyperparameter_comparison"
     if not result_dir.exists():
@@ -272,7 +272,7 @@ def gather_results(
     task: str,
     external=False,
     postprocessed=False,
-    combined=True,
+    combined=False,
     version="best",
 ) -> pd.DataFrame:
     """Collect all result files from all experiments. Only experiments that are
@@ -287,7 +287,7 @@ def gather_results(
     external : bool, optional
         If the external testset should be evaluated, by default False
     postprocessed : bool, optional
-        If the data from the posprocessed should be evaluated, by default False
+        If the data from the postprocessed should be evaluated, by default False
     combined : bool, optional
         If there is a combined model, which should be analyzed, by default True
     version : str, optional
