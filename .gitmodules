@@ -1,6 +1,6 @@
-[submodule "SegmentationNetworkBasis"]
+[submodule "SegClassRegBasis"]
 	path = SegmentationNetworkBasis
-	url = http://ckmsrv/Bonobo.Git.Server/SegmentationNetworkBasis.git
+	url = http://ckmsrv/Bonobo.Git.Server/SegClassRegBasis.git
 [submodule "SegmentationArchitectures"]
 	path = SegmentationArchitectures
 	url = http://ckmsrv/Bonobo.Git.Server/SegmentationArchitectures.git

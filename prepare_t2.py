@@ -5,6 +5,7 @@ import copy
 import logging
 import os
 import sys
+from collections import OrderedDict
 from pathlib import Path
 from typing import Any, Dict, List, Union
 
@@ -16,11 +17,11 @@ tf_logger = logging.getLogger("tensorflow")
 os.environ["TF_CPP_MIN_LOG_LEVEL"] = "3"
 # pylint: disable=wrong-import-position, unused-import
 
-from experiment import Experiment
-from SegmentationNetworkBasis.architecture import DeepLabv3plus, DenseTiramisu, UNet
+import networks
+from SegmentationNetworkBasis.experiment import Experiment
 from SegmentationNetworkBasis.normalization import NORMALIZING
 from SegmentationNetworkBasis.preprocessing import preprocess_dataset
-from utils import compare_hyperparameters, export_batch_file, generate_folder_name
+from utils import export_experiments, export_batch_file
 
 # set tf thread mode
 os.environ["TF_GPU_THREAD_MODE"] = "gpu_private"
@@ -67,10 +68,36 @@ if __name__ == "__main__":
     if not experiment_dir.exists():
         experiment_dir.mkdir()
 
+    targets = OrderedDict(
+        {
+            "0008|1090": "cat",  # : Manufacturer's Model Name
+            "0018|0021": "cat",  # : Sequence Variant
+            "0018|0050": "reg",  # : Slice Thickness
+            "0018|0080": "reg",  # : Repetition Time
+            "0018|0095": "reg",  # : Pixel Bandwidth
+            "0018|1314": "reg",  # : Flip Angle
+            "0018|0081": "reg",  # : Echo Time
+            "0018|0087": "cat",  # : Magnetic Field Strength
+            "pixel_spacing": "reg",
+            "location": "cat",
+        }
+    )
+    column_names = {
+        "0008|1090": "model_name",
+        "0018|0021": "sequence_variant",
+        "0018|0050": "slice_thickness",
+        "0018|0080": "repetition_time",
+        "0018|0095": "pixel_bandwidth",
+        "0018|1314": "flip_angle",
+        "0018|0081": "echo_time",
+        "0018|0087": "field_strength",
+        "pixel_spacing": "pixel_spacing",
+    }
+
     # load data
-    with open(data_dir / "images.yaml") as f:
+    with open(data_dir / "images.yaml", encoding="utf8") as f:
         found_images = yaml.load(f, Loader=yaml.Loader)
-    with open(data_dir / "segmented_images.yaml") as f:
+    with open(data_dir / "segmented_images.yaml", encoding="utf8") as f:
         segmented_images = yaml.load(f, Loader=yaml.Loader)
     timepoints = pd.read_csv(data_dir / "timepoints.csv", sep=";", index_col=0)
 
@@ -80,43 +107,50 @@ if __name__ == "__main__":
     unsegmented_images.sort()
 
     K_FOLD = 5
-    N_CHANNELS = 2
+    N_CHANNELS = 1
 
     # ignore certain files
-    ignore = ["1005_2_l0_d0"]  # this file has labels not in the image
+    ignore = []
 
     # create dict with all points. The names have the format:
     # patient_timepoint_l{label_number}_d{diffusion_number}
     dataset: Dict[str, Dict[str, Union[List[str], str]]] = {}
-    for timepoint, data in segmented_images.items():
-        for label_num, label_data in enumerate(data):
-            assert "T2 axial" in label_data["name"]
-            found_data = found_images[timepoint]
-            if not "ADC axial recalculated" in found_data:
+    for timepoint, found_data in found_images.items():
+        if not "T2 axial" in found_data:
+            continue
+        for t2_num, t2 in enumerate(found_data["T2 axial"]):
+            name = f"{timepoint}_t{t2_num}"
+            if name in ignore:
                 continue
-            if not "Diff axial b800" in found_data:
-                if "Diff axial b800 recalculated" in found_data:
-                    B_NAME = "Diff axial b800 recalculated"
-                else:
-                    raise ValueError("No b800 image found but an ADC image")
-            else:
-                B_NAME = "Diff axial b800"
-            for diff_num, (adc, b800) in enumerate(
-                zip(found_data["ADC axial recalculated"], found_data[B_NAME])
-            ):
-                name = f"{timepoint}_l{label_num}_d{diff_num}"
-                if name in ignore:
-                    continue
-                b800 = b800.replace("Images", "Images registered and N4 corrected")
-                adc = adc.replace("Images", "Images registered and N4 corrected")
-                dataset[name] = {
-                    "images": [data_dir / b800, data_dir / adc],
-                    "labels": data_dir / label_data["labels"],
-                }
+            image = t2.replace("Images", "Images registered and N4 corrected")
+            image_dir = (data_dir / t2).parent
+            param_file = image_dir / "acquisition_parameters.csv"
+            params = pd.read_csv(param_file, sep=";", index_col=0)
+            t2_name = Path(t2).with_suffix("").with_suffix("").name
+            missing_columns = [c for c in targets.keys() if c not in params]
+            if len(missing_columns) > 0:
+                raise ValueError(f"{missing_columns} not found")
+            params_t2 = params.loc[t2_name, targets.keys()]
+            cat_dict = {}
+            reg_dict = {}
+            for col, param_val in params_t2.iteritems():
+                col_name = column_names.get(col, col)
+                col_type = targets[col]
+                if col_type == "reg":
+                    reg_dict[col_name] = float(param_val)
+                elif col_type == "cat":
+                    cat_dict[col_name] = str(param_val).strip()
+            # add location to scanner
+            cat_dict["model_name"] = cat_dict["location"] + " - " + cat_dict["model_name"]
+            dataset[name] = {
+                "images": [data_dir / image],
+                "classification": cat_dict,
+                "regression": reg_dict,
+            }
 
     # export dataset
     dataset_file = experiment_dir / "dataset.yaml"
-    with open(dataset_file, "w") as f:
+    with open(dataset_file, "w", encoding="utf8") as f:
         yaml.dump(dataset, f, sort_keys=False)
 
     # define the parameters that are constant
@@ -124,6 +158,8 @@ if __name__ == "__main__":
         "l_r": 0.001,
         "optimizer": "Adam",
         "epochs": 100,
+        "batch_size": 256,
+        "in_plane_dimension": 64,
         # parameters for saving the best model
         "best_model_decay": 0.3,
         # scheduling parameters
@@ -132,13 +168,14 @@ if __name__ == "__main__":
         "reduce_lr_on_plateau": False,
         "patience_lr_plat": 10,
         "factor_lr_plat": 0.5,
-        # finetuning parameters
+        # fine tuning parameters
         "finetune_epoch": 0,
         "finetune_layers": "all",
         "finetune_lr": 0.001,
         # sampling parameters
-        "samples_per_volume": 80,
+        "samples_per_volume": 10,
         "background_label_percentage": 0.15,
+        "percent_of_object_samples": 0,
         # Augmentation parameters
         "add_noise": False,
         "max_rotation": 0.1,
@@ -154,7 +191,11 @@ if __name__ == "__main__":
     constant_parameters = {
         "train_parameters": train_parameters,
         "preprocessing_parameters": preprocessing_parameters,
-        "loss": "DICE",
+        "dimensions": 2,
+        "loss": {
+            "classification": "CEL",
+            "regression": "MSE",
+        },
     }
     # define constant parameters
     hyper_parameters: List[Dict[str, Any]] = [
@@ -164,55 +205,27 @@ if __name__ == "__main__":
     ]
 
     ### architecture ###
-    F_BASE = 8
-    network_parameters_UNet = {
-        "regularize": (True, "L2", 1e-5),
-        "drop_out": (True, 0.01),
-        "activation": "elu",
-        "cross_hair": False,
-        "clipping_value": 1,
-        "res_connect": True,
-        "n_filters": (F_BASE * 8, F_BASE * 16, F_BASE * 32, F_BASE * 64, F_BASE * 128),
-        "do_bias": False,
-        "do_batch_normalization": True,
-        "ratio": 2,
-    }
-    network_parameters_DenseTiramisu = {
-        "regularize": (True, "L2", 1e-5),
-        "drop_out": (True, 0.01),
-        "activation": "elu",
-        "cross_hair": False,
-        "clipping_value": 1,
-        "layers_per_block": (4, 5, 7, 10, 12),
-        "bottleneck_layers": 15,
-        "growth_rate": 16,
-        "do_bias": False,
-        "do_batch_normalization": True,
-    }
-    network_parameters_DeepLabv3plus = {
-        "aspp_rates": (3, 6, 9),  # half because input is half the size
-        "clipping_value": 50,
-        "backbone": "densenet121",
-    }
-    network_parameters = [network_parameters_UNet, network_parameters_DeepLabv3plus]
-    architectures = [UNet, DeepLabv3plus]
+    network_parameters = {}
 
     hyper_parameters_new = []
     for hyp in hyper_parameters:
-        for arch, network_params in zip(architectures, network_parameters):
+        for n_conv in range(1, 8):
             hyp_new = copy.deepcopy(hyp)
-            hyp_new["architecture"] = arch
-            hyp_new["network_parameters"] = network_params
+            hyp_new["architecture"] = networks.SimpleModel
+            hyp_new["network_parameters"] = network_parameters.copy()
+            hyp_new["network_parameters"]["n_conv"] = n_conv
             hyper_parameters_new.append(hyp_new)
     hyper_parameters = hyper_parameters_new
 
     ### normalization method ###
     normalization_methods = {
+        NORMALIZING.MEAN_STD: {},
         NORMALIZING.QUANTILE: {
             "lower_q": 0.05,
             "upper_q": 0.95,
         },
         NORMALIZING.HISTOGRAM_MATCHING: {"mask_quantile": 0},
+        NORMALIZING.HM_QUANTILE: {},
     }
     # add all methods with their hyperparameters
     hyper_parameters_new = []
@@ -224,25 +237,30 @@ if __name__ == "__main__":
             hyper_parameters_new.append(hyp_new)
     hyper_parameters = hyper_parameters_new
 
-    ### dimension ###
-    dimensions = [2]
-    hyper_parameters = vary_hyperparameters(hyper_parameters, ("dimensions",), dimensions)
+    def generate_folder_name(parameters):
+        """
+        Make a name summarizing the hyperparameters.
+        """
+        epochs = parameters["train_parameters"]["epochs"]
 
-    ### percent_of_object_samples ###
-    pos_values = [0.4]
-    hyper_parameters = vary_hyperparameters(
-        hyper_parameters, ("train_parameters", "percent_of_object_samples"), pos_values
-    )
+        param_names = [
+            parameters["architecture"].get_name() + str(parameters["dimensions"]) + "D",
+        ]
 
-    attention = [False]
-    hyper_parameters = vary_hyperparameters(
-        hyper_parameters, ("network_parameters", "attention"), attention
-    )
+        # number of convolutions
+        param_names.append("n_conv_" + str(parameters["network_parameters"]["n_conv"]))
 
-    encoder_attention = [None]
-    hyper_parameters = vary_hyperparameters(
-        hyper_parameters, ("network_parameters", "encoder_attention"), encoder_attention
-    )
+        # normalization
+        param_names.append(
+            str(parameters["preprocessing_parameters"]["normalizing_method"].name)
+        )
+
+        # add epoch number
+        param_names.append(str(epochs))
+
+        folder_name = "-".join(param_names)
+
+        return folder_name
 
     # generate tensorflow command
     tensorboard_command = f'tensorboard --logdir="{experiment_dir.resolve()}"'
@@ -251,97 +269,63 @@ if __name__ == "__main__":
     # set config
     PREPROCESSED_DIR = Path("data_preprocessed")
 
-    for location in ["Frankfurt", "Regensburg", "Mannheim-not-from-study", "all"]:
+    timepoints_mannheim = [s.partition("_t")[0] for s in dataset if s.startswith("990")]
+    timepoints_train = (
+        list(timepoints.index) + timepoints_mannheim  # pylint: disable=no-member
+    )
 
-        timepoints_mannheim = [
-            s for s in segmented_images.keys() if s.startswith("990") and s.endswith("_1")
-        ]
-        if location in ["Regensburg", "Frankfurt"]:
-            # only use before therapy images that are segmented
-            timepoints_train = timepoints.query(
-                f"treatment_status=='before therapy' & segmented & location=='{location}'"
-            ).index
-        elif location == "all":
-            timepoints_train = (
-                list(
-                    timepoints.query("treatment_status=='before therapy' & segmented").index
-                )
-                + timepoints_mannheim
-            )
-        elif location == "Mannheim-not-from-study":
-            timepoints_train = timepoints_mannheim
+    EXPERIMENT_GROUP = "Classify_Simple_Network"
+    current_exp_dir = experiment_dir / EXPERIMENT_GROUP
 
-        experiment_group_name = f"Normalization_{location}"
-        current_exp_dir = experiment_dir / experiment_group_name
+    # set training files
+    train_list = [key for key in dataset if key.partition("_t")[0] in timepoints_train]
 
-        # set training files
-        train_list = [key for key in dataset if key.partition("_l")[0] in timepoints_train]
+    # set test files (just use the rest)
+    test_list: List[str] = list(set(dataset.keys()) - set(train_list))
 
-        # set test files (just use the rest)
-        test_list: List[str] = list(set(dataset.keys()) - set(train_list))
+    # set up all experiments
+    experiments: List[Experiment] = []
+    for hyp in hyper_parameters:
 
-        # set up all experiments
-        experiments: List[Experiment] = []
-        for hyp in hyper_parameters:
-            # use less filters for 3D on local computer
-            if not "CLUSTER" in os.environ:
-                if hyp["architecture"] is UNet:
-                    if hyp["dimensions"] == 3:
-                        F_BASE = 4
-                        n_filters = (
-                            F_BASE * 8,
-                            F_BASE * 16,
-                            F_BASE * 32,
-                            F_BASE * 64,
-                            F_BASE * 128,
-                        )
-                        hyp["network_parameters"]["n_filters"] = n_filters
-                    else:
-                        F_BASE = 8
-                        n_filters = (
-                            F_BASE * 8,
-                            F_BASE * 16,
-                            F_BASE * 32,
-                            F_BASE * 64,
-                            F_BASE * 128,
-                        )
-                        hyp["network_parameters"]["n_filters"] = n_filters
+        # define experiment (not a constant)
+        experiment_name = generate_folder_name(hyp)  # pylint: disable=invalid-name
 
-            # define experiment (not a constant)
-            experiment_name = generate_folder_name(hyp)  # pylint: disable=invalid-name
+        # set a name for the preprocessing dir
+        # so the same method will also use the same directory
+        preprocessing_name = hyp["preprocessing_parameters"]["normalizing_method"].name
 
-            # set a name for the preprocessing dir
-            # so the same method will also use the same directory
-            preprocessing_name = hyp["preprocessing_parameters"]["normalizing_method"].name
+        # set number of validation files
+        hyp["train_parameters"]["number_of_vald"] = len(train_list) // 10
 
-            # preprocess data (only do that once for all experiments)
-            exp_dataset = preprocess_dataset(
-                data_set=dataset,
-                num_channels=N_CHANNELS,
-                base_dir=experiment_dir,
-                preprocessed_dir=PREPROCESSED_DIR / preprocessing_name,
-                train_dataset=train_list,
-                preprocessing_parameters=hyp["preprocessing_parameters"],
-            )
+        # preprocess data (only do that once for all experiments)
+        exp_dataset = preprocess_dataset(
+            data_set=dataset,
+            num_channels=N_CHANNELS,
+            base_dir=experiment_dir,
+            preprocessed_dir=PREPROCESSED_DIR / preprocessing_name,
+            train_dataset=train_list,
+            preprocessing_parameters=hyp["preprocessing_parameters"],
+        )
 
-            exp = Experiment(
-                hyper_parameters=hyp,
-                name=experiment_name,
-                output_path_rel=Path(experiment_group_name) / experiment_name,
-                data_set=exp_dataset,
-                crossvalidation_set=train_list,
-                external_test_set=test_list,
-                folds=K_FOLD,
-                seed=42,
-                num_channels=N_CHANNELS,
-                folds_dir_rel=Path(experiment_group_name) / "folds",
-                tensorboard_images=True,
-                versions=["best"],
-            )
-            experiments.append(exp)
+        exp = Experiment(
+            hyper_parameters=hyp,
+            name=experiment_name,
+            output_path_rel=Path(EXPERIMENT_GROUP) / experiment_name,
+            data_set=exp_dataset,
+            crossvalidation_set=train_list,
+            external_test_set=test_list,
+            folds=K_FOLD,
+            seed=42,
+            num_channels=N_CHANNELS,
+            folds_dir_rel=Path(EXPERIMENT_GROUP) / "folds",
+            tensorboard_images=True,
+            versions=["best", "final"],
+            tasks=("classification", "regression"),
+        )
+        experiments.append(exp)
 
         # export all hyperparameters
-        compare_hyperparameters(experiments, current_exp_dir)
+        export_experiments(experiments, current_exp_dir)
 
         # if on cluster, export slurm files
         if "CLUSTER" in os.environ:
@@ -378,7 +362,7 @@ if __name__ == "__main__":
             COMMAND += f'$env:experiment_dir="{experiment_dir}"\n'
 
             # create env file
-            with open(ps_script_set_env, "w+") as powershell_file_tb:
+            with open(ps_script_set_env, "w+", encoding="utf8") as powershell_file_tb:
                 powershell_file_tb.write(COMMAND)
 
             ps_script = current_exp_dir / "start.ps1"
@@ -403,7 +387,7 @@ if __name__ == "__main__":
             # tensorboard command (up to here, it is the same)
             COMMAND_TB = COMMAND
             COMMAND_TB += "$start='tensorboard --logdir=\"' + "
-            COMMAND_TB += f"${{env:experiment_dir}} + '\\{experiment_group_name}\"'\n"
+            COMMAND_TB += f"${{env:experiment_dir}} + '\\{EXPERIMENT_GROUP}\"'\n"
             COMMAND_TB += "Write-Output $start\n"
             COMMAND_TB += "Invoke-Expression ${start}\n"
 
@@ -411,7 +395,7 @@ if __name__ == "__main__":
             COMMAND_COMBINE = COMMAND
             COMMAND_COMBINE += '$script=${env:script_dir} + "\\combine_models.py"\n'
             COMMAND_COMBINE += (
-                f'$output_path=${{env:experiment_dir}} + "\\{experiment_group_name}"\n'
+                f'$output_path=${{env:experiment_dir}} + "\\{EXPERIMENT_GROUP}"\n'
             )
             COMMAND_COMBINE += "$output_path=$output_path -replace ' ', '` '\n"
             COMMAND_COMBINE += '$command="python " + ${script} + " -p ${output_path}"\n'
@@ -421,7 +405,7 @@ if __name__ == "__main__":
             COMMAND_ANALYSIS = COMMAND
             COMMAND_ANALYSIS += '$script=${env:script_dir} + "\\analyze_results.py"\n'
             COMMAND_ANALYSIS += (
-                f'$output_path=${{env:experiment_dir}} + "\\{experiment_group_name}"\n'
+                f'$output_path=${{env:experiment_dir}} + "\\{EXPERIMENT_GROUP}"\n'
             )
             COMMAND_ANALYSIS += "$output_path=$output_path -replace ' ', '` '\n"
             COMMAND_ANALYSIS += '$command="python " + ${script} + " -p ${output_path}"\n'
@@ -431,27 +415,29 @@ if __name__ == "__main__":
             COMMAND += '$script=${env:script_dir} + "\\run_single_experiment.py"\n'
             for exp in experiments:
                 COMMAND += f'\n\nWrite-Output "starting with {exp.name}"\n'
-                exp_p_rel = f"\\{experiment_group_name}\\{exp.output_path.name}"
+                exp_p_rel = f"\\{EXPERIMENT_GROUP}\\{exp.output_path.name}"
                 COMMAND += f'$output_path=${{env:experiment_dir}} + "{exp_p_rel}"\n'
                 for fold_num in range(K_FOLD):
                     COMMAND += f'$command="python " + ${{script}} + " -f {fold_num} -e " + \'${{output_path}}\'\n'
                     COMMAND += "Invoke-Expression ${command}\n"
 
-            with open(ps_script, "w+") as powershell_file:
+            with open(ps_script, "w+", encoding="utf8") as powershell_file:
                 powershell_file.write(COMMAND)
 
             # create tensorboard file
-            with open(ps_script_tb, "w+") as powershell_file_tb:
+            with open(ps_script_tb, "w+", encoding="utf8") as powershell_file_tb:
                 powershell_file_tb.write(COMMAND_TB)
 
             # create combine file
-            with open(ps_script_combine, "w+") as powershell_file_combine:
+            with open(ps_script_combine, "w+", encoding="utf8") as powershell_file_combine:
                 powershell_file_combine.write(COMMAND_COMBINE)
 
             # create analysis file
-            with open(ps_script_analysis, "w+") as powershell_file_analysis:
+            with open(
+                ps_script_analysis, "w+", encoding="utf8"
+            ) as powershell_file_analysis:
                 powershell_file_analysis.write(COMMAND_ANALYSIS)
 
             print(f"To run the training, execute {ps_script}")
             print(f"To run tensorboard, execute {ps_script_tb}")
-            print(f"To analyse the results, execute {ps_script_analysis}")
+            print(f"To analyze the results, execute {ps_script_analysis}")

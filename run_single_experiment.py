@@ -11,10 +11,8 @@ tf_logger = logging.getLogger("tensorflow")
 os.environ["TF_CPP_MIN_LOG_LEVEL"] = "3"
 # pylint: disable=wrong-import-position
 
-import tensorflow as tf
-
-from experiment import Experiment
-from utils import configure_logging, plot_hparam_comparison
+from SegmentationNetworkBasis.experiment import Experiment
+from utils import configure_logging
 
 
 def init_argparse():
@@ -42,7 +40,7 @@ def init_argparse():
 
 
 def run_experiment_fold(experiment: Experiment, fold: int):
-    """Run the fold of a singel experiment, this function mainly handles the
+    """Run the fold of a single experiment, this function mainly handles the
     logging and then calls experiment.run_fold(fold)
 
     Parameters
@@ -78,7 +76,7 @@ param_file = current_experiment_dir / "parameters.yaml"
 assert param_file.exists(), f"Parameter file {param_file} does not exist."
 exp = Experiment.from_file(param_file)
 
-assert f < exp.folds, f"Fold number {f} is higher than the maximim number {exp.folds}."
+assert f < exp.folds, f"Fold number {f} is higher than the maximum number {exp.folds}."
 
 # add more detailed logger for each network, when problems arise, use debug
 log_dir = exp.output_path / exp.fold_dir_names[f]
@@ -103,8 +101,7 @@ fh_debug.setFormatter(log_formatter)
 # add to loggers
 logger.addHandler(fh_debug)
 
-with tf.device("/device:GPU:1"):
-    run_experiment_fold(exp, f)
+run_experiment_fold(exp, f)
 
 # try to evaluate it (this will only work if this is the last fold)
 try:
@@ -122,24 +119,3 @@ if exp.external_test_set is not None:
         print("Could not evaluate the experiment (happens if not all folds are finished).")
     else:
         print("Evaluation finished.")
-
-try:
-    for version in ["best", "final"]:
-        plot_hparam_comparison(exp.output_path.parent, version=version)
-        plot_hparam_comparison(exp.output_path.parent, postprocessed=True, version=version)
-except FileNotFoundError:
-    print("Plotting of hyperparameter comparison failed.")
-else:
-    print("Hyperparameter comparison was plotted.")
-
-try:
-    for version in ["best", "final"]:
-        if exp.external_test_set is not None:
-            plot_hparam_comparison(exp.output_path.parent, external=True, version=version)
-            plot_hparam_comparison(
-                exp.output_path.parent, external=True, postprocessed=True, version=version
-            )
-except FileNotFoundError:
-    print("Plotting of hyperparameter comparison on the external testset failed.")
-else:
-    print("Hyperparameter comparison on the external testset was plotted.")

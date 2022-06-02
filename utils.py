@@ -10,8 +10,6 @@ import matplotlib
 import numpy as np
 import pandas as pd
 
-from SegmentationNetworkBasis.architecture import DenseTiramisu, UNet, DeepLabv3plus
-
 # if on cluster, use other backend
 # pylint: disable=wrong-import-position, ungrouped-imports
 if "CLUSTER" in os.environ:
@@ -46,6 +44,7 @@ def configure_logging(tf_logger: logging.Logger) -> logging.Logger:
 
 def plot_hparam_comparison(
     current_experiment: os.PathLike,
+    task: str,
     metrics=None,
     external=False,
     postprocessed=False,
@@ -61,7 +60,7 @@ def plot_hparam_comparison(
     if metrics is None:
         metrics = ["Dice"]
 
-    hparam_file = current_experiment / "hyperparameters.csv"
+    exp_file = current_experiment / "experiments.csv"
     hparam_changed_file = current_experiment / "hyperparameters_changed.csv"
 
     result_name = f"hy_comp_{version}"
@@ -72,11 +71,11 @@ def plot_hparam_comparison(
     # add pdf
     result_name += ".pdf"
 
-    hparams: pd.DataFrame = pd.read_csv(hparam_file, sep=";")
+    hparams: pd.DataFrame = pd.read_csv(exp_file, sep=";")
     hparams_changed: pd.DataFrame = pd.read_csv(hparam_changed_file, sep=";")
     changed_params = hparams_changed.columns[1:]
 
-    res_path = generate_res_path(version, external, postprocessed)
+    res_path = generate_res_path(version, external, postprocessed, task)
 
     # type is incorrectly detected
     # pylint: disable=no-member,unsubscriptable-object
@@ -179,7 +178,7 @@ def plot_hparam_comparison(
             # set the legend with title
             ax.legend(title=str(tuple(str(c)[:5] for c in unused_columns)))
 
-    fig.suptitle("Hypereparameter Comparison")
+    fig.suptitle("Hyperparameter Comparison")
     plt.tight_layout()
     result_dir = current_experiment / "analysis" / "hyperparameter_comparison"
     if not result_dir.exists():
@@ -188,25 +187,25 @@ def plot_hparam_comparison(
     plt.close()
 
 
-def generate_res_path(version: str, external: bool, postprocessed: bool):
+def generate_res_path(version: str, external: bool, postprocessed: bool, task: str):
     """For a given path, generate the relative path to the result file"""
     if external:
-        folder_name = f"results_external_testset_{version}"
+        folder_name = f"results_external_testset_{version}_{task}"
     else:
-        folder_name = f"results_test_{version}"
+        folder_name = f"results_test_{version}_{task}"
     if postprocessed:
         folder_name += "-postprocessed"
     res_path = Path(folder_name) / "evaluation-all-files.csv"
     return res_path
 
 
-def compare_hyperparameters(experiments, experiment_dir, version="best"):
+def export_experiments(experiments, experiment_dir):
     """
-    Compare the hyperparameters of all experiments and collect the ones that
-    were changed.
+    Export a summary of the experiments and compare the hyperparameters of all experiments
+    and collect the ones that were changed.
     """
     # export the hyperparameters
-    hyperparameter_file = experiment_dir / "hyperparameters.csv"
+    experiments_file = experiment_dir / "experiments.csv"
     hyperparameter_changed_file = experiment_dir / "hyperparameters_changed.csv"
     # collect all results
     hparams = []
@@ -264,89 +263,16 @@ def compare_hyperparameters(experiments, experiment_dir, version="best"):
                 if np.all(arch_params[col] == 1):
                     hparams_changed.drop(columns=col, inplace=True)
 
-    hparams.to_csv(hyperparameter_file, sep=";")
+    hparams.to_csv(experiments_file, sep=";")
     hparams_changed.to_csv(hyperparameter_changed_file, sep=";")
-
-
-def generate_folder_name(parameters):
-    """
-    Make a name summarizing the hyperparameters.
-    """
-    epochs = parameters["train_parameters"]["epochs"]
-
-    params = [
-        parameters["architecture"].get_name() + str(parameters["dimensions"]) + "D",
-        parameters["loss"],
-    ]
-
-    # TODO: move this logic into the network
-    if parameters["architecture"] is UNet:
-        # attention parameters
-        if "encoder_attention" in parameters["network_parameters"]:
-            if parameters["network_parameters"]["encoder_attention"] is not None:
-                params.append(parameters["network_parameters"]["encoder_attention"])
-        if "attention" in parameters["network_parameters"]:
-            if parameters["network_parameters"]["attention"]:
-                params.append("Attn")
-
-        # residual connections if it is an attribute
-        if "res_connect" in parameters["network_parameters"]:
-            if parameters["network_parameters"]["res_connect"]:
-                params.append("Res")
-            else:
-                params.append("nRes")
-
-        # filter multiplier
-        params.append("f_" + str(parameters["network_parameters"]["n_filters"][0] // 8))
-
-        # batch norm
-        if parameters["network_parameters"]["do_batch_normalization"]:
-            params.append("BN")
-        else:
-            params.append("nBN")
-
-        # dropout
-        if parameters["network_parameters"]["drop_out"][0]:
-            params.append("DO")
-        else:
-            params.append("nDO")
-    elif parameters["architecture"] is DenseTiramisu:
-        params.append("gr_" + str(parameters["network_parameters"]["growth_rate"]))
-
-        params.append(
-            "nl_" + str(len(parameters["network_parameters"]["layers_per_block"]))
-        )
-    elif parameters["architecture"] is DeepLabv3plus:
-        params.append(str(parameters["network_parameters"]["backbone"]))
-
-        params.append(
-            "aspp_"
-            + "_".join([str(n) for n in parameters["network_parameters"]["aspp_rates"]])
-        )
-    else:
-        raise NotImplementedError(f'{parameters["architecture"]} not implemented')
-
-    # normalization
-    params.append(str(parameters["preprocessing_parameters"]["normalizing_method"].name))
-
-    # object fraction
-    params.append(
-        f'obj_{int(parameters["train_parameters"]["percent_of_object_samples"]*100):03d}%'
-    )
-
-    # add epoch number
-    params.append(str(epochs))
-
-    folder_name = "-".join(params)
-
-    return folder_name
 
 
 def gather_results(
     experiment_dir: os.PathLike,
+    task: str,
     external=False,
     postprocessed=False,
-    combined=True,
+    combined=False,
     version="best",
 ) -> pd.DataFrame:
     """Collect all result files from all experiments. Only experiments that are
@@ -356,10 +282,12 @@ def gather_results(
     ----------
     experiment_dir : Pathlike
         The path where the experiments are located
+    task : str
+        The task to analyze, choices are segmentation, classification and regression
     external : bool, optional
         If the external testset should be evaluated, by default False
     postprocessed : bool, optional
-        If the data from the posprocessed should be evaluated, by default False
+        If the data from the postprocessed should be evaluated, by default False
     combined : bool, optional
         If there is a combined model, which should be analyzed, by default True
     version : str, optional
@@ -371,7 +299,7 @@ def gather_results(
         The results with all metrics for all files
     """
     experiment_dir = Path(experiment_dir)
-    hparam_file = experiment_dir / "hyperparameters.csv"
+    experiments_file = experiment_dir / "experiments.csv"
 
     if external:
         file_field = "results_file_external_testset"
@@ -381,9 +309,9 @@ def gather_results(
     if postprocessed:
         file_field += "_postprocessed"
 
-    res_path = generate_res_path(version, external, postprocessed)
+    res_path = generate_res_path(version, external, postprocessed, task)
 
-    hparams = pd.read_csv(hparam_file, sep=";")
+    hparams = pd.read_csv(experiments_file, sep=";", index_col=0)
     # type is incorrectly detected
     # pylint: disable=no-member
 
@@ -394,6 +322,9 @@ def gather_results(
         hparams.loc[loc] = "Combined"
         hparams.loc[loc, "path"] = c_path
 
+    # ignore some fields
+    ignore = ["tasks", "label_shapes", "path"]
+
     results_all_list = []
     for _, row in hparams.iterrows():
         results_file = experiment_dir.parent / row["path"] / res_path
@@ -401,6 +332,11 @@ def gather_results(
             results = pd.read_csv(results_file, sep=";")
             # set the model
             results["name"] = Path(row["path"]).name
+            # set the other parameters
+            for name, val in row.iteritems():
+                if name in ignore:
+                    continue
+                results[name] = val
             # save results
             results_all_list.append(results)
         else:
@@ -612,7 +548,7 @@ nvidia-smi
     if not filename.parent.exists():
         filename.parent.mkdir(parents=True)
     # write to file
-    with open(filename, "w+") as f:
+    with open(filename, "w+", encoding="utf8") as f:
         f.write(slurm_file)
 
 
@@ -637,7 +573,7 @@ def export_batch_file(filename, commands):
     if not filename.parent.exists():
         filename.parent.mkdir(parents=True)
     # write to file
-    with open(filename, "w+") as f:
+    with open(filename, "w+", encoding="utf8") as f:
         f.write(batch_file)
 
     # set permission

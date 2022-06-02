@@ -8,12 +8,13 @@ pre-commit==2.13.0
 pylint==2.9.3
 pytest==6.2.4
 PyYAML==5.4.1
-scipy==1.4.1
+scikit-learn==1.0.2
+scipy==1.7.1
 seaborn==0.11.2
 simpleitk==2.0.2
 tabulate==0.8.9
-tensorboard==2.4.1
-tensorboard-plugin-profile==2.4.0
-tensorflow-gpu==2.3.0
-tensorflow_addons==0.13.0
-tqdm==4.56.1
+tensorboard==2.7.0
+tensorboard-plugin-profile==2.5.0
+tensorflow-addons==0.15.0
+tensorflow-gpu @ https://storage.googleapis.com/tensorflow/windows/gpu/tensorflow_gpu-2.7.0-cp39-cp39-win_amd64.whl
+tqdm==4.62.3
