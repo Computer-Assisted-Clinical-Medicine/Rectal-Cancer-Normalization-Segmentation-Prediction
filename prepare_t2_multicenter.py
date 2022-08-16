@@ -115,6 +115,19 @@ if __name__ == "__main__":
                     "labels": data_dir / label_data["labels"],
                 }
 
+    # add unsegmented before therapy images
+    for timepoint in timepoints.query(
+        "not segmented & treatment_status == 'before therapy'"
+    ).folder:
+        found_data = found_images[timepoint]
+        if not "T2 axial" in found_data:
+            continue
+        for num, img in enumerate(found_data["T2 axial"]):
+            name = f"{timepoint}_t{num}"
+            dataset[name] = {
+                "images": [data_dir / image],
+            }
+
     # export dataset
     dataset_file = experiment_dir / "dataset.yaml"
     with open(dataset_file, "w") as f:

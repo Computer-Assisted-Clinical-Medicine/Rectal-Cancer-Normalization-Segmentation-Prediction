@@ -9,6 +9,8 @@ Analyze the results of the experiment
 
 # %%
 
+# pylint: disable=too-many-lines
+
 import os
 from pathlib import Path
 
@@ -16,21 +18,16 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import seaborn as sns
+import SimpleITK as sitk
 import yaml
-from IPython import display
+from matplotlib.transforms import Bbox
 from scipy.stats import ttest_ind
 from sklearn.cluster import DBSCAN, KMeans
+from tqdm.auto import tqdm
 
+from plot_utils import create_axes, display_dataframe, display_markdown, save_pub
+from SegmentationNetworkBasis import normalization
 from utils import gather_results
-
-
-def display_dataframe(dataframe: pd.DataFrame):
-    display.display(display.HTML(dataframe.to_html()))
-
-
-def display_markdown(text: str):
-    display.display_markdown(display.Markdown(text))
-
 
 experiment_dir = Path(os.environ["experiment_dir"])
 
@@ -52,6 +49,7 @@ for location in ["all", "Frankfurt", "Regensburg", "Mannheim-not-from-study"]:
                     external=external,
                     postprocessed=postprocessed,
                     version=version,
+                    combined=True,
                 )
                 if loc_results is not None:
                     loc_results["train_location"] = location
@@ -79,11 +77,11 @@ results.loc[mask, "treatment_status"] = "before OP"
 results["before_therapy"] = results.treatment_status == "before therapy"
 
 
-def get_norm(name):
-    if name == "combined_models":
+def get_norm(model_name):
+    if model_name == "combined_models":
         return "combined"
     else:
-        return name.split("-")[-3]
+        return model_name.split("-")[-3]
 
 
 results["normalization"] = results.name.apply(get_norm)
@@ -616,7 +614,7 @@ for col in acquisition_params.columns:
         data=data,
         y="Dice",
         x=col,
-        markers=["."] * 4,
+        markers=["."] * data.normalization.nunique(),
         hue="normalization",
         truncate=True,
         col="external",
@@ -722,8 +720,50 @@ titles = [
 ]
 for ax, tlt in zip(g.axes[0], titles):
     ax.set_title(tlt)
-plt.show()
-plt.close()
+save_pub("performance_ABC")
+
+g = sns.catplot(
+    data=data,
+    y="Dice",
+    x="normalization",
+    order=norm_order,
+    col="external",
+    hue="network",
+    kind="box",
+    legend=True,
+    legend_out=True,
+    height=4,
+    aspect=0.7,
+)
+titles = [
+    "all",
+    "internal",
+    "external",
+]
+for ax, tlt in zip(g.axes[0], titles):
+    ax.set_title(tlt)
+save_pub("performance_names")
+
+for name_df, name in zip(data.external.unique(), titles):
+    if name_df == "test":
+        query = f"external == '{name_df}'"
+    else:
+        query = f"external == {name_df}"
+    g = sns.catplot(
+        data=data.query(query),
+        y="Dice",
+        x="normalization",
+        order=norm_order,
+        row="external",
+        hue="network",
+        kind="box",
+        legend=True,
+        legend_out=True,
+        height=5,
+        aspect=0.8,
+    )
+    g.axes[0, 0].set_title(name)
+    save_pub(f"performance_names_{name}")
 
 fig, axes = plt.subplots(nrows=1, ncols=2, sharex=False, sharey=True, figsize=(8, 4))
 
@@ -759,9 +799,7 @@ titles = [
 for ax, tlt in zip(axes, titles):
     ax.set_title(tlt)
 
-plt.tight_layout()
-plt.show()
-plt.close()
+save_pub("params", bbox_inches="tight")
 
 raw_data = (
     results.query(
@@ -786,6 +824,392 @@ for group in raw_data.groups:
     data.loc[group, "external"] = mean_external
 display_markdown("Models trained on one center.")
 display_dataframe(data.round(2))
+
+# %%
+# make a nice description of the hm methods
+images = orig_dataset["1001_1_l0_d0"]["images"]
+images_sitk = [sitk.ReadImage(str(img)) for img in images]
+norm_dir_hist = experiment_dir / "data_preprocessed" / "HISTOGRAM_MATCHING"
+norm_files = [norm_dir_hist / f"normalization_mod{i}.yaml" for i in range(3)]
+norms = [normalization.HistogramMatching.from_file(f) for f in norm_files]
+images_normed = [n.normalize(img) for img, n in zip(images_sitk, norms)]
+
+axes = create_axes()
+
+for i, (n, lbl, img, img_norm, ax_line) in enumerate(
+    zip(norms, ["T2w", "b800", "ADC"], images_sitk, images_normed, axes)
+):
+    ax_line[0].plot(n.quantiles * 100, n.standard_scale, label=f"{lbl} - std.")
+    ax_line[0].plot(n.quantiles * 100, n.get_landmarks(img)[0], label=f"{lbl} - img.")
+    ax_line[0].set_ylabel("Intensity")
+    ax_line[0].set_xlim((0, 100))
+    ax_line[0].set_xticks(norms[0].quantiles * 100)
+    ax_line[0].legend()
+    if i == 2:
+        ax_line[0].set_xlabel("Percentile")
+    else:
+        ax_line[0].axes.xaxis.set_ticklabels([])
+        ax_line[0].axes.set_xlabel(None)
+    if i == 0:
+        ax_line[0].set_title("Landmarks")
+
+    img_np = sitk.GetArrayFromImage(img)
+    img_np = 2 * img_np / img_np.max() - 1
+    img_flat = img_np.reshape(-1)
+    img_norm_np = sitk.GetArrayFromImage(img_norm)
+    image_norm_flat = img_norm_np.reshape(-1)
+    dataframe = pd.DataFrame(
+        {
+            "Intensity": np.concatenate((img_flat, image_norm_flat)),
+            "image": ["ori. img."] * len(img_flat) + ["norm. img."] * len(image_norm_flat),
+        },
+    )
+    sns.histplot(
+        data=dataframe,
+        x="Intensity",
+        hue="image",
+        bins=20,
+        stat="proportion",
+        ax=ax_line[1],
+        legend=i == 0,
+    )
+    if i == 0:
+        ax_line[1].set_title("Histogram")
+    if i != 2:
+        ax_line[1].axes.set_xlabel(None)
+    ax_line[1].set_xlim((-1, 1))
+
+    ax_line[2].imshow(
+        img_np[img_np.shape[0] // 2], interpolation="nearest", cmap="gray", vmin=-1, vmax=1
+    )
+    ax_line[2].axis("off")
+    if i == 0:
+        ax_line[2].set_title("Original Image")
+
+    ax_line[3].imshow(
+        img_norm_np[img_norm_np.shape[0] // 2],
+        interpolation="nearest",
+        cmap="gray",
+        vmin=-1,
+        vmax=1,
+    )
+    ax_line[3].axis("off")
+    if i == 0:
+        ax_line[3].set_title("Normalized Image")
+
+# (x_min, y_min, x_max, y_max)
+save_pub("hm", bbox_inches=Bbox.from_extents(-0.8, 1.9, 10.5, 8.3))
+
+# %%
+# make a nice description of the mean-std method
+images = orig_dataset["1001_1_l0_d0"]["images"]
+images_sitk = [sitk.ReadImage(str(img)) for img in images]
+norm_dir_hist = experiment_dir / "data_preprocessed" / "MEAN_STD"
+norm_files = [norm_dir_hist / f"normalization_mod{i}.yaml" for i in range(3)]
+norms = [normalization.MeanSTD.from_file(f) for f in norm_files]
+for n in norms:
+    n.clip_outliers = False
+images_normed = [n.normalize(img) for img, n in zip(images_sitk, norms)]
+axes = create_axes()
+for i, (n, lbl, img, img_norm, ax_line) in enumerate(
+    zip(norms, ["T2w", "b800", "ADC"], images_sitk, images_normed, axes)
+):
+    img_np = sitk.GetArrayFromImage(img)
+    img_flat = img_np.reshape(-1)
+    img_norm_np = sitk.GetArrayFromImage(img_norm)
+    image_norm_flat = img_norm_np.reshape(-1)
+    dataframe = pd.DataFrame(
+        {
+            "Intensity": np.concatenate((img_flat, image_norm_flat)),
+            "image": ["original image"] * len(img_flat)
+            + ["normalized image"] * len(image_norm_flat),
+        },
+    )
+
+    sns.histplot(
+        data=dataframe.query("image == 'original image'"),
+        x="Intensity",
+        hue="image",
+        bins=20,
+        stat="proportion",
+        ax=ax_line[0],
+        legend=False,
+    )
+    if i == 0:
+        ax_line[0].set_title("Original Histogram")
+    if i != 2:
+        ax_line[0].axes.set_xlabel(None)
+
+    MIN_B = -1.6
+    MAX_B = 2.5
+    BIN_WIDTH = (MAX_B - MIN_B) / 20
+    min_disp = MIN_B - BIN_WIDTH / 2
+    max_disp = MAX_B + BIN_WIDTH / 2
+    sns.histplot(
+        data=dataframe.query("image == 'normalized image'"),
+        x="Intensity",
+        hue="image",
+        bins=np.linspace(min_disp, max_disp, 21),
+        stat="proportion",
+        ax=ax_line[1],
+        legend=False,
+    )
+    if i == 0:
+        ax_line[1].set_title("Normalized Histogram")
+    ax_line[1].set_xlim((min_disp - BIN_WIDTH, max_disp + BIN_WIDTH))
+    if i != 2:
+        ax_line[1].axes.set_xlabel(None)
+    ax_line[1].set_ylim(ax_line[0].get_ylim())
+
+    ax_line[2].imshow(
+        img_np[img_np.shape[0] // 2],
+        interpolation="nearest",
+        cmap="gray",
+        vmin=img_np.min(),
+        vmax=img_np.max(),
+    )
+    ax_line[2].axis("off")
+    if i == 0:
+        ax_line[2].set_title("Original Image")
+
+    ax_line[3].imshow(
+        img_norm_np[img_norm_np.shape[0] // 2],
+        interpolation="nearest",
+        cmap="gray",
+        vmin=img_norm_np.min(),
+        vmax=img_norm_np.max(),
+    )
+    ax_line[3].axis("off")
+    if i == 0:
+        ax_line[3].set_title("Normalized Image")
+
+save_pub("mean-std", bbox_inches=Bbox.from_extents(-0.8, 1.9, 10.5, 8.3))
+
+# %%
+# make a nice description of the perc method
+images = orig_dataset["1001_1_l0_d0"]["images"]
+images_sitk = [sitk.ReadImage(str(img)) for img in images]
+norm_dir_hist = experiment_dir / "data_preprocessed" / "QUANTILE"
+norm_files = [norm_dir_hist / f"normalization_mod{i}.yaml" for i in range(3)]
+norms = [normalization.Quantile.from_file(f) for f in norm_files]
+images_normed = [n.normalize(img) for img, n in zip(images_sitk, norms)]
+axes = create_axes()
+for i, (n, lbl, img, img_norm, ax_line) in enumerate(
+    zip(norms, ["T2w", "b800", "ADC"], images_sitk, images_normed, axes)
+):
+    img_np = sitk.GetArrayFromImage(img)
+    img_flat = img_np.reshape(-1)
+    img_norm_np = sitk.GetArrayFromImage(img_norm)
+    image_norm_flat = img_norm_np.reshape(-1)
+    dataframe = pd.DataFrame(
+        {
+            "Intensity": np.concatenate((img_flat, image_norm_flat)),
+            "image": ["original image"] * len(img_flat)
+            + ["normalized image"] * len(image_norm_flat),
+        },
+    )
+
+    sns.histplot(
+        data=dataframe.query("image == 'original image'"),
+        x="Intensity",
+        hue="image",
+        bins=20,
+        stat="proportion",
+        ax=ax_line[0],
+        legend=False,
+    )
+    if i == 0:
+        ax_line[0].set_title("Original Histogram")
+    if i != 2:
+        ax_line[0].axes.set_xlabel(None)
+
+    sns.histplot(
+        data=dataframe.query("image == 'normalized image'"),
+        x="Intensity",
+        hue="image",
+        bins=np.linspace(-1.05, 1.05, 21),
+        stat="proportion",
+        ax=ax_line[1],
+        legend=False,
+    )
+    if i == 0:
+        ax_line[1].set_title("Normalized Histogram")
+    if i != 2:
+        ax_line[1].axes.xaxis.set_ticklabels([])
+        ax_line[1].axes.set_xlabel(None)
+    ax_line[1].set_xlim((-1.15, 1.15))
+    # remove y-axis
+    ax_line[1].set_ylim(ax_line[0].get_ylim())
+    if i != 2:
+        ax_line[1].axes.set_xlabel(None)
+
+    ax_line[2].imshow(
+        img_np[img_np.shape[0] // 2],
+        interpolation="nearest",
+        cmap="gray",
+        vmin=img_np.min(),
+        vmax=img_np.max(),
+    )
+    ax_line[2].axis("off")
+    if i == 0:
+        ax_line[2].set_title("Original Image")
+
+    ax_line[3].imshow(
+        img_norm_np[img_norm_np.shape[0] // 2],
+        interpolation="nearest",
+        cmap="gray",
+        vmin=img_norm_np.min(),
+        vmax=img_norm_np.max(),
+    )
+    ax_line[3].axis("off")
+    if i == 0:
+        ax_line[3].set_title("Normalized Image")
+
+save_pub("perc", bbox_inches=Bbox.from_extents(-0.8, 1.9, 10.5, 8.3))
+
+# %%
+# make a nice description of the perc-hm methods
+images = orig_dataset["1001_1_l0_d0"]["images"]
+images_sitk = [sitk.ReadImage(str(img)) for img in images]
+norm_dir_hist = experiment_dir / "data_preprocessed" / "HM_QUANTILE"
+norm_files = [norm_dir_hist / f"normalization_mod{i}.yaml" for i in range(3)]
+norms = [normalization.HMQuantile.from_file(f) for f in norm_files]
+images_normed = [n.normalize(img) for img, n in zip(images_sitk, norms)]
+axes = create_axes()
+for i, (n, lbl, img, img_norm, ax_line) in enumerate(
+    zip(norms, ["T2w", "b800", "ADC"], images_sitk, images_normed, axes)
+):
+    ax_line[0].plot(n.quantiles * 100, n.standard_scale, label=f"{lbl} - std.")
+    quant = normalization.Quantile(lower_q=n.quantiles[0], upper_q=n.quantiles[-1])
+    landmarks = n.get_landmarks(quant.normalize(img))[0]
+    landmarks = landmarks / landmarks.max()
+    ax_line[0].plot(n.quantiles * 100, landmarks, label=f"{lbl} - img.")
+    ax_line[0].set_ylabel("Intensity")
+    ax_line[0].set_xlim((0, 100))
+    ax_line[0].set_xticks(norms[0].quantiles * 100)
+    if i == 2:
+        ax_line[0].set_xlabel("Percentile")
+    else:
+        ax_line[0].axes.set_xlabel(None)
+    if i == 0:
+        ax_line[0].legend()
+        ax_line[0].set_title("Landmarks")
+
+    img_np = sitk.GetArrayFromImage(img)
+    img_np = 2 * img_np / img_np.max() - 1
+    img_flat = img_np.reshape(-1)
+    img_norm_np = sitk.GetArrayFromImage(img_norm)
+    image_norm_flat = img_norm_np.reshape(-1)
+    dataframe = pd.DataFrame(
+        {
+            "Intensity": np.concatenate((img_flat, image_norm_flat)),
+            "image": ["orig. img."] * len(img_flat) + ["norm. img."] * len(image_norm_flat),
+        },
+    )
+    sns.histplot(
+        data=dataframe,
+        x="Intensity",
+        hue="image",
+        bins=20,
+        stat="proportion",
+        ax=ax_line[1],
+        legend=i == 0,
+    )
+    if i == 0:
+        ax_line[1].set_title("Histogram")
+    ax_line[1].set_xlim((-1, 1))
+    if i != 2:
+        ax_line[1].axes.set_xlabel(None)
+
+    ax_line[2].imshow(
+        img_np[img_np.shape[0] // 2], interpolation="nearest", cmap="gray", vmin=-1, vmax=1
+    )
+    ax_line[2].axis("off")
+    if i == 0:
+        ax_line[2].set_title("Original Image")
+
+    ax_line[3].imshow(
+        img_norm_np[img_norm_np.shape[0] // 2],
+        interpolation="nearest",
+        cmap="gray",
+        vmin=-1,
+        vmax=1,
+    )
+    ax_line[3].axis("off")
+    if i == 0:
+        ax_line[3].set_title("Normalized Image")
+
+save_pub("perc-hm", bbox_inches=Bbox.from_extents(-0.8, 1.9, 10.5, 8.3))
+
+# %%
+# plot means and std
+mean_stds_list = []
+modalities = ["T2w", "b800", "ADC"]
+for lbl, data in tqdm(orig_dataset.items()):
+    image_paths = data["images"]
+    images = [sitk.ReadImage(str(img_path)) for img_path in image_paths]
+    images_np = [sitk.GetArrayFromImage(img) for img in images]
+    mean_stds_list += [
+        {
+            "Mean": np.mean(img[img > np.quantile(img, 0.01)]),
+            "Std": np.std(img[img > np.quantile(img, 0.01)]),
+            "Name": lbl,
+            "Modality": mod,
+        }
+        for img, mod in zip(images_np, modalities)
+    ]
+
+mean_stds = pd.DataFrame(mean_stds_list)
+mean_stds["patientID"] = mean_stds["Name"].str.partition("_")[0]
+mean_stds["Location"] = mean_stds["patientID"].apply(lambda s: s[:-3])
+mean_stds = mean_stds.replace(
+    {
+        "1": "Center 1",
+        "11": "Center 2",
+        "99": "Center 3",
+        "13": "Center 4",
+        "12": "Center 5",
+        "5": "Center 6",
+    }
+)
+
+
+# %%
+fig, axes = plt.subplots(nrows=2, ncols=3, figsize=(10, 6), sharey=True)
+for num, (mod, ax_col) in enumerate(zip(modalities, axes.T)):
+    data = mean_stds.query(f"Modality == '{mod}' & Location != 'Center 6'")
+    std_max = data["Std"].quantile(0.99)
+    data = data.drop(index=data[data.Std > std_max].index)
+    sns.histplot(
+        data=data,
+        x="Mean",
+        hue="Location",
+        stat="proportion",
+        bins=20,
+        common_norm=False,
+        hue_order=[f"Center {i}" for i in range(1, 6)],
+        ax=ax_col[0],
+        legend=num == 0,
+        element="poly",
+    )
+
+    sns.histplot(
+        data=data,
+        x="Std",
+        hue="Location",
+        stat="proportion",
+        bins=20,
+        common_norm=False,
+        hue_order=[f"Center {i}" for i in range(1, 6)],
+        ax=ax_col[1],
+        legend=False,
+        element="poly",
+    )
+
+    ax_col[0].set_title(mod)
+
+plt.tight_layout()
+save_pub("mean-std-stat")
 
 # %%
 display_markdown("## Compare networks")
@@ -875,7 +1299,7 @@ differences = pd.DataFrame(index=data.index, columns=data.index)
 for first in data.index:
     for second in data.index:
         tscore, pvalue = ttest_ind(raw_data.get_group(first), raw_data.get_group(second))
-        differences.loc[first, second] = np.round(pvalue, 3)
+        differences.loc[first, second] = np.round(pvalue, 5)
 display_dataframe(data.round(2))
 display_markdown("P-Values")
 display_dataframe(differences)

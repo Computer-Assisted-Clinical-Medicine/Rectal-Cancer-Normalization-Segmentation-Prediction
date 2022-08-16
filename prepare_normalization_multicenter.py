@@ -112,9 +112,12 @@ if __name__ == "__main__":
                 )
                 b800 = b800.replace("Images", "Images registered and N4 corrected")
                 adc = adc.replace("Images", "Images registered and N4 corrected")
+                label = label_data["labels"].replace(
+                    "Images", "Images registered and N4 corrected"
+                )
                 dataset[name] = {
                     "images": [data_dir / image, data_dir / b800, data_dir / adc],
-                    "labels": data_dir / label_data["labels"],
+                    "labels": data_dir / label,
                 }
 
     # export dataset

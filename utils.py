@@ -346,7 +346,7 @@ def gather_results(
     experiment_dir: os.PathLike,
     external=False,
     postprocessed=False,
-    combined=True,
+    combined=False,
     version="best",
 ) -> pd.DataFrame:
     """Collect all result files from all experiments. Only experiments that are
