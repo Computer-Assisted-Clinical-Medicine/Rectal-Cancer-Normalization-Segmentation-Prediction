@@ -20,8 +20,8 @@ import tensorflow as tf
 import tensorflow.keras.backend as K
 
 import interpetability
-from SegmentationNetworkBasis.NetworkBasis import loss
-from SegmentationNetworkBasis.NetworkBasis.metric import Dice
+from SegClassRegBasis import loss
+from SegClassRegBasis.metric import Dice
 
 tf.python.framework.ops.disable_eager_execution()
 

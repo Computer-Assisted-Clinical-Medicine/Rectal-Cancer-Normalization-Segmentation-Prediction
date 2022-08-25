@@ -5,9 +5,9 @@ import logging
 
 import SimpleITK as sitk
 
-from SegmentationNetworkBasis import config as cfg
-from SegmentationNetworkBasis.segapplyloader import ApplyBasisLoader
-from SegmentationNetworkBasis.segbasisloader import SegBasisLoader
+from SegClassRegBasis import config as cfg
+from SegClassRegBasis.segapplyloader import ApplyBasisLoader
+from SegClassRegBasis.segbasisloader import SegBasisLoader
 
 # configure logger
 logger = logging.getLogger(__name__)

@@ -26,7 +26,7 @@ from sklearn.cluster import DBSCAN, KMeans
 from tqdm.auto import tqdm
 
 from plot_utils import create_axes, display_dataframe, display_markdown, save_pub
-from SegmentationNetworkBasis import normalization
+from SegClassRegBasis import normalization
 from utils import gather_results
 
 experiment_dir = Path(os.environ["experiment_dir"])

@@ -10,11 +10,11 @@ import pandas as pd
 import SimpleITK as sitk
 from tqdm.autonotebook import tqdm
 
-import evaluation
-import SegmentationNetworkBasis.config as cfg
-from experiment import Experiment
+import SegClassRegBasis.config as cfg
 from seg_data_loader import ApplyLoader
-from SegmentationNetworkBasis.postprocessing import keep_big_structures
+from SegClassRegBasis import evaluation
+from SegClassRegBasis.experiment import Experiment
+from SegClassRegBasis.postprocessing import keep_big_structures
 
 WRITE_PROBABILITIES = False
 OVERWRITE = False
@@ -397,5 +397,5 @@ if __name__ == "__main__":
         all_experiments.append(Experiment.from_file(param_file))
 
     # combine the models
-    for version in all_experiments[0].versions:
-        run_combine(experiments=all_experiments, version=version)
+    for vers in all_experiments[0].versions:
+        run_combine(experiments=all_experiments, version=vers)

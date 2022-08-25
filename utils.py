@@ -10,7 +10,7 @@ import matplotlib
 import numpy as np
 import pandas as pd
 
-from SegmentationNetworkBasis.architecture import DenseTiramisu, UNet, DeepLabv3plus
+from SegClassRegBasis.architecture import DenseTiramisu, UNet, DeepLabv3plus
 
 # if on cluster, use other backend
 # pylint: disable=wrong-import-position, ungrouped-imports

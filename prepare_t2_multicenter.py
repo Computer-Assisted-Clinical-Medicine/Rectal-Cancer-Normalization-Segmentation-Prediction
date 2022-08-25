@@ -16,10 +16,10 @@ tf_logger = logging.getLogger("tensorflow")
 os.environ["TF_CPP_MIN_LOG_LEVEL"] = "3"
 # pylint: disable=wrong-import-position, unused-import
 
-from experiment import Experiment
-from SegmentationNetworkBasis.architecture import DeepLabv3plus, DenseTiramisu, UNet
-from SegmentationNetworkBasis.normalization import NORMALIZING
-from SegmentationNetworkBasis.preprocessing import preprocess_dataset
+from SegClassRegBasis.architecture import DeepLabv3plus, DenseTiramisu, UNet
+from SegClassRegBasis.experiment import Experiment
+from SegClassRegBasis.normalization import NORMALIZING
+from SegClassRegBasis.preprocessing import preprocess_dataset
 from utils import compare_hyperparameters, export_batch_file, generate_folder_name
 
 # set tf thread mode
