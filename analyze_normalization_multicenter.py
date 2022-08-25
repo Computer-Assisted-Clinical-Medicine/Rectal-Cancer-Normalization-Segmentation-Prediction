@@ -1147,7 +1147,9 @@ mean_stds_list = []
 modalities = ["T2w", "b800", "ADC"]
 for lbl, data in tqdm(orig_dataset.items()):
     image_paths = data["images"]
-    images = [sitk.ReadImage(str(img_path)) for img_path in image_paths]
+    images = [
+        sitk.ReadImage(str(img_path)) for img_path in image_paths if img_path.exists()
+    ]
     images_np = [sitk.GetArrayFromImage(img) for img in images]
     mean_stds_list += [
         {
