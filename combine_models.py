@@ -172,10 +172,11 @@ def combine_models(
         if not pred_path.exists() or overwrite:
 
             # find all predictions
-            func = lambda x: (
-                x / result_path.name / f"prediction-{p_id}-{version}{cfg.file_suffix}"
-            )  # pylint: disable=cell-var-from-loop
-            p_files = weights.fold_dir.apply(func)
+            p_files = weights.fold_dir.apply(
+                lambda x: x
+                / result_path.name
+                / f"prediction-{p_id}-{version}{cfg.file_suffix}"
+            )
             found = p_files.apply(lambda x: x.exists())
             # skip files were nothing was found (they are probably in a different fold)
             if not np.any(found):
@@ -209,7 +210,7 @@ def combine_models(
                             ),
                         ]
                     ):
-                        print(f"{pat} was resample because of a size missmatch.")
+                        print(f"{pat} was resample because of a size miss-match.")
                         image = sitk.Resample(image, referenceImage=first_image)
                 labels = sitk.GetArrayFromImage(image)
                 if probability_avg is None:
@@ -254,14 +255,16 @@ def combine_models(
                 print(f"{label_path} not found")
                 continue
             result_metrics = {"File Number": p_id}
-            evaluation.evaluate_segmentation_prediction(
-                result_metrics, str(pred_path), str(label_path)
+            result_metrics.update(
+                evaluation.evaluate_segmentation_prediction(str(pred_path), str(label_path))
             )
             results_list.append(result_metrics)
 
             result_metrics = {"File Number": p_id}
-            evaluation.evaluate_segmentation_prediction(
-                result_metrics, str(pred_path_post), str(label_path)
+            result_metrics.update(
+                evaluation.evaluate_segmentation_prediction(
+                    str(pred_path_post), str(label_path)
+                )
             )
             results_post_list.append(result_metrics)
 

@@ -20,7 +20,7 @@ import seaborn as sns
 import yaml
 from IPython import display
 
-from utils import gather_results
+from SegClassRegBasis.utils import gather_results
 
 
 def display_dataframe(dataframe: pd.DataFrame):
@@ -57,6 +57,7 @@ def read_results(exp_dir: Path, versions=("best",)):
                 for version in versions:
                     loc_results = gather_results(
                         exp_dir / f"Normalization_{location}",
+                        task="segmentation",
                         external=external,
                         postprocessed=postprocessed,
                         version=version,
@@ -120,7 +121,7 @@ results.drop(index=results.index[results.normalization == "MEAN_STD"], inplace=T
 results.drop(index=results.index[results.normalization == "HM_QUANTILE"], inplace=True)
 
 display_markdown("## Load acquisition parameters")
-with open(base_path / experiment_names[1] / "dataset.yaml") as f:
+with open(base_path / experiment_names[1] / "dataset.yaml", encoding="utf8") as f:
     orig_dataset = yaml.load(f, Loader=yaml.Loader)
 
 new_root = Path("D:/Study Data/Dataset/Images")

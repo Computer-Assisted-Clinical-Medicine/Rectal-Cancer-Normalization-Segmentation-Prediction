@@ -4,7 +4,6 @@ Prepare the training and run it on the cluster or a local machine (automatically
 import copy
 import logging
 import os
-import sys
 from pathlib import Path
 from typing import Any, Dict, List, Union
 
@@ -20,7 +19,8 @@ from SegClassRegBasis.architecture import DeepLabv3plus, DenseTiramisu, UNet
 from SegClassRegBasis.experiment import Experiment
 from SegClassRegBasis.normalization import NORMALIZING
 from SegClassRegBasis.preprocessing import preprocess_dataset
-from utils import compare_hyperparameters, export_batch_file, generate_folder_name
+from SegClassRegBasis.utils import export_experiments_run_files
+from utils import generate_folder_name
 
 # set tf thread mode
 os.environ["TF_GPU_THREAD_MODE"] = "gpu_private"
@@ -68,9 +68,9 @@ if __name__ == "__main__":
         experiment_dir.mkdir()
 
     # load data
-    with open(data_dir / "images.yaml") as f:
+    with open(data_dir / "images.yaml", encoding="utf8") as f:
         found_images = yaml.load(f, Loader=yaml.Loader)
-    with open(data_dir / "segmented_images.yaml") as f:
+    with open(data_dir / "segmented_images.yaml", encoding="utf8") as f:
         segmented_images = yaml.load(f, Loader=yaml.Loader)
     timepoints = pd.read_csv(data_dir / "timepoints.csv", sep=";", index_col=0)
 
@@ -116,7 +116,7 @@ if __name__ == "__main__":
 
     # export dataset
     dataset_file = experiment_dir / "dataset.yaml"
-    with open(dataset_file, "w") as f:
+    with open(dataset_file, "w", encoding="utf8") as f:
         yaml.dump(dataset, f, sort_keys=False)
 
     # define the parameters that are constant
@@ -340,118 +340,5 @@ if __name__ == "__main__":
             )
             experiments.append(exp)
 
-        # export all hyperparameters
-        compare_hyperparameters(experiments, current_exp_dir)
-
-        # if on cluster, export slurm files
-        if "CLUSTER" in os.environ:
-            slurm_files = []
-            working_dir = Path("").resolve()
-            if not working_dir.exists():
-                working_dir.mkdir()
-            for exp in experiments:
-                slurm_files.append(exp.export_slurm_file(working_dir))
-
-            start_all_batch = current_exp_dir / "start_all_jobs.sh"
-            export_batch_file(
-                filename=start_all_batch,
-                commands=[f"sbatch {f}" for f in slurm_files],
-            )
-
-            # and create some needed directories (without their log dirs, jobs don't start)
-            plot_dir_slurm = working_dir / "plots" / "slurm"
-            if not plot_dir_slurm.exists():
-                plot_dir_slurm.mkdir(parents=True)
-            combined_dir_slurm = working_dir / "combined_models" / "slurm"
-            if not combined_dir_slurm.exists():
-                combined_dir_slurm.mkdir(parents=True)
-            print(f"To start the training, execute {start_all_batch}")
-        # if on local computer, export powershell start file
-        else:
-
-            # set the environment (might be changed for each machine)
-            ps_script_set_env = experiment_dir / "set_env.ps1"
-            script_dir = Path(sys.argv[0]).resolve().parent
-            COMMAND = f'$env:script_dir="{script_dir}"\n'
-            COMMAND += "$env:script_dir=$env:script_dir -replace ' ', '` '\n"
-            COMMAND += f'$env:data_dir="{data_dir}"\n'
-            COMMAND += f'$env:experiment_dir="{experiment_dir}"\n'
-
-            # create env file
-            with open(ps_script_set_env, "w+") as powershell_file_tb:
-                powershell_file_tb.write(COMMAND)
-
-            ps_script = current_exp_dir / "start.ps1"
-            ps_script_tb = current_exp_dir / "start_tensorboard.ps1"
-            ps_script_combine = current_exp_dir / "start_combine.ps1"
-            ps_script_analysis = current_exp_dir / "start_analysis.ps1"
-
-            # make a powershell command, add env
-            COMMAND = "$script_parent = (get-item $PSScriptRoot ).parent.FullName\n"
-            COMMAND += '$set_env="${script_parent}\\set_env.ps1"\n'
-            COMMAND += "$set_env=$set_env -replace ' ', '` '\n"
-            COMMAND += "Invoke-Expression ${set_env}\n"
-            COMMAND += 'Write-Output "Data dir: $env:data_dir"\n'
-            COMMAND += 'Write-Output "Experiment dir: $env:experiment_dir"\n'
-            COMMAND += 'Write-Output "Script dir: $env:script_dir"\n'
-
-            # activate
-            COMMAND += 'Write-Output "Activate Virtual Environment"\n'
-            COMMAND += '$activate=${env:script_dir} + "\\venv\\Scripts\\activate.ps1"\n'
-            COMMAND += "Invoke-Expression ${activate}\n"
-
-            # tensorboard command (up to here, it is the same)
-            COMMAND_TB = COMMAND
-            COMMAND_TB += "$start='tensorboard --logdir=\"' + "
-            COMMAND_TB += f"${{env:experiment_dir}} + '\\{experiment_group_name}\"'\n"
-            COMMAND_TB += "Write-Output $start\n"
-            COMMAND_TB += "Invoke-Expression ${start}\n"
-
-            # run combine
-            COMMAND_COMBINE = COMMAND
-            COMMAND_COMBINE += '$script=${env:script_dir} + "\\combine_models.py"\n'
-            COMMAND_COMBINE += (
-                f'$output_path=${{env:experiment_dir}} + "\\{experiment_group_name}"\n'
-            )
-            COMMAND_COMBINE += "$output_path=$output_path -replace ' ', '` '\n"
-            COMMAND_COMBINE += '$command="python " + ${script} + " -p ${output_path}"\n'
-            COMMAND_COMBINE += "Invoke-Expression ${command}\n"
-
-            # run analysis
-            COMMAND_ANALYSIS = COMMAND
-            COMMAND_ANALYSIS += '$script=${env:script_dir} + "\\analyze_results.py"\n'
-            COMMAND_ANALYSIS += (
-                f'$output_path=${{env:experiment_dir}} + "\\{experiment_group_name}"\n'
-            )
-            COMMAND_ANALYSIS += "$output_path=$output_path -replace ' ', '` '\n"
-            COMMAND_ANALYSIS += '$command="python " + ${script} + " -p ${output_path}"\n'
-            COMMAND_ANALYSIS += "Invoke-Expression ${command}\n"
-
-            # add the experiments
-            COMMAND += '$script=${env:script_dir} + "\\run_single_experiment.py"\n'
-            for exp in experiments:
-                COMMAND += f'\n\nWrite-Output "starting with {exp.name}"\n'
-                exp_p_rel = f"\\{experiment_group_name}\\{exp.output_path.name}"
-                COMMAND += f'$output_path=${{env:experiment_dir}} + "{exp_p_rel}"\n'
-                for fold_num in range(K_FOLD):
-                    COMMAND += f'$command="python " + ${{script}} + " -f {fold_num} -e " + \'${{output_path}}\'\n'
-                    COMMAND += "Invoke-Expression ${command}\n"
-
-            with open(ps_script, "w+") as powershell_file:
-                powershell_file.write(COMMAND)
-
-            # create tensorboard file
-            with open(ps_script_tb, "w+") as powershell_file_tb:
-                powershell_file_tb.write(COMMAND_TB)
-
-            # create combine file
-            with open(ps_script_combine, "w+") as powershell_file_combine:
-                powershell_file_combine.write(COMMAND_COMBINE)
-
-            # create analysis file
-            with open(ps_script_analysis, "w+") as powershell_file_analysis:
-                powershell_file_analysis.write(COMMAND_ANALYSIS)
-
-            print(f"To run the training, execute {ps_script}")
-            print(f"To run tensorboard, execute {ps_script_tb}")
-            print(f"To analyse the results, execute {ps_script_analysis}")
+    # export all hyperparameters
+    export_experiments_run_files(experiment_dir, experiments)
