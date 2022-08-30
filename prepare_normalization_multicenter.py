@@ -15,6 +15,7 @@ tf_logger = logging.getLogger("tensorflow")
 os.environ["TF_CPP_MIN_LOG_LEVEL"] = "3"
 # pylint: disable=wrong-import-position, unused-import
 
+from gan_normalization import GAN_NORMALIZING, train_gan_normalization
 from SegClassRegBasis.architecture import DeepLabv3plus, UNet
 from SegClassRegBasis.experiment import Experiment
 from SegClassRegBasis.normalization import NORMALIZING
@@ -94,17 +95,18 @@ if __name__ == "__main__":
         for label_num, label_data in enumerate(data):
             assert "T2 axial" in label_data["name"]
             found_data = found_images[timepoint]
-            if not "ADC axial recalculated" in found_data:
+            if not "ADC axial original" in found_data:
                 continue
             if not "Diff axial b800" in found_data:
                 if "Diff axial b800 recalculated" in found_data:
                     B_NAME = "Diff axial b800 recalculated"
                 else:
-                    raise ValueError("No b800 image found but an ADC image")
+                    print("No b800 image found but an ADC image")
+                    continue
             else:
                 B_NAME = "Diff axial b800"
             for diff_num, (adc, b800) in enumerate(
-                zip(found_data["ADC axial recalculated"], found_data[B_NAME])
+                zip(found_data["ADC axial original"], found_data[B_NAME])
             ):
                 name = f"{timepoint}_l{label_num}_d{diff_num}"
                 if name in ignore:
@@ -215,6 +217,11 @@ if __name__ == "__main__":
         NORMALIZING.HISTOGRAM_MATCHING: {"mask_quantile": 0},
         NORMALIZING.MEAN_STD: {},
         NORMALIZING.HM_QUANTILE: {},
+        GAN_NORMALIZING.GAN_DISCRIMINATORS: {
+            "depth": 3,
+            "filter_base": 16,
+            "min_max": False,
+        },
     }
     # add all methods with their hyperparameters
     hyper_parameters_new = []
@@ -283,6 +290,7 @@ if __name__ == "__main__":
 
         experiment_group_name = f"Normalization_{location}"
         current_exp_dir = experiment_dir / experiment_group_name
+        group_dir_rel = Path(GROUP_BASE_NAME) / experiment_group_name
 
         # set training files
         train_list = [key for key in dataset if key.partition("_l")[0] in timepoints_train]
@@ -323,19 +331,51 @@ if __name__ == "__main__":
 
             # set a name for the preprocessing dir
             # so the same method will also use the same directory
-            preprocessing_name = hyp["preprocessing_parameters"]["normalizing_method"].name
+            pre_params = hyp["preprocessing_parameters"]
+            norm_type = pre_params["normalizing_method"]
+            preprocessing_name = norm_type.name
+
+            if norm_type == GAN_NORMALIZING.GAN_DISCRIMINATORS:
+                PASS_MODALITY = True
+                model_paths = []
+                for mod_num in range(N_CHANNELS):
+                    model_paths.append(
+                        train_gan_normalization(
+                            dataset=dataset,
+                            train_list=train_list,
+                            mod_num=mod_num,
+                            preprocessed_dir=PREPROCESSED_DIR,
+                            experiment_group=group_dir_rel,
+                            **pre_params["normalization_parameters"],
+                        )
+                    )
+                pre_params["normalization_parameters"]["model_paths"] = tuple(model_paths)
+            else:
+                PASS_MODALITY = False
+
+            # normalizations that are trained should be saved in the exp group dir
+            if norm_type in [
+                GAN_NORMALIZING.GAN_DISCRIMINATORS,
+                NORMALIZING.HISTOGRAM_MATCHING,
+                NORMALIZING.HM_QUANTILE,
+            ]:
+                preprocessed_dir_exp = (
+                    group_dir_rel / "data_preprocessed" / preprocessing_name
+                )
+            else:
+                preprocessed_dir_exp = PREPROCESSED_DIR / preprocessing_name
 
             # preprocess data (only do that once for all experiments)
             exp_dataset = preprocess_dataset(
                 data_set=dataset,
                 num_channels=N_CHANNELS,
                 base_dir=experiment_dir,
-                preprocessed_dir=PREPROCESSED_DIR / preprocessing_name,
+                preprocessed_dir=preprocessed_dir_exp,
                 train_dataset=train_list,
-                preprocessing_parameters=hyp["preprocessing_parameters"],
+                preprocessing_parameters=pre_params,
+                pass_modality=PASS_MODALITY,
             )
 
-            group_dir_rel = Path(GROUP_BASE_NAME) / experiment_group_name
             exp = Experiment(
                 hyper_parameters=hyp,
                 name=experiment_name,

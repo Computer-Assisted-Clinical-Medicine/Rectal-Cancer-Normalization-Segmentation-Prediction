@@ -6,6 +6,7 @@ numpy==1.23.2
 opencv_python==4.6.0.66 
 pandas==1.4.3
 pre-commit==2.20.0
+pydot==1.4.2
 pylint==2.14.5
 pytest==7.1.2
 PyYAML==6.0

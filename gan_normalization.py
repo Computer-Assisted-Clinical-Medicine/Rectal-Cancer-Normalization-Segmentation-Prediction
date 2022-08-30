@@ -1,0 +1,442 @@
+"""Normalize images using GANs"""
+import copy
+import os
+from collections import OrderedDict
+from enum import Enum
+from pathlib import Path
+from typing import List
+
+import numpy as np
+import pandas as pd
+import SimpleITK as sitk
+import tensorflow as tf
+
+import gan_networks
+from SegClassRegBasis import config as cfg
+from SegClassRegBasis.experiment import Experiment
+from SegClassRegBasis.normalization import NORMALIZING, Normalization, all_subclasses
+from SegClassRegBasis.preprocessing import preprocess_dataset
+from SegClassRegBasis.segbasisnet import SegBasisNet
+
+
+def train_gan_normalization(
+    dataset: dict,
+    train_list: List[str],
+    mod_num: int,
+    preprocessed_dir: Path,
+    experiment_group: Path,
+    depth: int,
+    filter_base: int,
+    min_max: bool,
+):
+    """Train the GAN Normalization"""
+
+    dataset_norm = copy.deepcopy(dataset)
+    experiment_dir = Path(os.environ["experiment_dir"])
+    data_dir = Path(os.environ["data_dir"])
+
+    targets = OrderedDict(
+        {
+            "0008|1090": "cat",  # : Manufacturer's Model Name
+            "0018|0021": "cat",  # : Sequence Variant
+            "0018|0050": "reg",  # : Slice Thickness
+            "0018|0080": "reg",  # : Repetition Time
+            "0018|0095": "reg",  # : Pixel Bandwidth
+            "0018|0081": "reg",  # : Echo Time
+            "0018|0087": "cat",  # : Magnetic Field Strength
+            "pixel_spacing": "reg",
+            "location": "cat",
+        }
+    )
+    column_names = {
+        "0008|1090": "model_name",
+        "0018|0021": "sequence_variant",
+        "0018|0050": "slice_thickness",
+        "0018|0080": "repetition_time",
+        "0018|0095": "pixel_bandwidth",
+        "0018|0081": "echo_time",
+        "0018|0087": "field_strength",
+        "pixel_spacing": "pixel_spacing",
+        "location": "location",
+    }
+    column_tasks = {column_names[field]: tsk for field, tsk in targets.items()}
+
+    # get the parameters
+    for pat_name, data in dataset_norm.items():
+        img_path = data["images"][mod_num]
+        rel_path = img_path.relative_to(data_dir / "Images registered and N4 corrected")
+        param_file = data_dir / "Images" / rel_path.parent / "acquisition_parameters.csv"
+        if not param_file.exists():
+            raise FileNotFoundError(f"Param file {param_file} not found.")
+        params = pd.read_csv(param_file, sep=";", index_col=0)
+        img_name = Path(img_path).with_suffix("").with_suffix("").name
+        missing_columns = [c for c in targets.keys() if c not in params]
+        if len(missing_columns) > 0:
+            raise ValueError(f"{missing_columns} not found")
+        if img_name == "Diff axial b800 recalculated":
+            possible_diff = [700, 1000]
+            for poss_diff in possible_diff:
+                name = f"Diff axial b{poss_diff}"
+                if name in params.index:
+                    img_name = name
+        params_img = params.loc[img_name, targets.keys()]
+        cat_dict = {}
+        reg_dict = {}
+        for col, param_val in params_img.iteritems():
+            col_name = column_names.get(col, col)
+            col_type = targets[col]
+            if col_type == "reg":
+                reg_dict[col_name] = float(param_val)
+            elif col_type == "cat":
+                cat_dict[col_name] = str(param_val).strip()
+        # add location to scanner
+        cat_dict["model_name"] = cat_dict["location"] + " - " + cat_dict["model_name"]
+        dataset_norm[pat_name]["classification"] = cat_dict
+        dataset_norm[pat_name]["regression"] = reg_dict
+        dataset_norm[pat_name]["autoencoder"] = "image"
+
+    # define the parameters that are constant
+    train_parameters = {
+        "l_r": ("exponential", 0.1, 0.001),
+        "optimizer": "Adam",
+        "epochs": 200,
+        "batch_size": 256,
+        "in_plane_dimension": 128,
+        # parameters for saving the best model
+        "best_model_decay": 0.3,
+        # scheduling parameters
+        "early_stopping": False,
+        # "patience_es": 30,
+        "reduce_lr_on_plateau": False,
+        # "patience_lr_plat": 20,
+        # "factor_lr_plat": 0.5,
+        "monitor": "val_generator/loss",
+        "monitor_mode": "min",
+        "save_best_only": False,
+        # fine tuning parameters
+        "finetune_epoch": None,
+        "finetune_layers": None,
+        "finetune_lr": None,
+        # sampling parameters
+        "samples_per_volume": 10,
+        "background_label_percentage": 0.15,
+        "percent_of_object_samples": 0,
+        # Augmentation parameters
+        "add_noise": False,
+        "max_rotation": 0.1,
+        "min_resolution_augment": 1.2,
+        "max_resolution_augment": 0.9,
+    }
+
+    preprocessing_parameters = {
+        "resample": True,
+        "target_spacing": (1, 1, 3),
+        "normalizing_method": NORMALIZING.QUANTILE,
+        "normalization_parameters": {
+            "lower_q": 0.05,
+            "upper_q": 0.95,
+        },
+    }
+
+    constant_parameters = {
+        "train_parameters": train_parameters,
+        "preprocessing_parameters": preprocessing_parameters,
+        "dimensions": 2,
+    }
+
+    # first discriminator just checks if the image looks good or not
+    expanded_tasks = {}
+    expanded_tasks["autoencoder"] = "autoencoder"
+    discriminators = [
+        {
+            "name": "discriminator_real_fake",
+            "input_type": "image",
+            "discriminator_n_conv": 3,
+            "loss": "MSE",
+            "goal": "confuse",
+        }
+    ]
+    # Other discriminators, use the median, there is nothing in the protocol
+    reg_params_median = pd.DataFrame(
+        [d["regression"] for d in dataset_norm.values()]
+    ).median()
+    target_labels = reg_params_median.to_dict()
+    target_labels.update(
+        {
+            "model_name": None,
+            "sequence_variant": None,
+            "field_strength": None,
+            "location": None,
+        }
+    )
+    input_types = {
+        "model_name": "latent",
+        "sequence_variant": "latent",
+        "slice_thickness": "image",
+        "repetition_time": "image",
+        "pixel_bandwidth": "image",
+        "flip_angle": "image",
+        "echo_time": "image",
+        "field_strength": "image",
+        "pixel_spacing": "image",
+        "location": "latent",
+    }
+    for col in column_names.values():
+        if column_tasks[col] == "cat":
+            disc_loss = "CEL"
+            expanded_tasks[col] = "discriminator-classification"
+        elif column_tasks[col] == "reg":
+            disc_loss = "MSE"
+            expanded_tasks[col] = "discriminator-regression"
+        else:
+            raise ValueError(f"Task {column_tasks[col]} unknown.")
+        discriminators.append(
+            {
+                "name": col,
+                "input_type": input_types[col],
+                "loss": disc_loss,
+                "goal": "predict",
+                "target_labels": target_labels[col],
+                "loss_weight": 0.01,
+            }
+        )
+
+    def get_mod(data_img: sitk.Image, label_img: sitk.Image):
+        """This function can be used to adapt the images to the task at hand.
+
+        Parameters
+        ----------
+        data_img : sitk.Image
+            The image
+        label_img : sitk.Image
+            The labels
+
+        Returns
+        -------
+        sitk.Image, sitk.Image
+            The adapted image and labels
+        """
+        # just get one channel of the image
+        assert data_img.GetNumberOfComponentsPerPixel() == 3
+        data_img = sitk.VectorIndexSelectionCast(data_img, mod_num)
+        return data_img, label_img
+
+    hyperparameters = {
+        **constant_parameters,
+        "architecture": gan_networks.AutoencoderGAN,
+        "network_parameters": {
+            "depth": depth,
+            "filter_base": filter_base,
+            "skip_edges": True,
+            "discriminators": discriminators,
+            "regularize": (True, "L2", 0.001),
+            "clip_value": 0.1,
+            "variational": False,
+            "loss_parameters": {
+                "NMI": {
+                    "min_val": -1,
+                    "max_val": 1,
+                    "n_bins": 150,
+                },
+                "CON-OUT": {
+                    "min_val": -1,
+                    "max_val": 1,
+                    "scaling": 10,
+                },
+            },
+            # Discriminator arguments
+            "disc_real_fake_optimizer": "Adam",
+            "disc_real_fake_lr": ("exponential", 0.1, 0.001),
+            "disc_real_fake_n_conv": 3,
+            "disc_image_optimizer": "Adam",
+            "disc_image_lr": ("exponential", 0.1, 0.001),
+            "disc_image_n_conv": 3,
+            "disc_latent_optimizer": "Adam",
+            "disc_latent_lr": ("exponential", 0.1, 0.001),
+            "disc_latent_n_conv": 3,
+        },
+        "loss": {
+            "autoencoder": "MSE",
+            "classification": "CEL",
+            "regression": "MSE",
+            "discriminator-classification": "CEL",
+            "discriminator-regression": "MSE",
+        },
+        "dataloader_parameters": {
+            "preprocessing_func": get_mod,
+        },
+    }
+    if min_max:
+        hyperparameters["network_parameters"]["output_min"] = -1
+        hyperparameters["network_parameters"]["output_max"] = 1
+
+    # define experiment (not a constant)
+    experiment_name = f"Train_Normalization_GAN_{mod_num}"
+
+    # set a name for the preprocessing dir
+    # so the same method will also use the same directory
+    preprocessing_name = hyperparameters["preprocessing_parameters"][
+        "normalizing_method"
+    ].name
+
+    # set number of validation files
+    hyperparameters["train_parameters"]["number_of_vald"] = len(train_list) // 10
+
+    # preprocess data (only do that once for all experiments)
+    exp_dataset = preprocess_dataset(
+        data_set=dataset_norm,
+        num_channels=3,
+        base_dir=experiment_dir,
+        preprocessed_dir=preprocessed_dir / preprocessing_name,
+        train_dataset=train_list,
+        preprocessing_parameters=hyperparameters["preprocessing_parameters"],
+    )
+
+    # using nothing as training set
+    cfg.data_train_split = 1
+
+    exp = Experiment(
+        hyper_parameters=hyperparameters,
+        name=experiment_name,
+        output_path_rel=experiment_group / "Train_Normalization_GAN" / experiment_name,
+        data_set=exp_dataset,
+        crossvalidation_set=train_list,
+        folds=1,
+        seed=42,
+        num_channels=1,
+        folds_dir_rel=experiment_group / "Train_Normalization_GAN" / "folds_norm",
+        tensorboard_images=True,
+        versions=["final"],
+        tasks=("autoencoder"),
+        expanded_tasks=expanded_tasks,
+    )
+
+    exp.run_fold(0)
+
+    return exp.output_path / "fold-0" / "models" / "model-final"
+
+
+class GAN_NORMALIZING(Enum):  # pylint:disable=invalid-name
+    """The different normalization types
+    To get the corresponding class, call get_class
+    """
+
+    GAN_DISCRIMINATORS = 0
+
+    def get_class(self) -> Normalization:
+        """Get the corresponding normalization class for an enum, it has to be a subclass
+        of the Normalization class.
+
+        Parameters
+        ----------
+        enum : NORMALIZING
+            The enum
+
+        Returns
+        -------
+        Normalization
+            The normalization class
+
+        Raises
+        ------
+        ValueError
+            If the class was found for that enum
+        """
+        for norm_cls in all_subclasses(Normalization):
+            if norm_cls.enum is self:
+                return norm_cls
+        raise ValueError(f"No normalization for {self.value}")
+
+
+class GanDiscriminators(Normalization):
+    """Use the trained networks to normalize the images"""
+
+    enum = GAN_NORMALIZING.GAN_DISCRIMINATORS
+
+    parameters_to_save = ["model_paths", "mod_num", "depth", "filter_base", "min_max"]
+
+    # make sure the parameters stay the same
+    def __init__(
+        self, model_paths: Path, mod_num: int, depth, filter_base, min_max, **kwargs
+    ) -> None:
+        self.depth = depth
+        self.filter_base = filter_base
+        self.model_paths = model_paths
+        self.mod_num = mod_num
+        self.min_max = min_max
+        self.model = self.load_model(self.model_paths[mod_num])
+        super().__init__(normalize_channelwise=False)
+
+    def load_model(self, model_path: Path) -> tf.keras.Model:
+        exp_dir = Path(os.environ["experiment_dir"])
+        return SegBasisNet(
+            {"segmentation": "DICE"}, model_path=exp_dir / model_path, is_training=False
+        )
+
+    def normalize(self, image: sitk.Image) -> sitk.Image:
+        """Apply the histogram matching to an image
+
+        Parameters
+        ----------
+        image : sitk.Image
+            The image
+
+        Returns
+        -------
+        sitk.Image
+            The normalized image
+        """
+        image_np = sitk.GetArrayFromImage(image)
+
+        pad_with = np.zeros((3, 2), dtype=int)
+        div_h = 8
+        min_p = 8
+        for num in [1, 2]:
+            size = image_np.shape[num]
+            if size % 2 == 0:
+                # and make sure have of the final size is divisible by divisible_by
+                if div_h == 0:
+                    pad_div = 0
+                else:
+                    pad_div = div_h - ((size // 2 + min_p) % div_h)
+                pad_with[num] = min_p + pad_div
+            else:
+                # and make sure have of the final size is divisible by divisible_by
+                if div_h == 0:
+                    pad_div = 0
+                else:
+                    pad_div = div_h - (((size + 1) // 2 + min_p) % div_h)
+                pad = min_p + pad_div
+                # pad asymmetrical
+                pad_with[num, 0] = pad + 1
+                pad_with[num, 1] = pad
+
+        image_np_padded = np.pad(image_np, pad_with)
+
+        results = []
+        for sample in image_np_padded:
+            # add batch dimension
+            sample_batch = sample.reshape((1,) + sample.shape)
+            res = self.model.model(sample_batch)
+            # make sure the result is a tuple
+            if len(res) == 1:
+                res = (res,)
+            # convert to numpy
+            res_np = res[0].numpy()
+            results.append(res_np)
+
+        # and concatenate them
+        image_np_norm = np.concatenate(results, axis=0).squeeze()
+
+        # remove the padding
+        for num, (first, last) in enumerate(pad_with):
+            image_np_norm = np.take(
+                image_np_norm,
+                indices=np.arange(first, image_np_norm.shape[num] - last),
+                axis=num,
+            )
+
+        # and turn it back into an image
+        image_normalized = sitk.GetImageFromArray(image_np_norm)
+        image_normalized.CopyInformation(image)
+        return image_normalized
