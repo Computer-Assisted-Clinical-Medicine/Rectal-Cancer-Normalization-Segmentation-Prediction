@@ -29,7 +29,7 @@ from plot_utils import create_axes, display_dataframe, display_markdown, save_pu
 from SegClassRegBasis import normalization
 from SegClassRegBasis.utils import gather_results
 
-experiment_dir = Path(os.environ["experiment_dir"])
+experiment_dir = Path(os.environ["experiment_dir"]) / "Normalization_Experiment"
 
 # load data
 data_dir = Path(os.environ["data_dir"])
@@ -45,7 +45,7 @@ for location in ["all", "Frankfurt", "Regensburg", "Mannheim-not-from-study"]:
         for postprocessed in [True, False]:
             for version in ["best", "final"]:
                 loc_results = gather_results(
-                    experiment_dir / f"Normalization_{location}",
+                    experiment_dir,
                     task="segmentation",
                     external=external,
                     postprocessed=postprocessed,

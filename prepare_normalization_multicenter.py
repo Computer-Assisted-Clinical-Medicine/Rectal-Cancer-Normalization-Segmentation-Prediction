@@ -15,7 +15,7 @@ tf_logger = logging.getLogger("tensorflow")
 os.environ["TF_CPP_MIN_LOG_LEVEL"] = "3"
 # pylint: disable=wrong-import-position, unused-import
 
-from SegClassRegBasis.architecture import DeepLabv3plus, DenseTiramisu, UNet
+from SegClassRegBasis.architecture import DeepLabv3plus, UNet
 from SegClassRegBasis.experiment import Experiment
 from SegClassRegBasis.normalization import NORMALIZING
 from SegClassRegBasis.preprocessing import preprocess_dataset
@@ -64,8 +64,10 @@ if __name__ == "__main__":
 
     data_dir = Path(os.environ["data_dir"])
     experiment_dir = Path(os.environ["experiment_dir"])
-    if not experiment_dir.exists():
-        experiment_dir.mkdir()
+    GROUP_BASE_NAME = "Normalization_Experiment"
+    exp_group_base_dir = experiment_dir / GROUP_BASE_NAME
+    if not exp_group_base_dir.exists():
+        exp_group_base_dir.mkdir(parents=True)
 
     # load data
     with open(data_dir / "images.yaml", encoding="utf8") as f:
@@ -121,7 +123,7 @@ if __name__ == "__main__":
                 }
 
     # export dataset
-    dataset_file = experiment_dir / "dataset.yaml"
+    dataset_file = exp_group_base_dir / "dataset.yaml"
     with open(dataset_file, "w", encoding="utf8") as f:
         yaml.dump(dataset, f, sort_keys=False)
 
@@ -130,6 +132,8 @@ if __name__ == "__main__":
         "l_r": 0.001,
         "optimizer": "Adam",
         "epochs": 100,
+        "batch_size": 128,
+        "in_plane_dimension": 256,
         # parameters for saving the best model
         "best_model_decay": 0.3,
         # scheduling parameters
@@ -183,25 +187,15 @@ if __name__ == "__main__":
         "do_batch_normalization": False,
         "ratio": 2,
     }
-    network_parameters_DenseTiramisu = {
-        "regularize": (True, "L2", 1e-5),
-        "drop_out": (True, 0.01),
-        "activation": "elu",
-        "cross_hair": False,
-        "clipping_value": 1,
-        "layers_per_block": (4, 5, 7, 10, 12),
-        "bottleneck_layers": 15,
-        "growth_rate": 16,
-        "do_bias": False,
-        "do_batch_normalization": True,
-    }
     network_parameters_DeepLabv3plus = {
         "aspp_rates": (3, 6, 9),  # half because input is half the size
         "clipping_value": 50,
         "backbone": "densenet121",
     }
-    network_parameters = [network_parameters_UNet, network_parameters_DeepLabv3plus]
-    architectures = [UNet, DeepLabv3plus]
+    network_parameters = [
+        network_parameters_UNet
+    ]  # , network_parameters_DeepLabv3plus] # TODO: uncomment
+    architectures = [UNet]  # , DeepLabv3plus] # TODO: uncomment
 
     hyper_parameters_new = []
     for hyp in hyper_parameters:
@@ -252,32 +246,40 @@ if __name__ == "__main__":
         hyper_parameters, ("network_parameters", "encoder_attention"), encoder_attention
     )
 
-    # generate tensorflow command
-    tensorboard_command = f'tensorboard --logdir="{experiment_dir.resolve()}"'
-    print(f"To see the progress in tensorboard, run:\n{tensorboard_command}")
-
     # set config
-    PREPROCESSED_DIR = Path("data_preprocessed")
+    PREPROCESSED_DIR = Path(GROUP_BASE_NAME) / "data_preprocessed"
 
-    for location in ["Frankfurt", "Regensburg", "Mannheim-not-from-study", "all"]:
+    # set up all experiments
+    experiments: List[Experiment] = []
 
-        timepoints_mannheim = [
-            s for s in segmented_images.keys() if s.startswith("990") and s.endswith("_1")
-        ]
-        if location in ["Regensburg", "Frankfurt"]:
+    for location in [
+        "all",
+        "Frankfurt",
+        "Regensburg",
+        "Mannheim",
+        "Not-Frankfurt",
+        "Not-Regensburg",
+        "Not-Mannheim",
+    ]:
+
+        if location == "all":
+            timepoints_train = list(
+                timepoints.query("treatment_status=='before therapy' & segmented").index
+            )
+        elif location in timepoints.location.unique():
             # only use before therapy images that are segmented
             timepoints_train = timepoints.query(
-                f"treatment_status=='before therapy' & segmented & location=='{location}'"
+                f"treatment_status=='before therapy' & segmented & '{location}' in location"
             ).index
-        elif location == "all":
-            timepoints_train = (
-                list(
-                    timepoints.query("treatment_status=='before therapy' & segmented").index
-                )
-                + timepoints_mannheim
-            )
-        elif location == "Mannheim-not-from-study":
-            timepoints_train = timepoints_mannheim
+        elif "not" in location.lower():
+            if location == "Not-Mannheim":
+                timepoints_train = timepoints.query(
+                    "treatment_status=='before therapy' & segmented & 'Mannheim' not in location"
+                ).index
+            else:
+                timepoints_train = timepoints.query(
+                    f"treatment_status=='before therapy' & segmented & location !='{location.replace('Not-', '')}'"
+                ).index
 
         experiment_group_name = f"Normalization_{location}"
         current_exp_dir = experiment_dir / experiment_group_name
@@ -288,8 +290,6 @@ if __name__ == "__main__":
         # set test files (just use the rest)
         test_list: List[str] = list(set(dataset.keys()) - set(train_list))
 
-        # set up all experiments
-        experiments: List[Experiment] = []
         for hyp in hyper_parameters:
             # use less filters for 3D on local computer
             if not "CLUSTER" in os.environ:
@@ -315,6 +315,9 @@ if __name__ == "__main__":
                         )
                         hyp["network_parameters"]["n_filters"] = n_filters
 
+            # set number of validation files
+            hyp["train_parameters"]["number_of_vald"] = max(len(train_list) // 15, 4)
+
             # define experiment (not a constant)
             experiment_name = generate_folder_name(hyp)  # pylint: disable=invalid-name
 
@@ -332,20 +335,21 @@ if __name__ == "__main__":
                 preprocessing_parameters=hyp["preprocessing_parameters"],
             )
 
+            group_dir_rel = Path(GROUP_BASE_NAME) / experiment_group_name
             exp = Experiment(
                 hyper_parameters=hyp,
                 name=experiment_name,
-                output_path_rel=Path(experiment_group_name) / experiment_name,
+                output_path_rel=group_dir_rel / experiment_name,
                 data_set=exp_dataset,
                 crossvalidation_set=train_list,
                 external_test_set=test_list,
                 folds=K_FOLD,
                 seed=42,
                 num_channels=N_CHANNELS,
-                folds_dir_rel=Path(experiment_group_name) / "folds",
+                folds_dir_rel=group_dir_rel / "folds",
                 tensorboard_images=True,
             )
             experiments.append(exp)
 
     # export all hyperparameters
-    export_experiments_run_files(experiment_dir, experiments)
+    export_experiments_run_files(exp_group_base_dir, experiments)
