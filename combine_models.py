@@ -10,11 +10,11 @@ import pandas as pd
 import SimpleITK as sitk
 from tqdm.autonotebook import tqdm
 
-import evaluation
-import SegmentationNetworkBasis.config as cfg
-from experiment import Experiment
+import SegClassRegBasis.config as cfg
 from seg_data_loader import ApplyLoader
-from SegmentationNetworkBasis.postprocessing import keep_big_structures
+from SegClassRegBasis import evaluation
+from SegClassRegBasis.experiment import Experiment
+from SegClassRegBasis.postprocessing import keep_big_structures
 
 WRITE_PROBABILITIES = False
 OVERWRITE = False
@@ -172,10 +172,11 @@ def combine_models(
         if not pred_path.exists() or overwrite:
 
             # find all predictions
-            func = lambda x: (
-                x / result_path.name / f"prediction-{p_id}-{version}{cfg.file_suffix}"
-            )  # pylint: disable=cell-var-from-loop
-            p_files = weights.fold_dir.apply(func)
+            p_files = weights.fold_dir.apply(
+                lambda x: x
+                / result_path.name
+                / f"prediction-{p_id}-{version}{cfg.file_suffix}"
+            )
             found = p_files.apply(lambda x: x.exists())
             # skip files were nothing was found (they are probably in a different fold)
             if not np.any(found):
@@ -209,7 +210,7 @@ def combine_models(
                             ),
                         ]
                     ):
-                        print(f"{pat} was resample because of a size missmatch.")
+                        print(f"{pat} was resample because of a size miss-match.")
                         image = sitk.Resample(image, referenceImage=first_image)
                 labels = sitk.GetArrayFromImage(image)
                 if probability_avg is None:
@@ -254,14 +255,16 @@ def combine_models(
                 print(f"{label_path} not found")
                 continue
             result_metrics = {"File Number": p_id}
-            evaluation.evaluate_segmentation_prediction(
-                result_metrics, str(pred_path), str(label_path)
+            result_metrics.update(
+                evaluation.evaluate_segmentation_prediction(str(pred_path), str(label_path))
             )
             results_list.append(result_metrics)
 
             result_metrics = {"File Number": p_id}
-            evaluation.evaluate_segmentation_prediction(
-                result_metrics, str(pred_path_post), str(label_path)
+            result_metrics.update(
+                evaluation.evaluate_segmentation_prediction(
+                    str(pred_path_post), str(label_path)
+                )
             )
             results_post_list.append(result_metrics)
 
@@ -397,5 +400,5 @@ if __name__ == "__main__":
         all_experiments.append(Experiment.from_file(param_file))
 
     # combine the models
-    for version in all_experiments[0].versions:
-        run_combine(experiments=all_experiments, version=version)
+    for vers in all_experiments[0].versions:
+        run_combine(experiments=all_experiments, version=vers)

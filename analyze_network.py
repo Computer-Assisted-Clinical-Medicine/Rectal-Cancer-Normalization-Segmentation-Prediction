@@ -20,8 +20,8 @@ import tensorflow as tf
 import tensorflow.keras.backend as K
 
 import interpetability
-from SegmentationNetworkBasis.NetworkBasis import loss
-from SegmentationNetworkBasis.NetworkBasis.metric import Dice
+from SegClassRegBasis import loss
+from SegClassRegBasis.metric import Dice
 
 tf.python.framework.ops.disable_eager_execution()
 
@@ -428,7 +428,7 @@ for i in range(smooth_grads_fp.shape[-1]):
 # %% [markdown]
 """
 ### Combination of smooth gradients with grad-CAM
-Gradients are combined with grad-CAM by using elementwise multiplication.
+Gradients are combined with grad-CAM by using element wise multiplication.
 """
 
 for grad_img, gradcam_img, input_img in zip(smooth_grads, gradcam_plus, input_image_np):

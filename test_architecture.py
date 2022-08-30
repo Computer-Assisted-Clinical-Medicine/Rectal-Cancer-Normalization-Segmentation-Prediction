@@ -9,9 +9,9 @@ from typing import Any, Dict
 import tensorflow as tf
 
 import seg_data_loader
-from SegmentationNetworkBasis import architecture
-from SegmentationNetworkBasis import config as cfg
-from SegmentationNetworkBasis.test_seg_data_loader import (
+from SegClassRegBasis import architecture
+from SegClassRegBasis import config as cfg
+from SegClassRegBasis.test_seg_data_loader import (
     get_loader,
     load_dataset,
     set_parameters_according_to_dimension,

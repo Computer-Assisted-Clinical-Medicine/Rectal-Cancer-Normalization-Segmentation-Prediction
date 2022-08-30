@@ -1,5 +1,5 @@
 """
-Different functions to help interpet the models.
+Different functions to help interpret the models.
 """
 from typing import Tuple
 
@@ -45,7 +45,7 @@ def grad_cam(
         If weights should be apply to the pixels when averaging the label. The
         array should have the same spatial dimensions as the input, by default None
     apply_relu : bool, optional
-        If a ReLU should be applied to the outbut of the conv layer, by default False
+        If a ReLU should be applied to the output of the conv layer, by default False
     smooth : bool, optional
         Smooth the gradients by running it 50 times with gaussian noise with
         15% of the input magnitude, by default False
@@ -69,7 +69,7 @@ def grad_cam(
     y_c = get_mean_prediction(pixel_weights, y, cls)
 
     # calculate the gradients with respect to the feature map of the layer
-    # this is the partial derivativ from the paper (the list has dim. 1)
+    # this is the partial derivative from the paper (the list has dim. 1)
     grads = K.gradients(y_c, conv_output)[0]
 
     # make it a function to be able to get actual values
@@ -147,14 +147,14 @@ def grad_cam_plus_plus(
         An array of input images with shape (batch, width, height, channels)
     layer_name : str
         The name of the layer for which the output should be used. This should
-        be the rectified feature map. (At least accroding to the authors git repo)
+        be the rectified feature map. (At least according to the authors git repo)
     cls : int, optional
         The class to use, by default 1
     pixel_weights : np.array, optional
         If weights should be apply to the pixels when averaging the label. The
         array should have the same spatial dimensions as the input, by default None
     apply_relu : bool, optional
-        If a ReLU should be applied to the outbut of the conv layer, by default False
+        If a ReLU should be applied to the output of the conv layer, by default False
     smooth : bool, optional
         Smooth the gradients by running it 50 times with gaussian noise with
         15% of the input magnitude, by default False
@@ -181,11 +181,11 @@ def grad_cam_plus_plus(
     y_c = get_mean_prediction(pixel_weights, y, cls)
 
     # calculate the gradients with respect to the feature map of the layer
-    # this is the partial derivativ from the paper
+    # this is the partial derivative from the paper
     grads = K.gradients(y_c, conv_output)[0]
     # norm grads
     grads = grads / tf.reduce_max(grads)
-    # also get derivatives of the exp(Y_c) (with a lot more axes to multiply batchwise)
+    # also get derivatives of the exp(Y_c) (with a lot more axes to multiply batch wise)
     first = tf.multiply(
         tf.expand_dims(
             tf.expand_dims(tf.expand_dims(K.exp(y_c), axis=-1), axis=-1), axis=-1

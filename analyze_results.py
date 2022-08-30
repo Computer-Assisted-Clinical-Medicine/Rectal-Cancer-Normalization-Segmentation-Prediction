@@ -12,7 +12,7 @@ import matplotlib
 import numpy as np
 import seaborn as sns
 
-from utils import gather_results
+from SegClassRegBasis.utils import gather_results
 
 # if on cluster, use other backend
 # pylint: disable=wrong-import-position, ungrouped-imports, wrong-import-order
@@ -78,14 +78,14 @@ def remove_parameters(name: str):
     return name
 
 
-def add_linebrakes(name: str, max_length=20):
+def add_line_brakes(name: str, max_length=20):
     if len(name) > max_length and len(name) - max_length > max_length / 2:
-        # add linebreak at the next -
-        name = name[:max_length] + add_linebrakes(name[max_length:]).replace("-", "\n-", 1)
+        # add line break at the next -
+        name = name[:max_length] + add_line_brakes(name[max_length:]).replace("-", "\n-", 1)
     return name
 
 
-def remove_linebrakes(name: str):
+def remove_line_brakes(name: str):
     return name.replace("\n", "")
 
 
@@ -96,12 +96,14 @@ def remove_linebrakes(name: str):
 
 VERSION = "best"
 
-results = gather_results(experiment_dir, combined=True, version=VERSION)
-# 1035_1 is with fat supression
+results = gather_results(
+    experiment_dir, task="segmentation", combined=True, version=VERSION
+)
+# 1035_1 is with fat suppression
 results = results.drop(results.index[results["File Number"] == "1035_1"])
 # make nicer names
 results.name = results.name.cat.rename_categories(
-    lambda x: add_linebrakes(remove_parameters(x))
+    lambda x: add_line_brakes(remove_parameters(x))
 )
 results.sort_values("name", inplace=True)
 # take the mean over all folds and models
@@ -172,7 +174,7 @@ save_and_show(f"{VERSION}_test_set_volume_vs_volume")
 
 # remove linebreaks when exporting to csv
 for res in [results, results_study_only]:
-    res.name = results.name.cat.rename_categories(lambda x: remove_linebrakes(x))
+    res.name = results.name.cat.rename_categories(lambda x: remove_line_brakes(x))
 results.groupby("name").describe().transpose().to_csv(
     plot_dir / f"{VERSION}_summary_test_set.csv", sep=";"
 )
@@ -185,14 +187,16 @@ results_study_only.groupby("name").describe().transpose().to_csv(
 ## Do the analysis for the test-set
 """
 
-results_ex = gather_results(experiment_dir, combined=True, external=True, version=VERSION)
+results_ex = gather_results(
+    experiment_dir, task="segmentation", combined=True, external=True, version=VERSION
+)
 if results_ex is None:
     print("No external testset")
     sys.exit()
 results_ex = results_ex[np.logical_not(results_ex["File Number"].str.startswith("99"))]
 # make nicer names
 results_ex.name = results_ex.name.cat.rename_categories(
-    lambda x: add_linebrakes(remove_parameters(x))
+    lambda x: add_line_brakes(remove_parameters(x))
 )
 results_ex.sort_values("name", inplace=True)
 

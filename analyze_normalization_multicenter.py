@@ -26,16 +26,16 @@ from sklearn.cluster import DBSCAN, KMeans
 from tqdm.auto import tqdm
 
 from plot_utils import create_axes, display_dataframe, display_markdown, save_pub
-from SegmentationNetworkBasis import normalization
-from utils import gather_results
+from SegClassRegBasis import normalization
+from SegClassRegBasis.utils import gather_results
 
-experiment_dir = Path(os.environ["experiment_dir"])
+experiment_dir = Path(os.environ["experiment_dir"]) / "Normalization_Experiment"
 
 # load data
 data_dir = Path(os.environ["data_dir"])
 timepoints = pd.read_csv(data_dir / "timepoints.csv", sep=";", index_col=0)
 
-with open(experiment_dir / "dataset.yaml") as f:
+with open(experiment_dir / "dataset.yaml", encoding="utf8") as f:
     orig_dataset = yaml.load(f, Loader=yaml.Loader)
 
 collected_results = []
@@ -45,7 +45,8 @@ for location in ["all", "Frankfurt", "Regensburg", "Mannheim-not-from-study"]:
         for postprocessed in [True, False]:
             for version in ["best", "final"]:
                 loc_results = gather_results(
-                    experiment_dir / f"Normalization_{location}",
+                    experiment_dir,
+                    task="segmentation",
                     external=external,
                     postprocessed=postprocessed,
                     version=version,
@@ -943,20 +944,20 @@ for i, (n, lbl, img, img_norm, ax_line) in enumerate(
     MIN_B = -1.6
     MAX_B = 2.5
     BIN_WIDTH = (MAX_B - MIN_B) / 20
-    min_disp = MIN_B - BIN_WIDTH / 2
-    max_disp = MAX_B + BIN_WIDTH / 2
+    MIN_DISP = MIN_B - BIN_WIDTH / 2
+    MAX_DISP = MAX_B + BIN_WIDTH / 2
     sns.histplot(
         data=dataframe.query("image == 'normalized image'"),
         x="Intensity",
         hue="image",
-        bins=np.linspace(min_disp, max_disp, 21),
+        bins=np.linspace(MIN_DISP, MAX_DISP, 21),
         stat="proportion",
         ax=ax_line[1],
         legend=False,
     )
     if i == 0:
         ax_line[1].set_title("Normalized Histogram")
-    ax_line[1].set_xlim((min_disp - BIN_WIDTH, max_disp + BIN_WIDTH))
+    ax_line[1].set_xlim((MIN_DISP - BIN_WIDTH, MAX_DISP + BIN_WIDTH))
     if i != 2:
         ax_line[1].axes.set_xlabel(None)
     ax_line[1].set_ylim(ax_line[0].get_ylim())
