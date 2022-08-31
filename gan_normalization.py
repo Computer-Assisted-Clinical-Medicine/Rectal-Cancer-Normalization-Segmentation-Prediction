@@ -4,8 +4,9 @@ import os
 from collections import OrderedDict
 from enum import Enum
 from pathlib import Path
-from typing import List
+from typing import Any, Dict, List
 
+import filelock
 import numpy as np
 import pandas as pd
 import SimpleITK as sitk
@@ -28,12 +29,21 @@ def train_gan_normalization(
     depth: int,
     filter_base: int,
     min_max: bool,
+    **kwargs,
 ):
     """Train the GAN Normalization"""
 
     dataset_norm = copy.deepcopy(dataset)
     experiment_dir = Path(os.environ["experiment_dir"])
     data_dir = Path(os.environ["data_dir"])
+
+    experiment_name = f"Train_Normalization_GAN_{mod_num}"
+    exp_output_path = experiment_group / "Train_Normalization_GAN" / experiment_name
+    fold_dir = experiment_dir / exp_output_path / "fold-0"
+    model_path = fold_dir / "models" / "model-final"
+
+    if model_path.exists():
+        return model_path
 
     targets = OrderedDict(
         {
@@ -221,7 +231,7 @@ def train_gan_normalization(
         data_img = sitk.VectorIndexSelectionCast(data_img, mod_num)
         return data_img, label_img
 
-    hyperparameters = {
+    hyperparameters: Dict[str, Any] = {
         **constant_parameters,
         "architecture": gan_networks.AutoencoderGAN,
         "network_parameters": {
@@ -270,9 +280,6 @@ def train_gan_normalization(
         hyperparameters["network_parameters"]["output_min"] = -1
         hyperparameters["network_parameters"]["output_max"] = 1
 
-    # define experiment (not a constant)
-    experiment_name = f"Train_Normalization_GAN_{mod_num}"
-
     # set a name for the preprocessing dir
     # so the same method will also use the same directory
     preprocessing_name = hyperparameters["preprocessing_parameters"][
@@ -298,7 +305,7 @@ def train_gan_normalization(
     exp = Experiment(
         hyper_parameters=hyperparameters,
         name=experiment_name,
-        output_path_rel=experiment_group / "Train_Normalization_GAN" / experiment_name,
+        output_path_rel=exp_output_path,
         data_set=exp_dataset,
         crossvalidation_set=train_list,
         folds=1,
@@ -311,9 +318,15 @@ def train_gan_normalization(
         expanded_tasks=expanded_tasks,
     )
 
-    exp.run_fold(0)
+    lock_path = fold_dir / "lock_fold.txt.lock"
+    if not lock_path.exists():
+        with filelock.FileLock(lock_path, timeout=1):
+            exp.run_fold(0)
 
-    return exp.output_path / "fold-0" / "models" / "model-final"
+    tf.keras.backend.clear_session()
+    del exp
+
+    return model_path
 
 
 class GAN_NORMALIZING(Enum):  # pylint:disable=invalid-name
@@ -364,13 +377,15 @@ class GanDiscriminators(Normalization):
         self.model_paths = model_paths
         self.mod_num = mod_num
         self.min_max = min_max
-        self.model = self.load_model(self.model_paths[mod_num])
+        self.model = None
         super().__init__(normalize_channelwise=False)
 
-    def load_model(self, model_path: Path) -> tf.keras.Model:
+    def load_model(self):
         exp_dir = Path(os.environ["experiment_dir"])
-        return SegBasisNet(
-            {"segmentation": "DICE"}, model_path=exp_dir / model_path, is_training=False
+        self.model = SegBasisNet(
+            {"segmentation": "DICE"},
+            model_path=exp_dir / self.model_paths[self.mod_num],
+            is_training=False,
         )
 
     def normalize(self, image: sitk.Image) -> sitk.Image:
@@ -386,6 +401,9 @@ class GanDiscriminators(Normalization):
         sitk.Image
             The normalized image
         """
+        if self.model is None:
+            self.load_model()
+
         image_np = sitk.GetArrayFromImage(image)
 
         pad_with = np.zeros((3, 2), dtype=int)
