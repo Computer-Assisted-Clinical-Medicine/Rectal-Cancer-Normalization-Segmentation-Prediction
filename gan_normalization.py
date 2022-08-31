@@ -42,6 +42,10 @@ def train_gan_normalization(
     fold_dir = experiment_dir / exp_output_path / "fold-0"
     model_path = fold_dir / "models" / "model-final"
 
+    start_lr = 0.05
+    end_lr = 0.001
+    lr_sd_type = "exponential_half"
+
     if model_path.exists():
         return model_path
 
@@ -107,7 +111,7 @@ def train_gan_normalization(
 
     # define the parameters that are constant
     train_parameters = {
-        "l_r": ("exponential", 0.1, 0.001),
+        "l_r": (lr_sd_type, start_lr, end_lr),
         "optimizer": "Adam",
         "epochs": 200,
         "batch_size": 256,
@@ -128,7 +132,7 @@ def train_gan_normalization(
         "finetune_layers": None,
         "finetune_lr": None,
         # sampling parameters
-        "samples_per_volume": 10,
+        "samples_per_volume": 64,
         "background_label_percentage": 0.15,
         "percent_of_object_samples": 0,
         # Augmentation parameters
@@ -256,13 +260,13 @@ def train_gan_normalization(
             },
             # Discriminator arguments
             "disc_real_fake_optimizer": "Adam",
-            "disc_real_fake_lr": ("exponential", 0.1, 0.001),
+            "disc_real_fake_lr": (lr_sd_type, start_lr, end_lr),
             "disc_real_fake_n_conv": 3,
             "disc_image_optimizer": "Adam",
-            "disc_image_lr": ("exponential", 0.1, 0.001),
+            "disc_image_lr": (lr_sd_type, start_lr, end_lr),
             "disc_image_n_conv": 3,
             "disc_latent_optimizer": "Adam",
-            "disc_latent_lr": ("exponential", 0.1, 0.001),
+            "disc_latent_lr": (lr_sd_type, start_lr, end_lr),
             "disc_latent_n_conv": 3,
         },
         "loss": {
@@ -287,7 +291,7 @@ def train_gan_normalization(
     ].name
 
     # set number of validation files
-    hyperparameters["train_parameters"]["number_of_vald"] = len(train_list) // 10
+    hyperparameters["train_parameters"]["number_of_vald"] = max(len(train_list) // 10, 4)
 
     # preprocess data (only do that once for all experiments)
     exp_dataset = preprocess_dataset(
@@ -318,7 +322,7 @@ def train_gan_normalization(
         expanded_tasks=expanded_tasks,
     )
 
-    lock_path = fold_dir / "lock_fold.txt.lock"
+    lock_path = experiment_dir / exp_output_path / "lock_fold.txt.lock"
     if not lock_path.exists():
         with filelock.FileLock(lock_path, timeout=1):
             exp.run_fold(0)
