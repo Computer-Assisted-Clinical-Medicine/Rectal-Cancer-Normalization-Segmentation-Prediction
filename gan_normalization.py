@@ -109,11 +109,15 @@ def train_gan_normalization(
         dataset_norm[pat_name]["regression"] = reg_dict
         dataset_norm[pat_name]["autoencoder"] = "image"
 
+    n_epochs = 200
+    if len(train_list) < 100:
+        n_epochs = 400
+
     # define the parameters that are constant
     train_parameters = {
         "l_r": (lr_sd_type, start_lr, end_lr),
         "optimizer": "Adam",
-        "epochs": 200,
+        "epochs": n_epochs,
         "batch_size": 256,
         "in_plane_dimension": 128,
         # parameters for saving the best model
