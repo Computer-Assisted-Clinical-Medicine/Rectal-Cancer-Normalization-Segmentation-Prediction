@@ -15,11 +15,11 @@ from SegmentationArchitectures.utils import get_regularizer
 def gaussian_kernel(
     size: int,
     std: float = 1.0,
-) -> np.array:
+) -> np.ndarray:
     """Makes 2D gaussian Kernel for convolution."""
 
     x = np.arange(-(size - 1) / 2, size / 2, dtype=np.float32)
-    vals = np.exp(-(x ** 2) / (2 * std ** 2))
+    vals = np.exp(-(x**2) / (2 * std**2))
     gauss_kernel = np.einsum("i,j->ij", vals, vals)
     gauss_kernel_normalized = gauss_kernel / np.sum(gauss_kernel)
 
@@ -135,7 +135,7 @@ def auto_encoder(
             raise ValueError("Either provide output_min and output_max or neither")
 
     # scale down multiple times
-    filters = [filter_base * (2 ** i) for i in range(depth)]
+    filters = [filter_base * (2**i) for i in range(depth)]
     x = inputs
     for i, f in enumerate(filters[:-1]):
         x = conv_block(x, n_filters=f, regularizer=regularizer, name=f"enc{i}")
@@ -320,7 +320,7 @@ class AutoEncoder(SegBasisNet):
             **kwargs,
         )
 
-        self.divisible_by = 2 ** depth
+        self.divisible_by = 2**depth
 
     @staticmethod
     def get_name():

@@ -21,7 +21,7 @@ from SegClassRegBasis.experiment import Experiment
 from SegClassRegBasis.normalization import NORMALIZING
 from SegClassRegBasis.preprocessing import preprocess_dataset
 from SegClassRegBasis.utils import export_experiments_run_files
-from utils import generate_folder_name
+from utils import generate_folder_name, split_into_modalities
 
 # set tf thread mode
 os.environ["TF_GPU_THREAD_MODE"] = "gpu_private"
@@ -84,6 +84,7 @@ if __name__ == "__main__":
 
     K_FOLD = 5
     N_CHANNELS = 3
+    MODALITIES = ("T2 axial", "Diff axial b800", "ADC axial original")
 
     # ignore certain files
     ignore = ["1005_2_l0_d0"]  # this file has labels not in the image
@@ -93,7 +94,7 @@ if __name__ == "__main__":
     dataset: Dict[str, Dict[str, Union[List[str], str]]] = {}
     for timepoint, data in segmented_images.items():
         for label_num, label_data in enumerate(data):
-            assert "T2 axial" in label_data["name"]
+            assert MODALITIES[0] in label_data["name"]
             found_data = found_images[timepoint]
             if not "ADC axial original" in found_data:
                 continue
@@ -214,14 +215,14 @@ if __name__ == "__main__":
             "lower_q": 0.05,
             "upper_q": 0.95,
         },
-        NORMALIZING.HISTOGRAM_MATCHING: {"mask_quantile": 0},
-        NORMALIZING.MEAN_STD: {},
-        NORMALIZING.HM_QUANTILE: {},
         GAN_NORMALIZING.GAN_DISCRIMINATORS: {
             "depth": 3,
             "filter_base": 16,
             "min_max": False,
         },
+        NORMALIZING.HISTOGRAM_MATCHING: {"mask_quantile": 0},
+        NORMALIZING.MEAN_STD: {},
+        NORMALIZING.HM_QUANTILE: {},
     }
     # add all methods with their hyperparameters
     hyper_parameters_new = []
@@ -259,6 +260,8 @@ if __name__ == "__main__":
     # set up all experiments
     experiments: List[Experiment] = []
 
+    QUANT_DATASET = None
+
     for location in [
         "all",
         "Frankfurt",
@@ -273,19 +276,25 @@ if __name__ == "__main__":
             timepoints_train = list(
                 timepoints.query("treatment_status=='before therapy' & segmented").index
             )
+            timepoints_train_norm = list(timepoints.index)
         elif location in timepoints.location.unique():
             # only use before therapy images that are segmented
             timepoints_train = timepoints.query(
                 f"treatment_status=='before therapy' & segmented & '{location}' in location"
             ).index
+            timepoints_train_norm = timepoints.query(f"'{location}' in location").index
         elif "not" in location.lower():
             if location == "Not-Mannheim":
                 timepoints_train = timepoints.query(
                     "treatment_status=='before therapy' & segmented & 'Mannheim' not in location"
                 ).index
+                timepoints_train_norm = timepoints.query("'Mannheim' not in location").index
             else:
                 timepoints_train = timepoints.query(
                     f"treatment_status=='before therapy' & segmented & location !='{location.replace('Not-', '')}'"
+                ).index
+                timepoints_train_norm = timepoints.query(
+                    f"location !='{location.replace('Not-', '')}'"
                 ).index
 
         experiment_group_name = f"Normalization_{location}"
@@ -341,17 +350,23 @@ if __name__ == "__main__":
                 for mod_num in range(N_CHANNELS):
                     model_paths.append(
                         train_gan_normalization(
-                            dataset=dataset,
-                            train_list=train_list,
+                            timepoints_train=timepoints_train_norm,
                             mod_num=mod_num,
                             preprocessed_dir=PREPROCESSED_DIR,
                             experiment_group=group_dir_rel,
+                            modality=MODALITIES[mod_num],
                             **pre_params["normalization_parameters"],
                         )
                     )
                 pre_params["normalization_parameters"]["model_paths"] = tuple(model_paths)
+                # overlap has already been cut
+                CUT_TO_OVERLAP = False
+                assert QUANT_DATASET is not None
+                DATASET_TO_PROCESS = QUANT_DATASET
             else:
                 PASS_MODALITY = False
+                CUT_TO_OVERLAP = True
+                DATASET_TO_PROCESS = dataset
 
             # normalizations that are trained should be saved in the exp group dir
             if norm_type in [
@@ -367,14 +382,18 @@ if __name__ == "__main__":
 
             # preprocess data (only do that once for all experiments)
             exp_dataset = preprocess_dataset(
-                data_set=dataset,
+                data_set=DATASET_TO_PROCESS,
                 num_channels=N_CHANNELS,
                 base_dir=experiment_dir,
                 preprocessed_dir=preprocessed_dir_exp,
                 train_dataset=train_list,
                 preprocessing_parameters=pre_params,
                 pass_modality=PASS_MODALITY,
+                cut_to_overlap=CUT_TO_OVERLAP,
             )
+
+            if QUANT_DATASET is None and norm_type == NORMALIZING.QUANTILE:
+                QUANT_DATASET = split_into_modalities(exp_dataset, n_channels=N_CHANNELS)
 
             exp = Experiment(
                 hyper_parameters=hyp,

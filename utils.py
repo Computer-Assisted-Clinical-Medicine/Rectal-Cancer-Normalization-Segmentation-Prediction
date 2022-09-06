@@ -2,8 +2,13 @@
 Miscellaneous functions
 """
 
+import os
+from pathlib import Path
+from typing import Dict, List, Union
 
-from SegClassRegBasis.architecture import DenseTiramisu, UNet, DeepLabv3plus
+import SimpleITK as sitk
+
+from SegClassRegBasis.architecture import DeepLabv3plus, DenseTiramisu, UNet
 
 
 def generate_folder_name(parameters):
@@ -78,3 +83,50 @@ def generate_folder_name(parameters):
     folder_name = "-".join(params)
 
     return folder_name
+
+
+def split_into_modalities(
+    dataset, n_channels: int
+) -> Dict[str, Dict[str, Union[List[str], str]]]:
+    """Split the modalities of an existing dataset into its parts. It will replace
+    the "image" part of the dictionary for each patient with multiple images.
+
+    Parameters
+    ----------
+    dataset : Dict[str, Dict[str, Union[List[str], str]]]
+        The dataset to process
+    n_channels : int
+        The number of channels
+
+    Returns
+    -------
+    Dict[str, Dict[str, Union[List[str], str]]]
+        The resulting dataset
+
+    Raises
+    ------
+    ValueError
+        _description_
+    """
+    experiment_dir = Path(os.environ["experiment_dir"])
+    new_dict = {}
+    for pat_name, data in dataset.items():
+        new_dict[pat_name] = {k: v for k, v in data.items() if k not in ["image", "labels"]}
+        new_dict[pat_name]["images"] = []
+        new_dict[pat_name]["labels"] = experiment_dir / data["labels"]
+        image = sitk.ReadImage(str(experiment_dir / data["image"]))
+        if not image.GetNumberOfComponentsPerPixel() == n_channels:
+            raise ValueError("Image has the wrong number of channels.")
+        new_path = data["image"].parent / "channel_wise"
+        new_path_abs = experiment_dir / new_path
+        if not new_path_abs.exists():
+            new_path_abs.mkdir()
+        for i in range(n_channels):
+            new_name = data["image"].name.replace(".nii.gz", f"_mod{i}.nii.gz")
+            new_path_img_abs = experiment_dir / new_path / new_name
+            if not new_path_img_abs.exists():
+                image_channel = sitk.VectorIndexSelectionCast(image, i)
+                sitk.WriteImage(image_channel, str(new_path_img_abs))
+            new_dict[pat_name]["images"].append(new_path_img_abs)
+
+    return new_dict

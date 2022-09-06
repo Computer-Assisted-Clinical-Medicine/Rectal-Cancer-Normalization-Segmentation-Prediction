@@ -1,16 +1,16 @@
 """Normalize images using GANs"""
-import copy
 import os
 from collections import OrderedDict
 from enum import Enum
 from pathlib import Path
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Union
 
 import filelock
 import numpy as np
 import pandas as pd
 import SimpleITK as sitk
 import tensorflow as tf
+import yaml
 
 import gan_networks
 from SegClassRegBasis import config as cfg
@@ -20,34 +20,97 @@ from SegClassRegBasis.preprocessing import preprocess_dataset
 from SegClassRegBasis.segbasisnet import SegBasisNet
 
 
+def make_normalization_dataset(
+    modality: str, targets: Dict[str, str], column_names: Dict[str, str]
+) -> Dict[str, Dict[str, Union[List[str], str, dict]]]:
+    """Make a dataset for the training of the normalization. It will return
+    all images with the given modality that are found in data_dir/images.yaml
+
+    Parameters
+    ----------
+    modality : str
+        The modality to use
+    targets : Dict[str, str]
+        The target columns to use, the key should be a name in the parameters.csv
+        and the value should be reg or cat, depending on the task
+    column_names : Dict[str, str]
+        The new names for the columns, the keys should be the same as in target,
+        only the values should be the new names
+
+    Returns
+    -------
+    Dict[str, Dict[str, Union[List[str], str, dict]]]
+        The dictionary containing the images and parameters
+    """
+    data_dir = Path(os.environ["data_dir"])
+    # load data
+    with open(data_dir / "images.yaml", encoding="utf8") as f:
+        found_images = yaml.load(f, Loader=yaml.Loader)
+    # create dict with all points. The names have the format:
+    # patient_timepoint_l{label_number}_d{diffusion_number}
+    dataset: Dict[str, Dict[str, Union[List[str], str, dict]]] = {}
+    for timepoint, found_data in found_images.items():
+        if not modality in found_data:
+            continue
+        for img_num, img in enumerate(found_data[modality]):
+            name = f"{timepoint}_img{img_num}"
+            image = img.replace("Images", "Images registered and N4 corrected")
+            image_dir = (data_dir / img).parent
+            param_file = image_dir / "acquisition_parameters.csv"
+            params = pd.read_csv(param_file, sep=";", index_col=0)
+            t2_name = Path(img).with_suffix("").with_suffix("").name
+            missing_columns = [c for c in targets.keys() if c not in params]
+            if len(missing_columns) > 0:
+                raise ValueError(f"{missing_columns} not found")
+            params_t2 = params.loc[t2_name, targets.keys()]
+            cat_dict: Dict[str, str] = {}
+            reg_dict: Dict[str, float] = {}
+            for col, param_val in params_t2.iteritems():
+                col_name = column_names.get(col, col)
+                col_type = targets[col]
+                if col_type == "reg":
+                    reg_dict[col_name] = float(param_val)
+                elif col_type == "cat":
+                    cat_dict[col_name] = str(param_val).strip()
+            # add location to scanner
+            cat_dict["model_name"] = cat_dict["location"] + " - " + cat_dict["model_name"]
+            dataset[name] = {
+                "images": [data_dir / image],
+                "classification": cat_dict,
+                "regression": reg_dict,
+                "autoencoder": "image",
+            }
+
+    return dataset
+
+
 def train_gan_normalization(
-    dataset: dict,
-    train_list: List[str],
+    timepoints_train: List[str],
     mod_num: int,
     preprocessed_dir: Path,
     experiment_group: Path,
     depth: int,
     filter_base: int,
     min_max: bool,
+    modality: str,
     **kwargs,
 ):
     """Train the GAN Normalization"""
 
-    dataset_norm = copy.deepcopy(dataset)
     experiment_dir = Path(os.environ["experiment_dir"])
-    data_dir = Path(os.environ["data_dir"])
 
     experiment_name = f"Train_Normalization_GAN_{mod_num}"
     exp_output_path = experiment_group / "Train_Normalization_GAN" / experiment_name
     fold_dir = experiment_dir / exp_output_path / "fold-0"
     model_path = fold_dir / "models" / "model-final"
+    model_path_rel = exp_output_path / "fold-0" / "models" / "model-final"
 
     start_lr = 0.05
     end_lr = 0.001
     lr_sd_type = "exponential_half"
 
     if model_path.exists():
-        return model_path
+        return model_path_rel
 
     targets = OrderedDict(
         {
@@ -75,43 +138,14 @@ def train_gan_normalization(
     }
     column_tasks = {column_names[field]: tsk for field, tsk in targets.items()}
 
-    # get the parameters
-    for pat_name, data in dataset_norm.items():
-        img_path = data["images"][mod_num]
-        rel_path = img_path.relative_to(data_dir / "Images registered and N4 corrected")
-        param_file = data_dir / "Images" / rel_path.parent / "acquisition_parameters.csv"
-        if not param_file.exists():
-            raise FileNotFoundError(f"Param file {param_file} not found.")
-        params = pd.read_csv(param_file, sep=";", index_col=0)
-        img_name = Path(img_path).with_suffix("").with_suffix("").name
-        missing_columns = [c for c in targets.keys() if c not in params]
-        if len(missing_columns) > 0:
-            raise ValueError(f"{missing_columns} not found")
-        if img_name == "Diff axial b800 recalculated":
-            possible_diff = [700, 1000]
-            for poss_diff in possible_diff:
-                name = f"Diff axial b{poss_diff}"
-                if name in params.index:
-                    img_name = name
-        params_img = params.loc[img_name, targets.keys()]
-        cat_dict = {}
-        reg_dict = {}
-        for col, param_val in params_img.iteritems():
-            col_name = column_names.get(col, col)
-            col_type = targets[col]
-            if col_type == "reg":
-                reg_dict[col_name] = float(param_val)
-            elif col_type == "cat":
-                cat_dict[col_name] = str(param_val).strip()
-        # add location to scanner
-        cat_dict["model_name"] = cat_dict["location"] + " - " + cat_dict["model_name"]
-        dataset_norm[pat_name]["classification"] = cat_dict
-        dataset_norm[pat_name]["regression"] = reg_dict
-        dataset_norm[pat_name]["autoencoder"] = "image"
+    dataset = make_normalization_dataset(
+        modality=modality, targets=targets, column_names=column_names
+    )
+
+    # set training files
+    train_list = [key for key in dataset if key.partition("_img")[0] in timepoints_train]
 
     n_epochs = 200
-    if len(train_list) < 100:
-        n_epochs = 400
 
     # define the parameters that are constant
     train_parameters = {
@@ -175,9 +209,7 @@ def train_gan_normalization(
         }
     ]
     # Other discriminators, use the median, there is nothing in the protocol
-    reg_params_median = pd.DataFrame(
-        [d["regression"] for d in dataset_norm.values()]
-    ).median()
+    reg_params_median = pd.DataFrame([d["regression"] for d in dataset.values()]).median()
     target_labels = reg_params_median.to_dict()
     target_labels.update(
         {
@@ -218,26 +250,6 @@ def train_gan_normalization(
                 "loss_weight": 0.01,
             }
         )
-
-    def get_mod(data_img: sitk.Image, label_img: sitk.Image):
-        """This function can be used to adapt the images to the task at hand.
-
-        Parameters
-        ----------
-        data_img : sitk.Image
-            The image
-        label_img : sitk.Image
-            The labels
-
-        Returns
-        -------
-        sitk.Image, sitk.Image
-            The adapted image and labels
-        """
-        # just get one channel of the image
-        assert data_img.GetNumberOfComponentsPerPixel() == 3
-        data_img = sitk.VectorIndexSelectionCast(data_img, mod_num)
-        return data_img, label_img
 
     hyperparameters: Dict[str, Any] = {
         **constant_parameters,
@@ -280,9 +292,6 @@ def train_gan_normalization(
             "discriminator-classification": "CEL",
             "discriminator-regression": "MSE",
         },
-        "dataloader_parameters": {
-            "preprocessing_func": get_mod,
-        },
     }
     if min_max:
         hyperparameters["network_parameters"]["output_min"] = -1
@@ -290,25 +299,33 @@ def train_gan_normalization(
 
     # set a name for the preprocessing dir
     # so the same method will also use the same directory
-    preprocessing_name = hyperparameters["preprocessing_parameters"][
-        "normalizing_method"
-    ].name
+    preprocessing_name = (
+        hyperparameters["preprocessing_parameters"]["normalizing_method"].name
+        + "_single_mod_"
+        + modality.replace(" ", "_")
+    )
 
     # set number of validation files
     hyperparameters["train_parameters"]["number_of_vald"] = max(len(train_list) // 10, 4)
 
     # preprocess data (only do that once for all experiments)
     exp_dataset = preprocess_dataset(
-        data_set=dataset_norm,
-        num_channels=3,
+        data_set=dataset,
+        num_channels=1,
         base_dir=experiment_dir,
         preprocessed_dir=preprocessed_dir / preprocessing_name,
-        train_dataset=train_list,
+        train_dataset=dataset.keys(),
         preprocessing_parameters=hyperparameters["preprocessing_parameters"],
     )
 
     # using nothing as training set
     cfg.data_train_split = 1
+
+    fold_dir_rel = (
+        experiment_group
+        / "Train_Normalization_GAN"
+        / f"folds_norm_{modality.replace(' ', '_')}"
+    )
 
     exp = Experiment(
         hyper_parameters=hyperparameters,
@@ -319,7 +336,7 @@ def train_gan_normalization(
         folds=1,
         seed=42,
         num_channels=1,
-        folds_dir_rel=experiment_group / "Train_Normalization_GAN" / "folds_norm",
+        folds_dir_rel=fold_dir_rel,
         tensorboard_images=True,
         versions=["final"],
         tasks=("autoencoder"),
@@ -334,7 +351,7 @@ def train_gan_normalization(
     tf.keras.backend.clear_session()
     del exp
 
-    return model_path
+    return model_path_rel
 
 
 class GAN_NORMALIZING(Enum):  # pylint:disable=invalid-name
