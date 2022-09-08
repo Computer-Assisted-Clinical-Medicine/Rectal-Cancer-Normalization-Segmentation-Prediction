@@ -7,10 +7,12 @@ from pathlib import Path
 import matplotlib.pyplot as plt
 import pandas as pd
 import seaborn as sns
+import tensorflow as tf
 import yaml
 from IPython.display import display
 from tqdm.autonotebook import tqdm
 
+from networks import auto_encoder
 from SegClassRegBasis import evaluation
 
 # %%
@@ -58,7 +60,7 @@ for location in [
         results_location = pd.read_csv(analysis_file, sep=";", index_col=0)
     else:
         if not dataset_file.exists():
-            print(f"{location} not yet finished.")
+            print(f"\t{location} not yet finished.")
             continue
         with open(dataset_file, "r", encoding="utf8") as f:
             dataset = yaml.load(f, yaml.UnsafeLoader)
@@ -100,8 +102,81 @@ sns.catplot(
 plt.show()
 plt.close()
 
+sns.catplot(
+    data=results,
+    y="norm_mutual_inf",
+    kind="box",
+    row="location",
+    col="modality",
+)
+plt.show()
+plt.close()
+
 # %%
 
 mean_results = results.groupby(["patient_id", "modality"]).median()
 
-display(mean_results.sort_values("structured_similarity_index"))
+display(
+    mean_results.sort_values("structured_similarity_index")[
+        ["rmse", "norm_mutual_inf", "structured_similarity_index"]
+    ]
+)
+
+display(
+    results.sort_values("structured_similarity_index")[
+        ["patient_id", "location", "rmse", "norm_mutual_inf", "structured_similarity_index"]
+    ]
+)
+
+# %%
+# plot the generator
+
+
+for location in [
+    "all",
+    "Frankfurt",
+    "Regensburg",
+    "Mannheim",
+    "Not-Frankfurt",
+    "Not-Regensburg",
+    "Not-Mannheim",
+]:
+
+    print(f"Starting with {location}.")
+
+    experiment_group_name = f"Normalization_{location}"
+
+    for channel in range(3):
+        exp_dir = (
+            exp_group_base_dir
+            / experiment_group_name
+            / "Train_Normalization_GAN"
+            / f"Train_Normalization_GAN_{channel}"
+        )
+
+        model_file = exp_dir / "generator_with_shapes.png"
+        if model_file.exists():
+            continue
+
+        with open(exp_dir / "parameters.yaml", "r", encoding="utf8") as f:
+            norm_settings = yaml.load(f, yaml.UnsafeLoader)
+
+        hp_train = norm_settings["hyper_parameters"]["train_parameters"]
+        hp_net = norm_settings["hyper_parameters"]["network_parameters"]
+        model = auto_encoder(
+            inputs=tf.keras.Input(
+                (hp_train["in_plane_dimension"], hp_train["in_plane_dimension"], 1),
+                batch_size=hp_train["batch_size"],
+            ),
+            depth=hp_net["depth"],
+            filter_base=hp_net["filter_base"],
+            skip_edges=hp_net["skip_edges"],
+            output_min=hp_net.get("output_min", None),
+            output_max=hp_net.get("output_max", None),
+            variational=hp_net.get("variational", False),
+        )
+        tf.keras.utils.plot_model(
+            model,
+            to_file=model_file,
+            show_shapes=True,
+        )

@@ -135,7 +135,7 @@ if __name__ == "__main__":
         "l_r": 0.001,
         "optimizer": "Adam",
         "epochs": 100,
-        "batch_size": 128,
+        "batch_size": 64,
         "in_plane_dimension": 256,
         # parameters for saving the best model
         "best_model_decay": 0.3,
@@ -150,7 +150,7 @@ if __name__ == "__main__":
         "finetune_layers": "all",
         "finetune_lr": 0.001,
         # sampling parameters
-        "samples_per_volume": 80,
+        "samples_per_volume": 32,
         "background_label_percentage": 0.15,
         # Augmentation parameters
         "add_noise": False,
@@ -183,7 +183,7 @@ if __name__ == "__main__":
         "drop_out": (True, 0.01),
         "activation": "elu",
         "cross_hair": False,
-        "clipping_value": 1,
+        "clip_value": 1,
         "res_connect": True,
         "n_filters": (F_BASE * 8, F_BASE * 16, F_BASE * 32, F_BASE * 64, F_BASE * 128),
         "do_bias": True,
@@ -192,7 +192,7 @@ if __name__ == "__main__":
     }
     network_parameters_DeepLabv3plus = {
         "aspp_rates": (3, 6, 9),  # half because input is half the size
-        "clipping_value": 50,
+        "clip_value": 50,
         "backbone": "densenet121",
     }
     network_parameters = [
