@@ -146,9 +146,7 @@ if __name__ == "__main__":
         "patience_lr_plat": 10,
         "factor_lr_plat": 0.5,
         # finetuning parameters
-        "finetune_epoch": 0,
-        "finetune_layers": "all",
-        "finetune_lr": 0.001,
+        "finetune_epoch": None,
         # sampling parameters
         "samples_per_volume": 32,
         "background_label_percentage": 0.15,
