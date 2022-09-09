@@ -39,25 +39,22 @@ with open(experiment_dir / "dataset.yaml", encoding="utf8") as f:
     orig_dataset = yaml.load(f, Loader=yaml.Loader)
 
 collected_results = []
-for location in ["all", "Frankfurt", "Regensburg", "Mannheim-not-from-study"]:
-    print(f"{location}")
-    for external in [True, False]:
-        for postprocessed in [True, False]:
-            for version in ["best", "final"]:
-                loc_results = gather_results(
-                    experiment_dir,
-                    task="segmentation",
-                    external=external,
-                    postprocessed=postprocessed,
-                    version=version,
-                    combined=True,
-                )
-                if loc_results is not None:
-                    loc_results["train_location"] = location
-                    loc_results["external"] = external
-                    loc_results["postprocessed"] = postprocessed
-                    loc_results["version"] = version
-                    collected_results.append(loc_results)
+for external in [True, False]:
+    for postprocessed in [True, False]:
+        for version in ["best", "final"]:
+            loc_results = gather_results(
+                experiment_dir,
+                task="segmentation",
+                external=external,
+                postprocessed=postprocessed,
+                version=version,
+                combined=False,
+            )
+            if loc_results is not None:
+                loc_results["external"] = external
+                loc_results["postprocessed"] = postprocessed
+                loc_results["version"] = version
+                collected_results.append(loc_results)
 
 results = pd.concat(collected_results)
 # reset index
@@ -65,6 +62,7 @@ results.index = pd.RangeIndex(results.shape[0])
 # set timepoint
 results["timepoint"] = results["File Number"].apply(lambda x: "_".join(x.split("_")[:2]))
 results["network"] = results.name.apply(lambda x: x.split("-")[0])
+results["train_location"] = results.exp_group_name.str.partition("_")[2]
 # set treatment status
 mask = results.index[~results.timepoint.str.startswith("99")]
 results.loc[mask, "treatment_status"] = timepoints.loc[
@@ -93,8 +91,8 @@ new_root = Path("D:/Study Data/Dataset/Images")
 # get image metadata
 param_list = []
 for number in results["File Number"].unique():
-    images = orig_dataset[number]["images"]
-    param_file = images[0].parent / "acquisition_parameters.csv"
+    images = [Path(img) for img in orig_dataset[number]["images"]]
+    param_file = data_dir / images[0].parent / "acquisition_parameters.csv"
     param_file = new_root / param_file.relative_to(root)
     parameters = pd.read_csv(param_file, sep=";", index_col=0)
     assert isinstance(parameters, pd.DataFrame)
@@ -178,26 +176,6 @@ g.fig.suptitle(
     "Overall Performance (version = best | before_therapy = True | postprocessed = True)"
 )
 g.fig.subplots_adjust(top=0.87)
-plt.show()
-plt.close()
-
-g = sns.catplot(
-    data=results.query(
-        "version == 'best' & before_therapy & postprocessed & name == 'combined_models'"
-    ),
-    x="Dice",
-    y="train_location",
-    col="external",
-    hue="normalization",
-    row="network",
-    kind="box",
-    legend=True,
-    legend_out=True,
-)
-g.fig.suptitle(
-    "Combined networks (version = best | before_therapy = True | postprocessed = True)"
-)
-g.fig.subplots_adjust(top=0.88)
 plt.show()
 plt.close()
 
