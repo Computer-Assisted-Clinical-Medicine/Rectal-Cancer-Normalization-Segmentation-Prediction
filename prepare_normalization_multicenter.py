@@ -121,8 +121,8 @@ if __name__ == "__main__":
                     "Images", "Images registered and N4 corrected"
                 )
                 dataset[name] = {
-                    "images": [data_dir / image, data_dir / b800, data_dir / adc],
-                    "labels": data_dir / label,
+                    "images": [image, b800, adc],
+                    "labels": label,
                 }
 
     # export dataset
@@ -360,11 +360,14 @@ if __name__ == "__main__":
                 # overlap has already been cut
                 CUT_TO_OVERLAP = False
                 assert QUANT_DATASET is not None
+                # the quant dataset lives in the experiment dir
                 DATASET_TO_PROCESS = QUANT_DATASET
+                preprocess_base_dir = experiment_dir
             else:
                 PASS_MODALITY = False
                 CUT_TO_OVERLAP = True
                 DATASET_TO_PROCESS = dataset
+                preprocess_base_dir = data_dir
 
             # normalizations that are trained should be saved in the exp group dir
             if norm_type in [
@@ -383,6 +386,7 @@ if __name__ == "__main__":
                 data_set=DATASET_TO_PROCESS,
                 num_channels=N_CHANNELS,
                 base_dir=experiment_dir,
+                data_dir=preprocess_base_dir,
                 preprocessed_dir=preprocessed_dir_exp,
                 train_dataset=train_list,
                 preprocessing_parameters=pre_params,

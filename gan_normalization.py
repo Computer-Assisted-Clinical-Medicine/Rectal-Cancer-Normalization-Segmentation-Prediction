@@ -75,7 +75,7 @@ def make_normalization_dataset(
             # add location to scanner
             cat_dict["model_name"] = cat_dict["location"] + " - " + cat_dict["model_name"]
             dataset[name] = {
-                "images": [data_dir / image],
+                "images": [image],
                 "classification": cat_dict,
                 "regression": reg_dict,
                 "autoencoder": "image",
@@ -98,6 +98,7 @@ def train_gan_normalization(
     """Train the GAN Normalization"""
 
     experiment_dir = Path(os.environ["experiment_dir"])
+    data_dir = Path(os.environ["data_dir"])
 
     experiment_name = f"Train_Normalization_GAN_{mod_num}"
     exp_output_path = experiment_group / "Train_Normalization_GAN" / experiment_name
@@ -313,6 +314,7 @@ def train_gan_normalization(
         data_set=dataset,
         num_channels=1,
         base_dir=experiment_dir,
+        data_dir=data_dir,
         preprocessed_dir=preprocessed_dir / preprocessing_name,
         train_dataset=dataset.keys(),
         preprocessing_parameters=hyperparameters["preprocessing_parameters"],

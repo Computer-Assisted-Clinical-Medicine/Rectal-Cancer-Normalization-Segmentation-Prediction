@@ -113,7 +113,7 @@ def split_into_modalities(
     for pat_name, data in dataset.items():
         new_dict[pat_name] = {k: v for k, v in data.items() if k not in ["image", "labels"]}
         new_dict[pat_name]["images"] = []
-        new_dict[pat_name]["labels"] = experiment_dir / data["labels"]
+        new_dict[pat_name]["labels"] = data["labels"]
         image = sitk.ReadImage(str(experiment_dir / data["image"]))
         if not image.GetNumberOfComponentsPerPixel() == n_channels:
             raise ValueError("Image has the wrong number of channels.")
@@ -127,6 +127,6 @@ def split_into_modalities(
             if not new_path_img_abs.exists():
                 image_channel = sitk.VectorIndexSelectionCast(image, i)
                 sitk.WriteImage(image_channel, str(new_path_img_abs))
-            new_dict[pat_name]["images"].append(new_path_img_abs)
+            new_dict[pat_name]["images"].append(new_path / new_name)
 
     return new_dict
