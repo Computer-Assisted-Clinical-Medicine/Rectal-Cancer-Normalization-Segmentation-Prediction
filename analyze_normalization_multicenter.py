@@ -179,24 +179,26 @@ g.fig.subplots_adjust(top=0.87)
 plt.show()
 plt.close()
 
-g = sns.catplot(
-    data=results.query(
-        "version == 'best' & before_therapy & postprocessed & name != 'combined_models' & train_location != 'all'"
-    ),
-    x="Dice",
-    y="normalization",
-    col="external",
-    hue="network",
-    kind="box",
-    legend=True,
-    legend_out=True,
+res_not_all = results.query(
+    "version == 'best' & before_therapy & postprocessed & name != 'combined_models' & train_location != 'all'"
 )
-g.fig.suptitle(
-    "Performance on all locations (except all) (version = best | before_therapy = True | postprocessed = True)"
-)
-g.fig.subplots_adjust(top=0.87)
-plt.show()
-plt.close()
+if res_not_all.size > 0:
+    g = sns.catplot(
+        data=res_not_all,
+        x="Dice",
+        y="normalization",
+        col="external",
+        hue="network",
+        kind="box",
+        legend=True,
+        legend_out=True,
+    )
+    g.fig.suptitle(
+        "Performance on all locations (except all) (version = best | before_therapy = True | postprocessed = True)"
+    )
+    g.fig.subplots_adjust(top=0.87)
+    plt.show()
+    plt.close()
 
 display_markdown("All training locations except all.")
 display_dataframe(
@@ -882,7 +884,7 @@ save_pub("hm", bbox_inches=Bbox.from_extents(-0.8, 1.9, 10.5, 8.3))
 # %%
 # make a nice description of the mean-std method
 images = orig_dataset["1001_1_l0_d0"]["images"]
-images_sitk = [sitk.ReadImage(str(img)) for img in images]
+images_sitk = [sitk.ReadImage(str(data_dir / img)) for img in images]
 norm_dir_hist = experiment_dir / "data_preprocessed" / "MEAN_STD"
 norm_files = [norm_dir_hist / f"normalization_mod{i}.yaml" for i in range(3)]
 norms = [normalization.MeanSTD.from_file(f) for f in norm_files]
