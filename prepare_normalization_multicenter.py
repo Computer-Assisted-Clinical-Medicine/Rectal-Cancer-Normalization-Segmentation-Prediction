@@ -135,8 +135,8 @@ if __name__ == "__main__":
         "l_r": 0.001,
         "optimizer": "Adam",
         "epochs": 100,
-        "batch_size": 64,
-        "in_plane_dimension": 256,
+        "batch_size": 128,
+        "in_plane_dimension": 128,
         # parameters for saving the best model
         "best_model_decay": 0.3,
         # scheduling parameters
