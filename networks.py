@@ -357,7 +357,7 @@ class AutoEncoder(SegBasisNet):
         hyperparameters = {key: str(value) for key, value in hyp.items()}
         return hyperparameters
 
-    def _set_up_inputs(self):
+    def set_up_inputs(self):
         """setup the inputs. Inputs are taken from the config file."""
         ndim = len(cfg.train_input_shape) - 1
         input_shape = [None] * ndim + cfg.train_input_shape[-1:]

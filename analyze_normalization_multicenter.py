@@ -86,8 +86,8 @@ def get_norm(model_name):
 results["normalization"] = results.name.apply(get_norm)
 results["from_study"] = ~results["File Number"].str.startswith("99")
 
-root = Path("D:/Study Data/Dataset/Images registered and N4 corrected")
-new_root = Path("D:/Study Data/Dataset/Images")
+root = data_dir / "Images registered and N4 corrected"
+new_root = data_dir / "Images"
 # get image metadata
 param_list = []
 for number in results["File Number"].unique():
@@ -809,8 +809,10 @@ display_dataframe(data.round(2))
 # %%
 # make a nice description of the hm methods
 images = orig_dataset["1001_1_l0_d0"]["images"]
-images_sitk = [sitk.ReadImage(str(img)) for img in images]
-norm_dir_hist = experiment_dir / "data_preprocessed" / "HISTOGRAM_MATCHING"
+images_sitk = [sitk.ReadImage(str(data_dir / img)) for img in images]
+norm_dir_hist = (
+    experiment_dir / "Normalization_all" / "data_preprocessed" / "HISTOGRAM_MATCHING"
+)
 norm_files = [norm_dir_hist / f"normalization_mod{i}.yaml" for i in range(3)]
 norms = [normalization.HistogramMatching.from_file(f) for f in norm_files]
 images_normed = [n.normalize(img) for img, n in zip(images_sitk, norms)]
@@ -969,7 +971,7 @@ save_pub("mean-std", bbox_inches=Bbox.from_extents(-0.8, 1.9, 10.5, 8.3))
 # %%
 # make a nice description of the perc method
 images = orig_dataset["1001_1_l0_d0"]["images"]
-images_sitk = [sitk.ReadImage(str(img)) for img in images]
+images_sitk = [sitk.ReadImage(str(data_dir / img)) for img in images]
 norm_dir_hist = experiment_dir / "data_preprocessed" / "QUANTILE"
 norm_files = [norm_dir_hist / f"normalization_mod{i}.yaml" for i in range(3)]
 norms = [normalization.Quantile.from_file(f) for f in norm_files]
@@ -1051,8 +1053,8 @@ save_pub("perc", bbox_inches=Bbox.from_extents(-0.8, 1.9, 10.5, 8.3))
 # %%
 # make a nice description of the perc-hm methods
 images = orig_dataset["1001_1_l0_d0"]["images"]
-images_sitk = [sitk.ReadImage(str(img)) for img in images]
-norm_dir_hist = experiment_dir / "data_preprocessed" / "HM_QUANTILE"
+images_sitk = [sitk.ReadImage(str(data_dir / img)) for img in images]
+norm_dir_hist = experiment_dir / "Normalization_all" / "data_preprocessed" / "HM_QUANTILE"
 norm_files = [norm_dir_hist / f"normalization_mod{i}.yaml" for i in range(3)]
 norms = [normalization.HMQuantile.from_file(f) for f in norm_files]
 images_normed = [n.normalize(img) for img, n in zip(images_sitk, norms)]
@@ -1127,7 +1129,7 @@ save_pub("perc-hm", bbox_inches=Bbox.from_extents(-0.8, 1.9, 10.5, 8.3))
 mean_stds_list = []
 modalities = ["T2w", "b800", "ADC"]
 for lbl, data in tqdm(orig_dataset.items()):
-    image_paths = data["images"]
+    image_paths = [data_dir / p for p in data["images"]]
     images = [
         sitk.ReadImage(str(img_path)) for img_path in image_paths if img_path.exists()
     ]
