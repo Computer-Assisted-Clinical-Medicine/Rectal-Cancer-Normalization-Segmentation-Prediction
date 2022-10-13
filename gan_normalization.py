@@ -89,10 +89,17 @@ def train_gan_normalization(
     mod_num: int,
     preprocessed_dir: Path,
     experiment_group: Path,
-    depth: int,
-    filter_base: int,
-    min_max: bool,
     modality: str,
+    n_epochs=200,
+    depth=3,
+    filter_base=16,
+    min_max=False,
+    smoothing_sigma=1.0,
+    latent_weight=1,
+    image_weight=1,
+    skip_edges=True,
+    latent=True,
+    gan_postifx="",
     **kwargs,
 ):
     """Train the GAN Normalization"""
@@ -100,8 +107,10 @@ def train_gan_normalization(
     experiment_dir = Path(os.environ["experiment_dir"])
     data_dir = Path(os.environ["data_dir"])
 
-    experiment_name = f"Train_Normalization_GAN_{mod_num}"
-    exp_output_path = experiment_group / "Train_Normalization_GAN" / experiment_name
+    experiment_name = f"Train_Normalization_GAN_{mod_num}{gan_postifx}"
+    exp_output_path = (
+        experiment_group / f"Train_Normalization_GAN{gan_postifx}" / experiment_name
+    )
     fold_dir = experiment_dir / exp_output_path / "fold-0"
     model_path = fold_dir / "models" / "model-final"
     model_path_rel = exp_output_path / "fold-0" / "models" / "model-final"
@@ -145,8 +154,6 @@ def train_gan_normalization(
 
     # set training files
     train_list = [key for key in dataset if key.partition("_img")[0] in timepoints_train]
-
-    n_epochs = 200
 
     # define the parameters that are constant
     train_parameters = {
@@ -194,6 +201,7 @@ def train_gan_normalization(
     constant_parameters = {
         "train_parameters": train_parameters,
         "preprocessing_parameters": preprocessing_parameters,
+        "dataloader_parameters": {"drop_remainder": True},
         "dimensions": 2,
     }
 
@@ -241,10 +249,13 @@ def train_gan_normalization(
             expanded_tasks[col] = "discriminator-regression"
         else:
             raise ValueError(f"Task {column_tasks[col]} unknown.")
+        input_type = input_types[col]
+        if input_type == "latent" and not latent:
+            continue
         discriminators.append(
             {
                 "name": col,
-                "input_type": input_types[col],
+                "input_type": input_type,
                 "loss": disc_loss,
                 "goal": "predict",
                 "target_labels": target_labels[col],
@@ -258,11 +269,14 @@ def train_gan_normalization(
         "network_parameters": {
             "depth": depth,
             "filter_base": filter_base,
-            "skip_edges": True,
+            "skip_edges": skip_edges,
             "discriminators": discriminators,
             "regularize": (True, "L2", 0.001),
             "clip_value": 0.1,
             "variational": False,
+            "smoothing_sigma": smoothing_sigma,
+            "latent_weight": latent_weight,
+            "image_weight": image_weight,
             "loss_parameters": {
                 "NMI": {
                     "min_val": -1,
@@ -307,7 +321,7 @@ def train_gan_normalization(
     )
 
     # set number of validation files
-    hyperparameters["train_parameters"]["number_of_vald"] = max(len(train_list) // 10, 4)
+    hyperparameters["train_parameters"]["number_of_vald"] = max(len(train_list) // 20, 4)
 
     # preprocess data (only do that once for all experiments)
     exp_dataset = preprocess_dataset(
@@ -323,11 +337,7 @@ def train_gan_normalization(
     # using nothing as training set
     cfg.data_train_split = 1
 
-    fold_dir_rel = (
-        experiment_group
-        / "Train_Normalization_GAN"
-        / f"folds_norm_{modality.replace(' ', '_')}"
-    )
+    fold_dir_rel = exp_output_path.parent / f"folds_norm_{modality.replace(' ', '_')}"
 
     exp = Experiment(
         hyper_parameters=hyperparameters,
@@ -349,6 +359,7 @@ def train_gan_normalization(
     if not lock_path.exists():
         with filelock.FileLock(lock_path, timeout=1):
             exp.run_fold(0)
+    lock_path.unlink()
 
     tf.keras.backend.clear_session()
     del exp
@@ -393,17 +404,47 @@ class GanDiscriminators(Normalization):
 
     enum = GAN_NORMALIZING.GAN_DISCRIMINATORS
 
-    parameters_to_save = ["model_paths", "mod_num", "depth", "filter_base", "min_max"]
+    parameters_to_save = [
+        "model_paths",
+        "mod_num",
+        "depth",
+        "filter_base",
+        "min_max",
+        "smoothing_sigma",
+        "latent_weight",
+        "image_weight",
+        "skip_edges",
+        "latent",
+        "n_epochs",
+    ]
 
     # make sure the parameters stay the same
     def __init__(
-        self, model_paths: Path, mod_num: int, depth, filter_base, min_max, **kwargs
+        self,
+        model_paths: Path,
+        mod_num: int,
+        depth,
+        filter_base,
+        min_max,
+        smoothing_sigma=1,
+        latent_weight=1,
+        image_weight=1,
+        skip_edges=True,
+        latent=True,
+        n_epochs=200,
+        **kwargs,
     ) -> None:
         self.depth = depth
         self.filter_base = filter_base
         self.model_paths = model_paths
         self.mod_num = mod_num
         self.min_max = min_max
+        self.smoothing_sigma = smoothing_sigma
+        self.latent_weight = latent_weight
+        self.image_weight = image_weight
+        self.skip_edges = skip_edges
+        self.latent = latent
+        self.n_epochs = n_epochs
         self.model = None
         super().__init__(normalize_channelwise=False)
 

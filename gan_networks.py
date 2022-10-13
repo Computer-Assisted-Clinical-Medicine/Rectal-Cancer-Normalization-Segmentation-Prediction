@@ -47,6 +47,8 @@ class GANModel(Model):
         disc_latent_tasks=None,
         clip_value: Optional[float] = None,
         variational=False,
+        latent_weight=1.0,
+        image_weight=1.0,
         **kwargs,
     ):
         super().__init__(*args, **kwargs)
@@ -74,6 +76,9 @@ class GANModel(Model):
         self.clip_value = clip_value
 
         self.variational = variational
+
+        self.latent_weight = float(latent_weight)
+        self.image_weight = float(image_weight)
 
         # make sure the discriminators are compiled
         for disc in [self.disc_real_fake, self.disc_image, self.disc_latent]:
@@ -245,22 +250,49 @@ class GANModel(Model):
                 )
                 gen_loss += disc_real_fake_loss
                 losses["generator/disc_real_fake_loss"] = disc_real_fake_loss
+                self.write_metrics(
+                    self.disc_real_fake,
+                    metrics,
+                    predictions,
+                    self.disc_real_fake_target_labels,
+                    disc_name="generator-real-fake",
+                )
 
             if self.disc_image is not None:
                 predictions = self.disc_image(pred_images)
-                disc_image_loss = self.disc_image.compiled_loss(
-                    self.disc_image_target_labels, predictions
+                disc_image_loss = (
+                    self.disc_image.compiled_loss(
+                        self.disc_image_target_labels, predictions
+                    )
+                    * self.image_weight
                 )
                 gen_loss += disc_image_loss
                 losses["generator/disc_image_loss"] = disc_image_loss
+                self.write_metrics(
+                    self.disc_image,
+                    metrics,
+                    predictions,
+                    self.disc_image_target_labels,
+                    disc_name="generator-image",
+                )
 
             if self.disc_latent is not None:
                 predictions = self.disc_latent(latent_variables)
-                disc_latent_loss = self.disc_latent.compiled_loss(
-                    self.disc_latent_target_labels, predictions
+                disc_latent_loss = (
+                    self.disc_latent.compiled_loss(
+                        self.disc_latent_target_labels, predictions
+                    )
+                    * self.latent_weight
                 )
                 gen_loss += disc_latent_loss
                 losses["generator/disc_latent_loss"] = disc_latent_loss
+                self.write_metrics(
+                    self.disc_latent,
+                    metrics,
+                    predictions,
+                    self.disc_latent_target_labels,
+                    disc_name="generator-latent",
+                )
 
             if self.variational:
                 # Add KL divergence regularization loss.
@@ -378,8 +410,9 @@ class GANModel(Model):
 
         if self.disc_image is not None:
             predictions = self.disc_image(pred_images)
-            disc_image_loss = self.disc_image.compiled_loss(
-                self.disc_image_target_labels, predictions
+            disc_image_loss = (
+                self.disc_image.compiled_loss(self.disc_image_target_labels, predictions)
+                * self.image_weight
             )
             gen_loss += disc_image_loss
             losses["generator/disc_image_loss"] = disc_image_loss
@@ -393,8 +426,9 @@ class GANModel(Model):
 
         if self.disc_latent is not None:
             predictions = self.disc_latent(latent_variables)
-            disc_latent_loss = self.disc_latent.compiled_loss(
-                self.disc_latent_target_labels, predictions
+            disc_latent_loss = (
+                self.disc_latent.compiled_loss(self.disc_latent_target_labels, predictions)
+                * self.latent_weight
             )
             gen_loss += disc_latent_loss
             losses["generator/disc_latent_loss"] = disc_latent_loss
@@ -475,6 +509,12 @@ class AutoencoderGAN(AutoEncoder):
         The maximum value, to which the output will be clipped, by default None
     variational : bool, optional
         If a variational autoencoder should be used, by default False
+    smoothing_sigma : float, optional
+        The sigma to use for smoothing before doing edge detection. By default 1
+    latent_weight : float, optional
+        The weight for the latent discriminartors, by default 1
+    image_weight : float, optional
+        The weight for the image discriminartors, by default 1
     """
 
     def __init__(
@@ -495,6 +535,9 @@ class AutoencoderGAN(AutoEncoder):
         output_min=None,
         output_max=None,
         variational=False,
+        smoothing_sigma=1,
+        latent_weight=1,
+        image_weight=1,
         **kwargs,
     ):
 
@@ -531,6 +574,9 @@ class AutoencoderGAN(AutoEncoder):
             output_min=output_min,
             output_max=output_max,
             variational=variational,
+            smoothing_sigma=smoothing_sigma,
+            latent_weight=latent_weight,
+            image_weight=image_weight,
             is_training=is_training,
             do_finetune=do_finetune,
             model_path=model_path,
@@ -673,17 +719,17 @@ class AutoencoderGAN(AutoEncoder):
             input_shape = (
                 None,
                 None,
-                self.options["filter_base"] * (2 ** (self.options["depth"] - 1)),
+                int(self.options["filter_base"] * (2 ** (self.options["depth"] - 1))),
             )
         else:
             raise ValueError(f"Input type {input_type} unknown")
 
         if disc_type == "SimpleConv":
-            model_input = keras.Input(shape=input_shape, batch_size=None)
+            model_input = keras.Input(shape=input_shape, batch_size=cfg.batch_size_train)
             x = model_input
             for i in range(discriminator_n_conv):
                 x = layers.Conv2D(
-                    32 * 2 ** i,
+                    32 * 2**i,
                     (3, 3),
                     strides=(2, 2),
                     padding="same",
@@ -815,6 +861,7 @@ class AutoencoderGAN(AutoEncoder):
             output_min=self.options["output_min"],
             output_max=self.options["output_max"],
             variational=self.options["variational"],
+            smoothing_sigma=self.options["smoothing_sigma"],
             keras_model=GANModel,
             model_arguments={
                 "disc_real_fake": self.disc_real_fake,
@@ -831,6 +878,8 @@ class AutoencoderGAN(AutoEncoder):
                 "disc_latent_target_labels": self.disc_latent_target_labels,
                 "clip_value": self.options["clip_value"],
                 "variational": self.options["variational"],
+                "latent_weight": self.options["latent_weight"],
+                "image_weight": self.options["image_weight"],
             },
         )
 

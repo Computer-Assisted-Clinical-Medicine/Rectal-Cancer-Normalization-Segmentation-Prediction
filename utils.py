@@ -70,7 +70,18 @@ def generate_folder_name(parameters):
         raise NotImplementedError(f'{parameters["architecture"]} not implemented')
 
     # normalization
-    params.append(str(parameters["preprocessing_parameters"]["normalizing_method"].name))
+    norm_name = parameters["preprocessing_parameters"]["normalizing_method"].name
+    if norm_name == "GAN_DISCRIMINATORS":
+        norm_params = parameters["preprocessing_parameters"]["normalization_parameters"]
+        depth = norm_params["depth"]
+        f_base = norm_params["filter_base"]
+        sigma = norm_params["smoothing_sigma"]
+        if depth == 3 and f_base == 16 and sigma == 1:
+            gan_postfix = ""
+        else:
+            gan_postfix = f"_{depth}_{f_base}_{sigma:4.2f}"
+        norm_name += gan_postfix
+    params.append(str(norm_name))
 
     # object fraction
     params.append(

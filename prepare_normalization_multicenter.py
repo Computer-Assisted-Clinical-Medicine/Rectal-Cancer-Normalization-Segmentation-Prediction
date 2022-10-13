@@ -206,24 +206,64 @@ if __name__ == "__main__":
     hyper_parameters = hyper_parameters_new
 
     ### normalization method ###
-    normalization_methods = {
-        NORMALIZING.QUANTILE: {
-            "lower_q": 0.05,
-            "upper_q": 0.95,
-        },
-        GAN_NORMALIZING.GAN_DISCRIMINATORS: {
-            "depth": 3,
-            "filter_base": 16,
-            "min_max": False,
-        },
-        NORMALIZING.HISTOGRAM_MATCHING: {"mask_quantile": 0},
-        NORMALIZING.MEAN_STD: {},
-        NORMALIZING.HM_QUANTILE: {},
-    }
+    normalization_methods = [
+        (
+            NORMALIZING.QUANTILE,
+            {
+                "lower_q": 0.05,
+                "upper_q": 0.95,
+            },
+        ),
+        (
+            GAN_NORMALIZING.GAN_DISCRIMINATORS,
+            {
+                "depth": 3,
+                "filter_base": 16,
+                "min_max": False,
+                "smoothing_sigma": 1,
+                "latent_weight": 1,
+                "image_weight": 1,
+                "skip_edges": True,
+                "latent": True,
+                "n_epochs": 200,
+            },
+        ),
+        (
+            GAN_NORMALIZING.GAN_DISCRIMINATORS,
+            {
+                "depth": 0,
+                "filter_base": 64,
+                "min_max": False,
+                "smoothing_sigma": 0.5,
+                "latent_weight": 10,
+                "image_weight": 100,
+                "skip_edges": False,
+                "latent": False,
+                "n_epochs": 50,
+            },
+        ),
+        (
+            GAN_NORMALIZING.GAN_DISCRIMINATORS,
+            {
+                "depth": 4,
+                "filter_base": 64,
+                "min_max": False,
+                "smoothing_sigma": 0.5,
+                "latent_weight": 10,
+                "image_weight": 100,
+                "skip_edges": True,
+                "latent": True,
+                "n_epochs": 100,
+            },
+        ),
+        (NORMALIZING.HISTOGRAM_MATCHING, {"mask_quantile": 0}),
+        (NORMALIZING.MEAN_STD, {}),
+        (NORMALIZING.HM_QUANTILE, {}),
+    ]
     # add all methods with their hyperparameters
     hyper_parameters_new = []
     for hyp in hyper_parameters:
-        for method, params in normalization_methods.items():
+        for method, params in normalization_methods:
             hyp_new = copy.deepcopy(hyp)
             hyp_new["preprocessing_parameters"]["normalizing_method"] = method
             hyp_new["preprocessing_parameters"]["normalization_parameters"] = params
@@ -338,9 +378,17 @@ if __name__ == "__main__":
             # so the same method will also use the same directory
             pre_params = hyp["preprocessing_parameters"]
             norm_type = pre_params["normalizing_method"]
-            preprocessing_name = norm_type.name
 
             if norm_type == GAN_NORMALIZING.GAN_DISCRIMINATORS:
+                norm_params = pre_params["normalization_parameters"]
+                depth = norm_params["depth"]
+                f_base = norm_params["filter_base"]
+                sigma = norm_params["smoothing_sigma"]
+                if depth == 3 and f_base == 16 and sigma == 1:
+                    GAN_POSTFIX = ""
+                else:
+                    GAN_POSTFIX = f"_{depth}_{f_base}_{sigma:4.2f}"
+                preprocessing_name = norm_type.name + GAN_POSTFIX
                 PASS_MODALITY = True
                 model_paths = []
                 for mod_num in range(N_CHANNELS):
@@ -351,7 +399,8 @@ if __name__ == "__main__":
                             preprocessed_dir=PREPROCESSED_DIR,
                             experiment_group=group_dir_rel,
                             modality=MODALITIES[mod_num],
-                            **pre_params["normalization_parameters"],
+                            gan_postifx=GAN_POSTFIX,
+                            **norm_params,
                         )
                     )
                 pre_params["normalization_parameters"]["model_paths"] = tuple(model_paths)
@@ -366,6 +415,7 @@ if __name__ == "__main__":
                 CUT_TO_OVERLAP = True
                 DATASET_TO_PROCESS = dataset
                 preprocess_base_dir = data_dir
+                preprocessing_name = norm_type.name
 
             # normalizations that are trained should be saved in the exp group dir
             if norm_type in [

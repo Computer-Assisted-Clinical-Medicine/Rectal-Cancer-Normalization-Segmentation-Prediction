@@ -144,6 +144,8 @@ acquisition_params.rename(columns=column_names, inplace=True)
 # set location
 results = results.merge(right=acquisition_params.location, on="File Number")
 
+network_order = ["UNet2D", "DeepLabv3plus2D"]
+
 # %% [markdown]
 
 # ## Analyze the data
@@ -168,6 +170,7 @@ g = sns.catplot(
     col="external",
     hue="normalization",
     row="network",
+    row_order=network_order,
     kind="box",
     legend=True,
     legend_out=True,
@@ -189,6 +192,7 @@ if res_not_all.size > 0:
         y="normalization",
         col="external",
         hue="network",
+        hue_order=network_order,
         kind="box",
         legend=True,
         legend_out=True,
@@ -200,23 +204,25 @@ if res_not_all.size > 0:
     plt.show()
     plt.close()
 
-display_markdown("All training locations except all.")
-display_dataframe(
-    pd.DataFrame(
-        results.query(
-            "version == 'best' & before_therapy & postprocessed"
-            + " & name != 'combined_models' & train_location != 'all'"
-        )
-        .groupby(["normalization", "external"])
-        .Dice.median()
+display_markdown("All training locations except all for the U-Net.")
+median_results = pd.DataFrame(
+    results.query(
+        "version == 'best' & before_therapy & postprocessed & network == 'UNet2D'"
+        + " & name != 'combined_models' & train_location != 'all'"
     )
+    .groupby(["normalization", "external"])
+    .Dice.mean()
 )
+display_dataframe(median_results)
+
+display_markdown("Difference between training and externel testset")
+display_dataframe(median_results.xs(False, level=1) - median_results.xs(True, level=1))
 
 display_markdown("All training locations except all.")
 display_dataframe(
     pd.DataFrame(
         results.query(
-            "version == 'best' & before_therapy & postprocessed"
+            "version == 'best' & before_therapy & postprocessed & network == 'UNet2D'"
             + " & name != 'combined_models' & train_location != 'all'"
         )
         .groupby(["normalization", "network", "external"])
@@ -268,6 +274,7 @@ for train_location in results.train_location.unique():
         col="postprocessed",
         hue="external",
         row="network",
+        row_order=network_order,
         kind="box",
         legend=True,
         legend_out=True,
@@ -287,6 +294,7 @@ for train_location in results.train_location.unique():
         col="postprocessed",
         hue="before_therapy",
         row="network",
+        row_order=network_order,
         kind="box",
         legend=True,
         legend_out=True,
@@ -306,6 +314,7 @@ for train_location in results.train_location.unique():
         col="before_therapy",
         hue="from_study",
         row="network",
+        row_order=network_order,
         kind="box",
         legend=True,
         legend_out=True,
@@ -327,6 +336,7 @@ for train_location in results.train_location.unique():
         col="before_therapy",
         hue="from_study",
         row="network",
+        row_order=network_order,
         kind="box",
         legend=True,
         legend_out=True,
@@ -688,6 +698,7 @@ g = sns.catplot(
     order=norm_order,
     col="external",
     hue="network",
+    hue_order=network_order,
     kind="box",
     legend=True,
     legend_out=True,
@@ -710,6 +721,7 @@ g = sns.catplot(
     order=norm_order,
     col="external",
     hue="network",
+    hue_order=network_order,
     kind="box",
     legend=True,
     legend_out=True,
@@ -737,6 +749,7 @@ for name_df, name in zip(data.external.unique(), titles):
         order=norm_order,
         row="external",
         hue="network",
+        hue_order=network_order,
         kind="box",
         legend=True,
         legend_out=True,

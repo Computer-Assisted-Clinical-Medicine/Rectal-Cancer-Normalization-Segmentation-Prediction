@@ -135,7 +135,10 @@ def auto_encoder(
             raise ValueError("Either provide output_min and output_max or neither")
 
     # scale down multiple times
-    filters = [filter_base * (2**i) for i in range(depth)]
+    if depth > 0:
+        filters = [filter_base * (2**i) for i in range(depth)]
+    else:
+        filters = [filter_base]
     x = inputs
     for i, f in enumerate(filters[:-1]):
         x = conv_block(x, n_filters=f, regularizer=regularizer, name=f"enc{i}")
@@ -149,9 +152,10 @@ def auto_encoder(
         )
         x = Sampling(name="sampling")([z_mean, z_log_var])
     else:
-        x = conv_block(
-            x, n_filters=filters[-1], regularizer=regularizer, name=f"enc{depth-1}"
-        )
+        if depth > 0:
+            x = conv_block(
+                x, n_filters=filters[-1], regularizer=regularizer, name=f"enc{depth-1}"
+            )
 
     # we might use the latent dimension as output
     latent = x
@@ -226,24 +230,49 @@ def auto_encoder(
 
         x = tf.keras.layers.Concatenate(axis=-1, name="concat_output_edges")([x, edges])
         x = layers.Conv2D(
-            filters=input_channels,
+            filters=filters[0],
             kernel_size=3,
             strides=1,
             padding="same",
             kernel_regularizer=regularizer,
-            name="dec_final/conv",
+            name="concat/conv",
         )(x)
+        x = layers.BatchNormalization(name="concat/bn_trans")(x)
+        x = layers.Activation("elu", name="concat/act_trans")(x)
 
     else:
         # Do final output without activation
-        x = layers.Conv2DTranspose(
-            filters=input_channels,
-            kernel_size=3,
-            strides=2,
-            padding="same",
-            kernel_regularizer=regularizer,
-            name="dec_final/conv",
-        )(x)
+        if depth > 0:
+            x = layers.Conv2DTranspose(
+                filters=filters[0],
+                kernel_size=3,
+                strides=2,
+                padding="same",
+                kernel_regularizer=regularizer,
+                name="dec_final/conv",
+            )(x)
+            x = layers.BatchNormalization(name="dec_final/bn")(x)
+            x = layers.Activation("elu", name="dec_final/act")(x)
+
+    x = layers.Conv2D(
+        filters=filters[0],
+        kernel_size=3,
+        strides=1,
+        padding="same",
+        kernel_regularizer=regularizer,
+        name="final_layer_0/conv",
+    )(x)
+    x = layers.BatchNormalization(name="final_layer_0/bn")(x)
+    x = layers.Activation("elu", name="final_layer_0/act")(x)
+
+    x = layers.Conv2D(
+        filters=input_channels,
+        kernel_size=3,
+        strides=1,
+        padding="same",
+        kernel_regularizer=regularizer,
+        name="final_layer_1/conv",
+    )(x)
 
     if output_min is not None and output_max is not None:
         x = tf.clip_by_value(x, output_min, output_max, name="clip_output")
@@ -278,6 +307,12 @@ class AutoEncoder(SegBasisNet):
         The maximum value, to which the output will be clipped, by default None
     variational : bool, optional
         If a variational autoencoder should be used, by default False
+    smoothing_sigma : float, optional
+        The sigma to use for smoothing before doing edge detection. By default 1
+    latent_weight : float, optional
+        The weight for the latent discriminartors, by default 1
+    image_weight : float, optional
+        The weight for the image discriminartors, by default 1
     is_training : bool, optional
         If in training, by default True
     do_finetune : bool, optional
@@ -298,6 +333,9 @@ class AutoEncoder(SegBasisNet):
         output_min=None,
         output_max=None,
         variational=False,
+        smoothing_sigma=1,
+        latent_weight=1,
+        image_weight=1,
         is_training=True,
         do_finetune=False,
         model_path="",
@@ -317,6 +355,9 @@ class AutoEncoder(SegBasisNet):
             output_min=output_min,
             output_max=output_max,
             variational=variational,
+            smoothing_sigma=smoothing_sigma,
+            latent_weight=latent_weight,
+            image_weight=image_weight,
             **kwargs,
         )
 
@@ -338,6 +379,7 @@ class AutoEncoder(SegBasisNet):
             output_min=self.options["output_min"],
             output_max=self.options["output_max"],
             variational=self.options["variational"],
+            smoothing_sigma=self.options["smoothing_sigma"],
         )
 
     def get_hyperparameter_dict(self):
@@ -363,7 +405,7 @@ class AutoEncoder(SegBasisNet):
         input_shape = [None] * ndim + cfg.train_input_shape[-1:]
         self.inputs["x"] = tf.keras.Input(
             shape=input_shape,
-            batch_size=None,
+            batch_size=cfg.batch_size_train,
             dtype=cfg.dtype,
             name="input",
         )
