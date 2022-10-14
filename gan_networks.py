@@ -47,6 +47,7 @@ class GANModel(Model):
         disc_latent_tasks=None,
         clip_value: Optional[float] = None,
         variational=False,
+        train_on_gen=False,
         latent_weight=1.0,
         image_weight=1.0,
         **kwargs,
@@ -76,6 +77,8 @@ class GANModel(Model):
         self.clip_value = clip_value
 
         self.variational = variational
+
+        self.train_on_gen = train_on_gen
 
         self.latent_weight = float(latent_weight)
         self.image_weight = float(image_weight)
@@ -203,6 +206,12 @@ class GANModel(Model):
             with tf.GradientTape() as tape:
                 predictions = self.disc_image(source_images, training=True)
                 dis_loss = self.disc_image.compiled_loss(labels_image, predictions)
+                if self.train_on_gen:
+                    predictions_gen = self.disc_image(generated_images, training=True)
+                    dis_loss_gen = self.disc_image.compiled_loss(
+                        labels_image, predictions_gen
+                    )
+                    dis_loss += dis_loss_gen
             grads = tape.gradient(dis_loss, self.disc_image.trainable_weights)
             grads, max_grad = self.clip_gradients(grads)
             self.disc_image.optimizer.apply_gradients(
@@ -210,6 +219,14 @@ class GANModel(Model):
             )
             self.write_metrics(self.disc_image, metrics, predictions, labels_image)
             metrics["disc_image/max_grad"] = max_grad
+            if self.train_on_gen:
+                self.write_metrics(
+                    disc=self.disc_image,
+                    metrics=metrics,
+                    predictions=predictions_gen,
+                    labels=labels_image,
+                    disc_name="disc_image_gen",
+                )
 
         if self.disc_latent is not None:
             labels_latent = tuple(target_data[t] for t in self.disc_latent_target_numbers)
@@ -324,7 +341,7 @@ class GANModel(Model):
 
         return metrics | losses
 
-    @tf.function
+    # @tf.function
     def test_step(self, data):
         """
         Perform the test step using an adversarial loss, does the same as the training
@@ -360,19 +377,26 @@ class GANModel(Model):
             real_labels = tf.ones((batch_size, 1))
             labels_rf = tf.concat([fake_labels, real_labels], axis=0)
             predictions = self.disc_real_fake(disc_input)
-            self.disc_real_fake.compiled_loss(labels_rf, predictions)
             self.write_metrics(self.disc_real_fake, metrics, predictions, labels_rf)
 
         if self.disc_image is not None:
             labels_image = tuple(target_data[t] for t in self.disc_image_target_numbers)
             predictions = self.disc_image(source_images)
-            self.disc_image.compiled_loss(labels_image, predictions)
+            if self.train_on_gen:
+                predictions_gen = self.disc_image(generated_images, training=True)
             self.write_metrics(self.disc_image, metrics, predictions, labels_image)
+            if self.train_on_gen:
+                self.write_metrics(
+                    disc=self.disc_image,
+                    metrics=metrics,
+                    predictions=predictions_gen,
+                    labels=labels_image,
+                    disc_name="disc_image_gen",
+                )
 
         if self.disc_latent is not None:
             labels_latent = tuple(target_data[t] for t in self.disc_latent_target_numbers)
             predictions = self.disc_latent(latent_variables)
-            self.disc_latent.compiled_loss(labels_latent, predictions)
             self.write_metrics(self.disc_latent, metrics, predictions, labels_latent)
 
         # Train the generator (note that we should *not* update the weights
@@ -509,12 +533,14 @@ class AutoencoderGAN(AutoEncoder):
         The maximum value, to which the output will be clipped, by default None
     variational : bool, optional
         If a variational autoencoder should be used, by default False
+    train_on_gen : bool, optional
+        If the image discriminator should be trained on the generated images, by default False
     smoothing_sigma : float, optional
         The sigma to use for smoothing before doing edge detection. By default 1
     latent_weight : float, optional
-        The weight for the latent discriminartors, by default 1
+        The weight for the latent discriminators, by default 1
     image_weight : float, optional
-        The weight for the image discriminartors, by default 1
+        The weight for the image discriminators, by default 1
     """
 
     def __init__(
@@ -535,6 +561,7 @@ class AutoencoderGAN(AutoEncoder):
         output_min=None,
         output_max=None,
         variational=False,
+        train_on_gen=False,
         smoothing_sigma=1,
         latent_weight=1,
         image_weight=1,
@@ -574,6 +601,7 @@ class AutoencoderGAN(AutoEncoder):
             output_min=output_min,
             output_max=output_max,
             variational=variational,
+            train_on_gen=train_on_gen,
             smoothing_sigma=smoothing_sigma,
             latent_weight=latent_weight,
             image_weight=image_weight,
@@ -878,6 +906,7 @@ class AutoencoderGAN(AutoEncoder):
                 "disc_latent_target_labels": self.disc_latent_target_labels,
                 "clip_value": self.options["clip_value"],
                 "variational": self.options["variational"],
+                "train_on_gen": self.options["train_on_gen"],
                 "latent_weight": self.options["latent_weight"],
                 "image_weight": self.options["image_weight"],
             },

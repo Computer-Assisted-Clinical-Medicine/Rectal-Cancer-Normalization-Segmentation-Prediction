@@ -155,6 +155,8 @@ if __name__ == "__main__":
         "max_rotation": 0.1,
         "min_resolution_augment": 1.2,
         "max_resolution_augment": 0.9,
+        # no tensorboard callback (slow)
+        "write_tensorboard": False,
     }
 
     preprocessing_parameters = {
@@ -225,37 +227,55 @@ if __name__ == "__main__":
                 "image_weight": 1,
                 "skip_edges": True,
                 "latent": True,
+                "train_on_gen": False,
                 "n_epochs": 200,
             },
         ),
         (
             GAN_NORMALIZING.GAN_DISCRIMINATORS,
             {
-                "depth": 0,
-                "filter_base": 64,
+                "depth": 3,
+                "filter_base": 16,
                 "min_max": False,
-                "smoothing_sigma": 0.5,
-                "latent_weight": 10,
-                "image_weight": 100,
-                "skip_edges": False,
-                "latent": False,
-                "n_epochs": 50,
-            },
-        ),
-        (
-            GAN_NORMALIZING.GAN_DISCRIMINATORS,
-            {
-                "depth": 4,
-                "filter_base": 64,
-                "min_max": False,
-                "smoothing_sigma": 0.5,
-                "latent_weight": 10,
-                "image_weight": 100,
+                "smoothing_sigma": 1,
+                "latent_weight": 1,
+                "image_weight": 1,
                 "skip_edges": True,
                 "latent": True,
-                "n_epochs": 100,
+                "train_on_gen": True,
+                "n_epochs": 200,
             },
         ),
+        # (
+        #     GAN_NORMALIZING.GAN_DISCRIMINATORS,
+        #     {
+        #         "depth": 4,
+        #         "filter_base": 64,
+        #         "min_max": False,
+        #         "smoothing_sigma": 0.5,
+        #         "latent_weight": 10,
+        #         "image_weight": 100,
+        #         "skip_edges": True,
+        #         "latent": True,
+        #         "train_on_gen": True,
+        #         "n_epochs": 100,
+        #     },
+        # ),
+        # (
+        #     GAN_NORMALIZING.GAN_DISCRIMINATORS,
+        #     {
+        #         "depth": 0,
+        #         "filter_base": 64,
+        #         "min_max": False,
+        #         "smoothing_sigma": 0.5,
+        #         "latent_weight": 10,
+        #         "image_weight": 100,
+        #         "skip_edges": False,
+        #         "latent": False,
+        #         "train_on_gen": False,
+        #         "n_epochs": 50,
+        #     },
+        # ),
         (NORMALIZING.HISTOGRAM_MATCHING, {"mask_quantile": 0}),
         (NORMALIZING.MEAN_STD, {}),
         (NORMALIZING.HM_QUANTILE, {}),
@@ -388,6 +408,8 @@ if __name__ == "__main__":
                     GAN_POSTFIX = ""
                 else:
                     GAN_POSTFIX = f"_{depth}_{f_base}_{sigma:4.2f}"
+                if norm_params.get("train_on_gen", False):
+                    GAN_POSTFIX += "_tog"
                 preprocessing_name = norm_type.name + GAN_POSTFIX
                 PASS_MODALITY = True
                 model_paths = []
@@ -399,7 +421,7 @@ if __name__ == "__main__":
                             preprocessed_dir=PREPROCESSED_DIR,
                             experiment_group=group_dir_rel,
                             modality=MODALITIES[mod_num],
-                            gan_postifx=GAN_POSTFIX,
+                            gan_suffix=GAN_POSTFIX,
                             **norm_params,
                         )
                     )

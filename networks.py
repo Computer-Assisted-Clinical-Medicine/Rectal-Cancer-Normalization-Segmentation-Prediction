@@ -310,9 +310,9 @@ class AutoEncoder(SegBasisNet):
     smoothing_sigma : float, optional
         The sigma to use for smoothing before doing edge detection. By default 1
     latent_weight : float, optional
-        The weight for the latent discriminartors, by default 1
+        The weight for the latent discriminators, by default 1
     image_weight : float, optional
-        The weight for the image discriminartors, by default 1
+        The weight for the image discriminators, by default 1
     is_training : bool, optional
         If in training, by default True
     do_finetune : bool, optional

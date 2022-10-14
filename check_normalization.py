@@ -27,8 +27,10 @@ GROUP_BASE_NAME = "Normalization_Experiment"
 exp_group_base_dir = experiment_dir / GROUP_BASE_NAME
 
 # NORM_SUFFIX = ""
-NORM_SUFFIX = "_4_64_0.50"
+NORM_SUFFIX = "_tog"
+# NORM_SUFFIX = "_4_64_0.50"
 # NORM_SUFFIX = "_0_64_0.50"
+# NORM_SUFFIX = "_4_64_0.50_tog"
 
 quantile_location = exp_group_base_dir / "data_preprocessed" / "QUANTILE"
 # read dataset
@@ -207,21 +209,110 @@ for location in [
 # %%
 # Plot training data
 
+
+def plot_disc(res: pd.DataFrame, disc_type: str):
+    """Plot the image or latent discriminators"""
+    disc = [
+        c[6 + len(disc_type) : -5]
+        for c in res.columns
+        if c.startswith(f"disc_{disc_type}/") and c.endswith("loss") and len(c) > 17
+    ]
+    img_gen_list = [c for c in res.columns if c.startswith("disc_image_gen")]
+    image_gen_pres = len(img_gen_list) > 0 and disc_type == "image"
+    if image_gen_pres:
+        ncols = 6
+    else:
+        ncols = 4
+    _, axes_disc = plt.subplots(
+        nrows=len(disc),
+        ncols=ncols,
+        sharex=True,
+        sharey=False,
+        figsize=(4 * ncols, len(disc) * 4),
+    )
+    for disc, axes_line in zip(disc, axes_disc):
+        disc_start = f"disc_{disc_type}/{disc}_"
+        disc_metric = [c for c in res.columns if c.startswith(disc_start)][0].partition(
+            disc_start
+        )[-1]
+        if disc_metric == "RootMeanSquaredError":
+            disc_metric_name = "RMSE"
+        else:
+            disc_metric_name = disc_metric
+        last_present = 0
+        for val in ("", "val_"):
+            fields = [
+                f"{val}disc_{disc_type}/{disc}/loss",
+                f"{val}disc_{disc_type}/{disc}_{disc_metric}",
+                f"{val}generator-{disc_type}/{disc}/loss",
+                f"{val}generator-{disc_type}/{disc}_{disc_metric}",
+            ]
+            names = [
+                f"Disc-{disc_type.capitalize()} {disc} loss",
+                f"Disc-{disc_type.capitalize()} {disc} {disc_metric_name}",
+                f"Generator {disc} loss",
+                f"Generator {disc} {disc_metric_name}",
+            ]
+            if image_gen_pres:
+                fields = (
+                    fields[:2]
+                    + [
+                        f"{val}disc_image_gen/{disc}/loss",
+                        f"{val}disc_image_gen/{disc}_{disc_metric}",
+                    ]
+                    + fields[2:]
+                )
+                names = (
+                    names[:2]
+                    + [
+                        f"Disc-Image-Gen {disc} loss",
+                        f"Disc-Image-Gen {disc} {disc_metric_name}",
+                    ]
+                    + names[2:]
+                )
+            for c in range(3):
+                res_channel = res.query(f"channel == '{c}'")
+                for num, (field, name) in enumerate(
+                    zip(
+                        fields,
+                        names,
+                    )
+                ):
+                    if field in res_channel.columns and res_channel.size > 0:
+                        plot_with_ma(
+                            axes_line[num],
+                            res_channel.epoch,
+                            res_channel[field],
+                            f"{val}{c}",
+                        )
+                        axes_line[num].set_ylabel(name)
+                        last_present = max(last_present, num)
+        axes_line[last_present].legend()
+
+    plt.tight_layout()
+    plt.show()
+    plt.close()
+
+
+def plot_with_ma(ax_ma, x, y, label, N=10):
+    """Plot a line with the value in the background and the moving average on top"""
+    p = ax_ma.plot(
+        x,
+        y,
+        alpha=0.2,
+    )
+    # plot with moving average
+    ax_ma.plot(
+        x,
+        np.convolve(
+            np.pad(y, (N // 2 - 1, N // 2), mode="reflect"), np.ones(N) / N, mode="valid"
+        ),
+        label=label,
+        color=p[-1].get_color(),
+    )
+
+
 training_metrics = [
-    "disc_image/echo_time_RootMeanSquaredError",
-    "disc_image/field_strength_AUC",
-    "disc_image/pixel_bandwidth_RootMeanSquaredError",
-    "disc_image/pixel_spacing_RootMeanSquaredError",
-    "disc_image/repetition_time_RootMeanSquaredError",
-    "disc_image/slice_thickness_RootMeanSquaredError",
-    "disc_latent/location_AUC",
-    "disc_latent/model_name_AUC",
-    "disc_latent/sequence_variant_AUC",
-    "discriminator_real_fake/RootMeanSquaredError",
-    "val_disc_image/echo_time_RootMeanSquaredError",
-    "val_generator-image/echo_time_RootMeanSquaredError",
-    "val_disc_latent/location_AUC",
-    "val_generator-latent/location_AUC",
     "val_generator/disc_image_loss",
     "val_generator/disc_latent_loss",
     "val_generator/disc_real_fake_loss",
@@ -285,58 +376,7 @@ for location in [
         plt.tight_layout()
         plt.show()
         plt.close()
+        print("Latent Discriminators")
+        plot_disc(train_results, "latent")
         print("Image Discriminators")
-        img_disc = [
-            c[11:-5]
-            for c in train_results.columns
-            if c.startswith("disc_image") and c.endswith("loss") and len(c) > 17
-        ]
-        fig, axes = plt.subplots(
-            nrows=len(img_disc),
-            ncols=4,
-            sharex=True,
-            sharey=False,
-            figsize=(16, nrows * 4),
-        )
-        for disc, axes_line in zip(img_disc, axes):
-            disc_start = f"disc_image/{disc}_"
-            disc_metric = [c for c in train_results.columns if c.startswith(disc_start)][
-                0
-            ].partition(disc_start)[-1]
-            if disc_metric == "RootMeanSquaredError":
-                disc_metric_name = "RMSE"
-            else:
-                disc_metric_name = disc_metric
-            last_present = 0
-            for val in ("", "val_"):
-                for channel in range(3):
-                    data = train_results.query(f"channel == '{channel}'")
-                    for num, (field, name) in enumerate(
-                        zip(
-                            [
-                                f"{val}disc_image/{disc}/loss",
-                                f"{val}disc_image/{disc}_{disc_metric}",
-                                f"{val}generator-image/{disc}/loss",
-                                f"{val}generator-image/{disc}_{disc_metric}",
-                            ],
-                            [
-                                f"Disc-Image {disc} loss",
-                                f"Disc-Image {disc} {disc_metric_name}",
-                                f"Generator {disc} loss",
-                                f"Generator {disc} {disc_metric_name}",
-                            ],
-                        )
-                    ):
-                        if field in data.columns:
-                            axes_line[num].plot(
-                                data.epoch,
-                                data[field],
-                                label=f"{val}{channel}",
-                            )
-                            axes_line[num].set_ylabel(name)
-                            last_present = max(last_present, num)
-            axes_line[last_present].legend()
-
-        plt.tight_layout()
-        plt.show()
-        plt.close()
+        plot_disc(train_results, "image")

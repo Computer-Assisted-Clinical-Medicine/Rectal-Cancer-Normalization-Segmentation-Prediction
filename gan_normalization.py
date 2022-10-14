@@ -99,7 +99,8 @@ def train_gan_normalization(
     image_weight=1,
     skip_edges=True,
     latent=True,
-    gan_postifx="",
+    train_on_gen=False,
+    gan_suffix="",
     **kwargs,
 ):
     """Train the GAN Normalization"""
@@ -107,9 +108,9 @@ def train_gan_normalization(
     experiment_dir = Path(os.environ["experiment_dir"])
     data_dir = Path(os.environ["data_dir"])
 
-    experiment_name = f"Train_Normalization_GAN_{mod_num}{gan_postifx}"
+    experiment_name = f"Train_Normalization_GAN_{mod_num}{gan_suffix}"
     exp_output_path = (
-        experiment_group / f"Train_Normalization_GAN{gan_postifx}" / experiment_name
+        experiment_group / f"Train_Normalization_GAN{gan_suffix}" / experiment_name
     )
     fold_dir = experiment_dir / exp_output_path / "fold-0"
     model_path = fold_dir / "models" / "model-final"
@@ -186,6 +187,8 @@ def train_gan_normalization(
         "max_rotation": 0.1,
         "min_resolution_augment": 1.2,
         "max_resolution_augment": 0.9,
+        # no tensorboard callback (slow)
+        "write_tensorboard": False,
     }
 
     preprocessing_parameters = {
@@ -274,9 +277,10 @@ def train_gan_normalization(
             "regularize": (True, "L2", 0.001),
             "clip_value": 0.1,
             "variational": False,
-            "smoothing_sigma": smoothing_sigma,
+            "train_on_gen": train_on_gen,
             "latent_weight": latent_weight,
             "image_weight": image_weight,
+            "smoothing_sigma": smoothing_sigma,
             "loss_parameters": {
                 "NMI": {
                     "min_val": -1,
@@ -415,6 +419,7 @@ class GanDiscriminators(Normalization):
         "image_weight",
         "skip_edges",
         "latent",
+        "train_on_gen",
         "n_epochs",
     ]
 
@@ -431,6 +436,7 @@ class GanDiscriminators(Normalization):
         image_weight=1,
         skip_edges=True,
         latent=True,
+        train_on_gen=False,
         n_epochs=200,
         **kwargs,
     ) -> None:
@@ -444,6 +450,7 @@ class GanDiscriminators(Normalization):
         self.image_weight = image_weight
         self.skip_edges = skip_edges
         self.latent = latent
+        self.train_on_gen = train_on_gen
         self.n_epochs = n_epochs
         self.model = None
         super().__init__(normalize_channelwise=False)

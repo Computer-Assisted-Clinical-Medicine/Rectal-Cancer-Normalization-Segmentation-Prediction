@@ -80,7 +80,10 @@ def generate_folder_name(parameters):
             gan_postfix = ""
         else:
             gan_postfix = f"_{depth}_{f_base}_{sigma:4.2f}"
+        if norm_params.get("train_on_gen", False):
+            gan_postfix += "_tog"
         norm_name += gan_postfix
+
     params.append(str(norm_name))
 
     # object fraction
