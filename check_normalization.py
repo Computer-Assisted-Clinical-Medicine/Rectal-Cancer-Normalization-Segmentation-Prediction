@@ -19,6 +19,88 @@ from tqdm.autonotebook import tqdm
 from networks import auto_encoder
 from SegClassRegBasis import evaluation
 
+
+def read_norm_exp(norm_suffix: str) -> pd.DataFrame:
+    """Analyze all experiments for one GAN normalization
+
+    Parameters
+    ----------
+    norm_suffix : str
+        The suffix of the normalization
+
+    Returns
+    -------
+    pd.DataFrame
+        The metrics compared to the quantile images
+    """
+
+    exp_dir = Path(os.environ["experiment_dir"])
+
+    quantile_location = exp_dir / GROUP_BASE_NAME / "data_preprocessed" / "QUANTILE"
+    # read dataset
+    quantile_dataset_file = quantile_location / "preprocessing_dataset.yaml"
+    with open(quantile_dataset_file, "r", encoding="utf8") as quant_file:
+        quantile_dataset = yaml.load(quant_file, yaml.UnsafeLoader)
+
+    results_all_list = []
+
+    for loc in [
+        "all",
+        "Frankfurt",
+        "Regensburg",
+        "Mannheim",
+        "Not-Frankfurt",
+        "Not-Regensburg",
+        "Not-Mannheim",
+    ]:
+        print(f"Starting with {loc}.")
+
+        res_list = []
+        dataset_file = (
+            exp_dir
+            / GROUP_BASE_NAME
+            / f"Normalization_{loc}"
+            / "data_preprocessed"
+            / f"GAN_DISCRIMINATORS{norm_suffix}"
+            / "preprocessing_dataset.yaml"
+        )
+        # read dataset
+        analysis_file = dataset_file.parent / "analysis.csv"
+        if analysis_file.exists():
+            results_location = pd.read_csv(analysis_file, sep=";", index_col=0)
+        else:
+            if not dataset_file.exists():
+                print(f"\t{loc} not yet finished.")
+                continue
+            with open(dataset_file, "r", encoding="utf8") as dataset_file:
+                dataset = yaml.load(dataset_file, yaml.UnsafeLoader)
+
+            print("Start evaluating the generated images.")
+            for pat_name, data in tqdm(dataset.items()):
+                image_gan = experiment_dir / data["image"]
+                image_quant = experiment_dir / quantile_dataset[pat_name]["image"]
+
+                for c in range(3):
+                    result_metrics = evaluation.evaluate_autoencoder_prediction(
+                        str(image_gan), str(image_quant), channel=c
+                    )
+                    result_metrics["modality"] = c
+                    result_metrics["location"] = loc
+                    result_metrics["patient_id"] = pat_name
+
+                    res_list.append(result_metrics)
+
+            results_location = pd.DataFrame(res_list)
+            results_location.to_csv(analysis_file, sep=";")
+
+        results_all_list.append(results_location)
+
+    if len(results_all_list) > 0:
+        return pd.concat(results_all_list).reset_index().drop(columns="index")
+    else:
+        return None
+
+
 # %%
 
 data_dir = Path(os.environ["data_dir"])
@@ -27,78 +109,13 @@ GROUP_BASE_NAME = "Normalization_Experiment"
 exp_group_base_dir = experiment_dir / GROUP_BASE_NAME
 
 # NORM_SUFFIX = ""
-NORM_SUFFIX = "_tog"
+NORM_SUFFIX = "_tog_idg0.50"
 # NORM_SUFFIX = "_4_64_0.50"
 # NORM_SUFFIX = "_0_64_0.50"
-# NORM_SUFFIX = "_4_64_0.50_tog"
-
-quantile_location = exp_group_base_dir / "data_preprocessed" / "QUANTILE"
-# read dataset
-quantile_dataset_file = quantile_location / "preprocessing_dataset.yaml"
-with open(quantile_dataset_file, "r", encoding="utf8") as f:
-    quantile_dataset = yaml.load(f, yaml.UnsafeLoader)
 
 # %%
 
-results_all_list = []
-
-for location in [
-    "all",
-    "Frankfurt",
-    "Regensburg",
-    "Mannheim",
-    "Not-Frankfurt",
-    "Not-Regensburg",
-    "Not-Mannheim",
-]:
-
-    print(f"Starting with {location}.")
-
-    experiment_group_name = f"Normalization_{location}"
-
-    results_list = []
-    dataset_file = (
-        exp_group_base_dir
-        / experiment_group_name
-        / "data_preprocessed"
-        / f"GAN_DISCRIMINATORS{NORM_SUFFIX}"
-        / "preprocessing_dataset.yaml"
-    )
-    # read dataset
-    analysis_file = dataset_file.parent / "analysis.csv"
-    if analysis_file.exists():
-        results_location = pd.read_csv(analysis_file, sep=";", index_col=0)
-    else:
-        if not dataset_file.exists():
-            print(f"\t{location} not yet finished.")
-            continue
-        with open(dataset_file, "r", encoding="utf8") as f:
-            dataset = yaml.load(f, yaml.UnsafeLoader)
-
-        print("Start evaluating the generated images.")
-        for pat_name, data in tqdm(dataset.items()):
-            image_gan = experiment_dir / data["image"]
-            image_quant = experiment_dir / quantile_dataset[pat_name]["image"]
-
-            for channel in range(3):
-                result_metrics = evaluation.evaluate_autoencoder_prediction(
-                    str(image_gan), str(image_quant), channel=channel
-                )
-                result_metrics["modality"] = channel
-                result_metrics["location"] = location
-                result_metrics["patient_id"] = pat_name
-
-                results_list.append(result_metrics)
-
-        results_location = pd.DataFrame(results_list)
-        results_location.to_csv(analysis_file, sep=";")
-
-    results_all_list.append(results_location)
-
-if len(results_all_list) > 0:
-    results = pd.concat(results_all_list).reset_index().drop(columns="index")
-else:
-    results = None
+results = read_norm_exp(NORM_SUFFIX)
 
 # %%
 
@@ -169,21 +186,21 @@ for location in [
     experiment_group_name = f"Normalization_{location}"
 
     for channel in range(3):
-        exp_dir = (
+        norm_exp_dir = (
             exp_group_base_dir
             / experiment_group_name
             / f"Train_Normalization_GAN{NORM_SUFFIX}"
             / f"Train_Normalization_GAN_{channel}{NORM_SUFFIX}"
         )
 
-        if not exp_dir.exists():
+        if not norm_exp_dir.exists():
             continue
 
-        model_file = exp_dir / "generator_with_shapes.png"
+        model_file = norm_exp_dir / "generator_with_shapes.png"
         if model_file.exists():
             continue
 
-        with open(exp_dir / "parameters.yaml", "r", encoding="utf8") as f:
+        with open(norm_exp_dir / "parameters.yaml", "r", encoding="utf8") as f:
             norm_settings = yaml.load(f, yaml.UnsafeLoader)
 
         hp_train = norm_settings["hyper_parameters"]["train_parameters"]
@@ -299,13 +316,13 @@ def plot_with_ma(ax_ma, x, y, label, N=10):
     p = ax_ma.plot(
         x,
         y,
-        alpha=0.2,
+        alpha=0.4,
     )
     # plot with moving average
     ax_ma.plot(
         x,
         np.convolve(
-            np.pad(y, (N // 2 - 1, N // 2), mode="reflect"), np.ones(N) / N, mode="valid"
+            np.pad(y, (N // 2 - 1, N // 2), mode="edge"), np.ones(N) / N, mode="valid"
         ),
         label=label,
         color=p[-1].get_color(),
@@ -336,14 +353,14 @@ for location in [
     experiment_group_name = f"Normalization_{location}"
 
     results_list = []
-    exp_dir = (
+    norm_exp_dir = (
         exp_group_base_dir / experiment_group_name / f"Train_Normalization_GAN{NORM_SUFFIX}"
     )
 
     train_results_list: List[pd.DataFrame] = []
     for channel in range(3):
         train_file = (
-            exp_dir
+            norm_exp_dir
             / f"Train_Normalization_GAN_{channel}{NORM_SUFFIX}"
             / "fold-0"
             / "training.csv"

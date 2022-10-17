@@ -21,7 +21,7 @@ from SegClassRegBasis.experiment import Experiment
 from SegClassRegBasis.normalization import NORMALIZING
 from SegClassRegBasis.preprocessing import preprocess_dataset
 from SegClassRegBasis.utils import export_experiments_run_files
-from utils import generate_folder_name, split_into_modalities
+from utils import generate_folder_name, get_gan_suffix, split_into_modalities
 
 # set tf thread mode
 os.environ["TF_GPU_THREAD_MODE"] = "gpu_private"
@@ -240,6 +240,7 @@ if __name__ == "__main__":
                 "smoothing_sigma": 1,
                 "latent_weight": 1,
                 "image_weight": 1,
+                "image_gen_weight": 0.5,
                 "skip_edges": True,
                 "latent": True,
                 "train_on_gen": True,
@@ -249,12 +250,29 @@ if __name__ == "__main__":
         # (
         #     GAN_NORMALIZING.GAN_DISCRIMINATORS,
         #     {
+        #         "depth": 3,
+        #         "filter_base": 16,
+        #         "min_max": False,
+        #         "smoothing_sigma": 0.5,
+        #         "latent_weight": 1,
+        #         "image_weight": 1,
+        #         "image_gen_weight": 1,
+        #         "skip_edges": True,
+        #         "latent": True,
+        #         "train_on_gen": True,
+        #         "n_epochs": 200,
+        #     },
+        # ),
+        # (
+        #     GAN_NORMALIZING.GAN_DISCRIMINATORS,
+        #     {
         #         "depth": 4,
         #         "filter_base": 64,
         #         "min_max": False,
         #         "smoothing_sigma": 0.5,
         #         "latent_weight": 10,
         #         "image_weight": 100,
+        #         "image_gen_weight": 1,
         #         "skip_edges": True,
         #         "latent": True,
         #         "train_on_gen": True,
@@ -404,13 +422,8 @@ if __name__ == "__main__":
                 depth = norm_params["depth"]
                 f_base = norm_params["filter_base"]
                 sigma = norm_params["smoothing_sigma"]
-                if depth == 3 and f_base == 16 and sigma == 1:
-                    GAN_POSTFIX = ""
-                else:
-                    GAN_POSTFIX = f"_{depth}_{f_base}_{sigma:4.2f}"
-                if norm_params.get("train_on_gen", False):
-                    GAN_POSTFIX += "_tog"
-                preprocessing_name = norm_type.name + GAN_POSTFIX
+                gan_suffix = get_gan_suffix(hyp)
+                preprocessing_name = norm_type.name + gan_suffix
                 PASS_MODALITY = True
                 model_paths = []
                 for mod_num in range(N_CHANNELS):
@@ -421,7 +434,7 @@ if __name__ == "__main__":
                             preprocessed_dir=PREPROCESSED_DIR,
                             experiment_group=group_dir_rel,
                             modality=MODALITIES[mod_num],
-                            gan_suffix=GAN_POSTFIX,
+                            gan_suffix=gan_suffix,
                             **norm_params,
                         )
                     )

@@ -97,6 +97,7 @@ def train_gan_normalization(
     smoothing_sigma=1.0,
     latent_weight=1,
     image_weight=1,
+    image_gen_weight=1,
     skip_edges=True,
     latent=True,
     train_on_gen=False,
@@ -280,6 +281,7 @@ def train_gan_normalization(
             "train_on_gen": train_on_gen,
             "latent_weight": latent_weight,
             "image_weight": image_weight,
+            "image_gen_weight": image_gen_weight,
             "smoothing_sigma": smoothing_sigma,
             "loss_parameters": {
                 "NMI": {
@@ -417,6 +419,7 @@ class GanDiscriminators(Normalization):
         "smoothing_sigma",
         "latent_weight",
         "image_weight",
+        "image_gen_weight",
         "skip_edges",
         "latent",
         "train_on_gen",
@@ -434,6 +437,7 @@ class GanDiscriminators(Normalization):
         smoothing_sigma=1,
         latent_weight=1,
         image_weight=1,
+        image_gen_weight=1,
         skip_edges=True,
         latent=True,
         train_on_gen=False,
@@ -448,6 +452,7 @@ class GanDiscriminators(Normalization):
         self.smoothing_sigma = smoothing_sigma
         self.latent_weight = latent_weight
         self.image_weight = image_weight
+        self.image_gen_weight = image_gen_weight
         self.skip_edges = skip_edges
         self.latent = latent
         self.train_on_gen = train_on_gen

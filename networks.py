@@ -309,10 +309,6 @@ class AutoEncoder(SegBasisNet):
         If a variational autoencoder should be used, by default False
     smoothing_sigma : float, optional
         The sigma to use for smoothing before doing edge detection. By default 1
-    latent_weight : float, optional
-        The weight for the latent discriminators, by default 1
-    image_weight : float, optional
-        The weight for the image discriminators, by default 1
     is_training : bool, optional
         If in training, by default True
     do_finetune : bool, optional
@@ -334,8 +330,6 @@ class AutoEncoder(SegBasisNet):
         output_max=None,
         variational=False,
         smoothing_sigma=1,
-        latent_weight=1,
-        image_weight=1,
         is_training=True,
         do_finetune=False,
         model_path="",
@@ -356,8 +350,6 @@ class AutoEncoder(SegBasisNet):
             output_max=output_max,
             variational=variational,
             smoothing_sigma=smoothing_sigma,
-            latent_weight=latent_weight,
-            image_weight=image_weight,
             **kwargs,
         )
 

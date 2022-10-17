@@ -5,7 +5,7 @@ Miscellaneous functions
 import os
 from pathlib import Path
 from typing import Dict, List, Union
-
+import numpy as np
 import SimpleITK as sitk
 
 from SegClassRegBasis.architecture import DeepLabv3plus, DenseTiramisu, UNet
@@ -72,17 +72,8 @@ def generate_folder_name(parameters):
     # normalization
     norm_name = parameters["preprocessing_parameters"]["normalizing_method"].name
     if norm_name == "GAN_DISCRIMINATORS":
-        norm_params = parameters["preprocessing_parameters"]["normalization_parameters"]
-        depth = norm_params["depth"]
-        f_base = norm_params["filter_base"]
-        sigma = norm_params["smoothing_sigma"]
-        if depth == 3 and f_base == 16 and sigma == 1:
-            gan_postfix = ""
-        else:
-            gan_postfix = f"_{depth}_{f_base}_{sigma:4.2f}"
-        if norm_params.get("train_on_gen", False):
-            gan_postfix += "_tog"
-        norm_name += gan_postfix
+        gan_suffix = get_gan_suffix(parameters)
+        norm_name += gan_suffix
 
     params.append(str(norm_name))
 
@@ -97,6 +88,35 @@ def generate_folder_name(parameters):
     folder_name = "-".join(params)
 
     return folder_name
+
+
+def get_gan_suffix(parameters: Dict) -> str:
+    """Take the hyperparameters and get the gan suffix
+
+    Parameters
+    ----------
+    parameters : Dict
+        The hyperparameters
+
+    Returns
+    -------
+    str
+        The suffix
+    """
+    norm_params = parameters["preprocessing_parameters"]["normalization_parameters"]
+    depth = norm_params["depth"]
+    f_base = norm_params["filter_base"]
+    sigma = norm_params["smoothing_sigma"]
+    image_gen_weight = norm_params.get("image_gen_weight", 1)
+    if depth == 3 and f_base == 16 and np.isclose(sigma, 1):
+        gan_suffix = ""
+    else:
+        gan_suffix = f"_{depth}_{f_base}_{sigma:4.2f}"
+    if norm_params.get("train_on_gen", False):
+        gan_suffix += "_tog"
+        if not np.isclose(image_gen_weight, 1):
+            gan_suffix += f"_idg{image_gen_weight:4.2f}"
+    return gan_suffix
 
 
 def split_into_modalities(

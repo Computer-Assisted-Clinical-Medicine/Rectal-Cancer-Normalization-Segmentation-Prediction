@@ -50,6 +50,7 @@ class GANModel(Model):
         train_on_gen=False,
         latent_weight=1.0,
         image_weight=1.0,
+        image_gen_weight=1.0,
         **kwargs,
     ):
         super().__init__(*args, **kwargs)
@@ -82,6 +83,7 @@ class GANModel(Model):
 
         self.latent_weight = float(latent_weight)
         self.image_weight = float(image_weight)
+        self.image_gen_weight = float(image_gen_weight)
 
         # make sure the discriminators are compiled
         for disc in [self.disc_real_fake, self.disc_image, self.disc_latent]:
@@ -200,6 +202,7 @@ class GANModel(Model):
             )
             self.write_metrics(self.disc_real_fake, metrics, predictions, labels_rf)
             metrics["discriminator_real_fake/max_grad"] = max_grad
+            losses["discriminator_real_fake/loss"] = dis_loss
 
         if self.disc_image is not None:
             labels_image = tuple(target_data[t] for t in self.disc_image_target_numbers)
@@ -211,7 +214,7 @@ class GANModel(Model):
                     dis_loss_gen = self.disc_image.compiled_loss(
                         labels_image, predictions_gen
                     )
-                    dis_loss += dis_loss_gen
+                    dis_loss += dis_loss_gen * self.image_gen_weight
             grads = tape.gradient(dis_loss, self.disc_image.trainable_weights)
             grads, max_grad = self.clip_gradients(grads)
             self.disc_image.optimizer.apply_gradients(
@@ -219,6 +222,7 @@ class GANModel(Model):
             )
             self.write_metrics(self.disc_image, metrics, predictions, labels_image)
             metrics["disc_image/max_grad"] = max_grad
+            losses["disc_image/loss"] = dis_loss
             if self.train_on_gen:
                 self.write_metrics(
                     disc=self.disc_image,
@@ -227,6 +231,7 @@ class GANModel(Model):
                     labels=labels_image,
                     disc_name="disc_image_gen",
                 )
+                losses["disc_image_gen/loss"] = dis_loss_gen
 
         if self.disc_latent is not None:
             labels_latent = tuple(target_data[t] for t in self.disc_latent_target_numbers)
@@ -240,6 +245,7 @@ class GANModel(Model):
             )
             self.write_metrics(self.disc_latent, metrics, predictions, labels_latent)
             metrics["disc_latent/max_grad"] = max_grad
+            losses["disc_latent/loss"] = dis_loss
 
         # Train the generator (note that we should *not* update the weights
         # of the discriminator)!
@@ -258,6 +264,7 @@ class GANModel(Model):
             # there might be an extra loss from the autoencoder
             if self.compiled_loss is not None:
                 autoencoder_loss = self.compiled_loss(source_images, pred_images)
+                losses["generator/autoencoder_loss"] = autoencoder_loss
                 gen_loss += autoencoder_loss
 
             if self.disc_real_fake is not None:
@@ -341,7 +348,7 @@ class GANModel(Model):
 
         return metrics | losses
 
-    # @tf.function
+    @tf.function
     def test_step(self, data):
         """
         Perform the test step using an adversarial loss, does the same as the training
@@ -541,6 +548,9 @@ class AutoencoderGAN(AutoEncoder):
         The weight for the latent discriminators, by default 1
     image_weight : float, optional
         The weight for the image discriminators, by default 1
+    image_gen_weight : float, optional
+        The weight of the image discriminator trained on the generated images,
+        by default 1
     """
 
     def __init__(
@@ -565,6 +575,7 @@ class AutoencoderGAN(AutoEncoder):
         smoothing_sigma=1,
         latent_weight=1,
         image_weight=1,
+        image_gen_weight=1,
         **kwargs,
     ):
 
@@ -605,6 +616,7 @@ class AutoencoderGAN(AutoEncoder):
             smoothing_sigma=smoothing_sigma,
             latent_weight=latent_weight,
             image_weight=image_weight,
+            image_gen_weight=image_gen_weight,
             is_training=is_training,
             do_finetune=do_finetune,
             model_path=model_path,
@@ -909,6 +921,7 @@ class AutoencoderGAN(AutoEncoder):
                 "train_on_gen": self.options["train_on_gen"],
                 "latent_weight": self.options["latent_weight"],
                 "image_weight": self.options["image_weight"],
+                "image_gen_weight": self.options["image_gen_weight"],
             },
         )
 
