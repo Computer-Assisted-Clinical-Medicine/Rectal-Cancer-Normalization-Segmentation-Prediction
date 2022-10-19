@@ -82,6 +82,7 @@ def auto_encoder(
     variational=False,
     keras_model: Model = Model,
     model_arguments=None,
+    **kwargs,
 ) -> tf.keras.Model:
     """Build a simple model for classification
 

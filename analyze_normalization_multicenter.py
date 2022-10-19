@@ -1,11 +1,9 @@
-"""
-Analyze the results of the experiment
-"""
+"""Analyze the results of the experiment"""
 
 # %% [markdown]
 
-# Analyze results
-# # Import and load data
+# # Analyze results
+# ## Import and load data
 
 # %%
 
@@ -144,8 +142,6 @@ acquisition_params.rename(columns=column_names, inplace=True)
 # set location
 results = results.merge(right=acquisition_params.location, on="File Number")
 
-network_order = ["UNet2D", "DeepLabv3plus2D"]
-
 # %% [markdown]
 
 # ## Analyze the data
@@ -169,8 +165,6 @@ g = sns.catplot(
     y="train_location",
     col="external",
     hue="normalization",
-    row="network",
-    row_order=network_order,
     kind="box",
     legend=True,
     legend_out=True,
@@ -191,8 +185,6 @@ if res_not_all.size > 0:
         x="Dice",
         y="normalization",
         col="external",
-        hue="network",
-        hue_order=network_order,
         kind="box",
         legend=True,
         legend_out=True,
@@ -273,8 +265,6 @@ for train_location in results.train_location.unique():
         y="normalization",
         col="postprocessed",
         hue="external",
-        row="network",
-        row_order=network_order,
         kind="box",
         legend=True,
         legend_out=True,
@@ -293,8 +283,6 @@ for train_location in results.train_location.unique():
         y="normalization",
         col="postprocessed",
         hue="before_therapy",
-        row="network",
-        row_order=network_order,
         kind="box",
         legend=True,
         legend_out=True,
@@ -313,8 +301,6 @@ for train_location in results.train_location.unique():
         y="normalization",
         col="before_therapy",
         hue="from_study",
-        row="network",
-        row_order=network_order,
         kind="box",
         legend=True,
         legend_out=True,
@@ -328,15 +314,13 @@ for train_location in results.train_location.unique():
 
     g = sns.catplot(
         data=results.query(
-            f"version == 'best' & train_location == '{train_location}'"
+            f"train_location == '{train_location}'"
             + " & name != 'combined_models' & not external & postprocessed"
         ),
         x="Dice",
         y="normalization",
         col="before_therapy",
         hue="from_study",
-        row="network",
-        row_order=network_order,
         kind="box",
         legend=True,
         legend_out=True,
@@ -632,7 +616,7 @@ for col in acquisition_params.columns:
     stds = groups.std()
 
     plt.figure(figsize=(8, 6))
-    for loc in data.normalization.unique():
+    for loc in np.sort(data.normalization.unique()):
         plt.errorbar(
             x=bin_centers[means.loc[loc].index - 1],
             y=means.loc[loc],
@@ -669,6 +653,8 @@ for col in acquisition_params.columns:
 display_markdown("## Publication figures")
 
 new_names = {
+    "GAN_DISCRIMINATORS": "GAN",
+    "GAN_DISCRIMINATORS_tog_idg0.50": "GAN_tog",
     "QUANTILE": "Perc",
     "HM_QUANTILE": "Perc-HM",
     "MEAN_STD": "M-Std",
@@ -682,13 +668,13 @@ new_names = {
     "Wuerzburg": "Center 5",
     "Regensburg-UK": "Center 6",
 }
-norm_order = ["Perc", "Perc-HM", "HM", "M-Std"]
+norm_order = ["GAN", "GAN_tog", "Perc", "Perc-HM", "HM", "M-Std"]
 
 TITLE = "Performance when training on a single center"
 display_markdown(TITLE)
-data = results.query(
-    "version == 'best' & before_therapy & postprocessed & name != 'combined_models'"
-).replace(new_names)
+data = results.query("before_therapy & postprocessed & name != 'combined_models'").replace(
+    new_names
+)
 data.loc[data.train_location == "all", "external"] = "test"
 
 g = sns.catplot(
@@ -697,8 +683,7 @@ g = sns.catplot(
     x="normalization",
     order=norm_order,
     col="external",
-    hue="network",
-    hue_order=network_order,
+    hue="version",
     kind="box",
     legend=True,
     legend_out=True,
@@ -712,6 +697,7 @@ titles = [
 ]
 for ax, tlt in zip(g.axes[0], titles):
     ax.set_title(tlt)
+    ax.tick_params(axis="x", rotation=90)
 save_pub("performance_ABC")
 
 g = sns.catplot(
@@ -720,8 +706,7 @@ g = sns.catplot(
     x="normalization",
     order=norm_order,
     col="external",
-    hue="network",
-    hue_order=network_order,
+    hue="version",
     kind="box",
     legend=True,
     legend_out=True,
@@ -735,6 +720,7 @@ titles = [
 ]
 for ax, tlt in zip(g.axes[0], titles):
     ax.set_title(tlt)
+    ax.tick_params(axis="x", rotation=90)
 save_pub("performance_names")
 
 for name_df, name in zip(data.external.unique(), titles):
@@ -748,8 +734,7 @@ for name_df, name in zip(data.external.unique(), titles):
         x="normalization",
         order=norm_order,
         row="external",
-        hue="network",
-        hue_order=network_order,
+        hue="version",
         kind="box",
         legend=True,
         legend_out=True,

@@ -190,13 +190,13 @@ if __name__ == "__main__":
         "do_batch_normalization": False,
         "ratio": 2,
     }
-    network_parameters_DeepLabv3plus = {
-        "aspp_rates": (3, 6, 9),  # half because input is half the size
-        "clip_value": 50,
-        "backbone": "densenet121",
-    }
-    network_parameters = [network_parameters_UNet, network_parameters_DeepLabv3plus]
-    architectures = [UNet, DeepLabv3plus]
+    # network_parameters_DeepLabv3plus = {
+    #     "aspp_rates": (3, 6, 9),  # half because input is half the size
+    #     "clip_value": 50,
+    #     "backbone": "densenet121",
+    # }
+    network_parameters = [network_parameters_UNet]
+    architectures = [UNet]
 
     hyper_parameters_new = []
     for hyp in hyper_parameters:
@@ -247,22 +247,6 @@ if __name__ == "__main__":
                 "n_epochs": 200,
             },
         ),
-        # (
-        #     GAN_NORMALIZING.GAN_DISCRIMINATORS,
-        #     {
-        #         "depth": 3,
-        #         "filter_base": 16,
-        #         "min_max": False,
-        #         "smoothing_sigma": 0.5,
-        #         "latent_weight": 1,
-        #         "image_weight": 1,
-        #         "image_gen_weight": 1,
-        #         "skip_edges": True,
-        #         "latent": True,
-        #         "train_on_gen": True,
-        #         "n_epochs": 200,
-        #     },
-        # ),
         # (
         #     GAN_NORMALIZING.GAN_DISCRIMINATORS,
         #     {
@@ -500,8 +484,8 @@ if __name__ == "__main__":
         """Define a priority for each experiment"""
         norm = exp_sort.hyper_parameters["preprocessing_parameters"]["normalizing_method"]
         norm_priority = {
-            NORMALIZING.QUANTILE: 4,
-            GAN_NORMALIZING.GAN_DISCRIMINATORS: 3,
+            GAN_NORMALIZING.GAN_DISCRIMINATORS: 4,
+            NORMALIZING.QUANTILE: 3,
             NORMALIZING.HISTOGRAM_MATCHING: 2,
             NORMALIZING.MEAN_STD: 1,
             NORMALIZING.HM_QUANTILE: 0,

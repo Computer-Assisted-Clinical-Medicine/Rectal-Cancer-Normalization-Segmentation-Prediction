@@ -19,7 +19,7 @@ def display_markdown(text: str):
 def save_pub(name, **kwargs):
     """Save the figure for publication"""
     experiment_dir = Path(os.environ["experiment_dir"])
-    pub_dir = experiment_dir / "pub"
+    pub_dir = experiment_dir / "Normalization_Experiment" / "pub"
     if not pub_dir.exists():
         pub_dir.mkdir()
     plt.savefig(pub_dir / f"{name}.png", dpi=600, **kwargs)

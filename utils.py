@@ -5,8 +5,10 @@ Miscellaneous functions
 import os
 from pathlib import Path
 from typing import Dict, List, Union
+
 import numpy as np
 import SimpleITK as sitk
+from tqdm.autonotebook import tqdm
 
 from SegClassRegBasis.architecture import DeepLabv3plus, DenseTiramisu, UNet
 
@@ -144,13 +146,11 @@ def split_into_modalities(
     """
     experiment_dir = Path(os.environ["experiment_dir"])
     new_dict = {}
-    for pat_name, data in dataset.items():
+    for pat_name, data in tqdm(dataset.items(), desc="split quant"):
         new_dict[pat_name] = {k: v for k, v in data.items() if k not in ["image", "labels"]}
         new_dict[pat_name]["images"] = []
         new_dict[pat_name]["labels"] = data["labels"]
-        image = sitk.ReadImage(str(experiment_dir / data["image"]))
-        if not image.GetNumberOfComponentsPerPixel() == n_channels:
-            raise ValueError("Image has the wrong number of channels.")
+        image = None
         new_path = data["image"].parent / "channel_wise"
         new_path_abs = experiment_dir / new_path
         if not new_path_abs.exists():
@@ -159,6 +159,10 @@ def split_into_modalities(
             new_name = data["image"].name.replace(".nii.gz", f"_mod{i}.nii.gz")
             new_path_img_abs = experiment_dir / new_path / new_name
             if not new_path_img_abs.exists():
+                if image is None:
+                    image = sitk.ReadImage(str(experiment_dir / data["image"]))
+                    if not image.GetNumberOfComponentsPerPixel() == n_channels:
+                        raise ValueError("Image has the wrong number of channels.")
                 image_channel = sitk.VectorIndexSelectionCast(image, i)
                 sitk.WriteImage(image_channel, str(new_path_img_abs))
             new_dict[pat_name]["images"].append(new_path / new_name)

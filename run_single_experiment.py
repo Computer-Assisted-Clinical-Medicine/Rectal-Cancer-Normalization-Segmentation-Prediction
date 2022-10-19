@@ -41,6 +41,39 @@ def init_argparse():
     return argpar
 
 
+def configure_loggers(logger: logging.Logger, log_dir: Path, suffix=""):
+    """COnfigure the loggers for a single experiment
+
+    Parameters
+    ----------
+    logger : logging.Logger
+        The base logger
+    log_dir : Path
+        The directory for the logs
+    suffix : str
+        The suffix of the logger to add to the filename
+    """
+    if not log_dir.exists():
+        log_dir.mkdir(parents=True)
+    log_formatter = logging.Formatter(
+        "%(levelname)s: %(name)s - %(funcName)s (l.%(lineno)d): %(message)s"
+    )
+
+    # create file handlers
+    fh_info = logging.FileHandler(log_dir / f"log_info{suffix}.txt")
+    fh_info.setLevel(logging.INFO)
+    fh_info.setFormatter(log_formatter)
+    # add to loggers
+    logger.addHandler(fh_info)
+
+    # create file handlers
+    fh_debug = logging.FileHandler(log_dir / f"log_debug{suffix}.txt")
+    fh_debug.setLevel(logging.DEBUG)
+    fh_debug.setFormatter(log_formatter)
+    # add to loggers
+    logger.addHandler(fh_debug)
+
+
 def run_experiment_fold(experiment: Experiment, fold: int):
     """Run the fold of a single experiment, this function mainly handles the
     logging and then calls experiment.run_fold(fold)
@@ -54,74 +87,41 @@ def run_experiment_fold(experiment: Experiment, fold: int):
     """
 
     try:
-        experiment.run_fold(fold)
+        experiment.train_fold(fold)
+        experiment.apply_fold(fold)
     except Exception as exc:  # pylint: disable=broad-except
         logging.exception(str(exc))
         raise exc
 
 
-parser = init_argparse()
-args = parser.parse_args()
+if __name__ == "__main__":
 
-# configure loggers
-logger = configure_logging(tf_logger)
+    parser = init_argparse()
+    args = parser.parse_args()
 
+    # configure loggers
+    exp_logger = configure_logging(tf_logger)
 
-data_dir = Path(os.environ["data_dir"])
-experiment_dir = Path(os.environ["experiment_dir"])
+    data_dir = Path(os.environ["data_dir"])
+    experiment_dir = Path(os.environ["experiment_dir"])
 
-current_experiment_dir = Path(args.experiment_dir)
-f = args.fold
+    current_experiment_dir = Path(args.experiment_dir)
+    f = args.fold
 
-# load experiment
-param_file = current_experiment_dir / "parameters.yaml"
-assert param_file.exists(), f"Parameter file {param_file} does not exist."
-exp = Experiment.from_file(param_file)
+    # load experiment
+    param_file = current_experiment_dir / "parameters.yaml"
+    assert param_file.exists(), f"Parameter file {param_file} does not exist."
+    exp = Experiment.from_file(param_file)
 
-assert f < exp.folds, f"Fold number {f} is higher than the maximum number {exp.folds}."
+    assert f < exp.folds, f"Fold number {f} is higher than the maximum number {exp.folds}."
 
-# add more detailed logger for each network, when problems arise, use debug
-log_dir = exp.output_path / exp.fold_dir_names[f]
-if not log_dir.exists():
-    log_dir.mkdir(parents=True)
+    # add more detailed logger for each network, when problems arise, use debug
+    exp_log_dir = exp.output_path / exp.fold_dir_names[f]
 
-# only have one process running for each fold
-with filelock.FileLock(log_dir / "lock_fold.txt.lock", timeout=1):
-    log_formatter = logging.Formatter(
-        "%(levelname)s: %(name)s - %(funcName)s (l.%(lineno)d): %(message)s"
-    )
-
-    # create file handlers
-    fh_info = logging.FileHandler(log_dir / "log_info.txt")
-    fh_info.setLevel(logging.INFO)
-    fh_info.setFormatter(log_formatter)
-    # add to loggers
-    logger.addHandler(fh_info)
-
-    # create file handlers
-    fh_debug = logging.FileHandler(log_dir / "log_debug.txt")
-    fh_debug.setLevel(logging.DEBUG)
-    fh_debug.setFormatter(log_formatter)
-    # add to loggers
-    logger.addHandler(fh_debug)
-
-    run_experiment_fold(exp, f)
-
-    # try to evaluate it (this will only work if this is the last fold)
-    try:
-        exp.evaluate()
-    except FileNotFoundError:
-        print("Could not evaluate the experiment (happens if not all folds are finished).")
-    else:
-        print("Evaluation finished.")
-
-    # try to evaluate the external testset
-    if exp.external_test_set is not None:
-        try:
-            exp.evaluate_external_testset()
-        except FileNotFoundError:
-            print(
-                "Could not evaluate the experiment (happens if not all folds are finished)."
-            )
-        else:
-            print("Evaluation finished.")
+    # only have one process running for each fold
+    lock_file = exp_log_dir / "lock_fold.txt.lock"
+    configure_loggers(exp_logger, exp_log_dir)
+    with filelock.FileLock(lock_file, timeout=1):
+        run_experiment_fold(exp, f)
+    if lock_file.exists():
+        lock_file.unlink()
