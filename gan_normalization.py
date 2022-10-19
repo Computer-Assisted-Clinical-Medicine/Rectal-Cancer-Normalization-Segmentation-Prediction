@@ -365,7 +365,8 @@ def train_gan_normalization(
     if not lock_path.exists():
         with filelock.FileLock(lock_path, timeout=1):
             exp.train_fold(0)
-    lock_path.unlink()
+    if lock_path.exists():
+        lock_path.unlink()
 
     tf.keras.backend.clear_session()
     del exp

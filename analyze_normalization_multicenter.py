@@ -196,62 +196,18 @@ if res_not_all.size > 0:
     plt.show()
     plt.close()
 
-display_markdown("All training locations except all for the U-Net.")
-median_results = pd.DataFrame(
-    results.query(
-        "version == 'best' & before_therapy & postprocessed & network == 'UNet2D'"
-        + " & name != 'combined_models' & train_location != 'all'"
-    )
-    .groupby(["normalization", "external"])
-    .Dice.mean()
-)
-display_dataframe(median_results)
-
-display_markdown("Difference between training and externel testset")
-display_dataframe(median_results.xs(False, level=1) - median_results.xs(True, level=1))
-
 display_markdown("All training locations except all.")
-display_dataframe(
-    pd.DataFrame(
-        results.query(
-            "version == 'best' & before_therapy & postprocessed & network == 'UNet2D'"
-            + " & name != 'combined_models' & train_location != 'all'"
-        )
-        .groupby(["normalization", "network", "external"])
-        .Dice.median()
-    )
-)
+res_grouped = results.query(
+    "version == 'best' & before_therapy & postprocessed & network == 'UNet2D'"
+    + " & name != 'combined_models' & train_location != 'all'"
+).groupby(["normalization", "external"])
 
-display_markdown("Models trained on all images.")
-display_dataframe(
-    pd.DataFrame(
-        results.query(
-            "version == 'best' & before_therapy & postprocessed"
-            + " & name != 'combined_models' & train_location == 'all'"
-        )
-        .groupby(["normalization", "network"])
-        .Dice.median()
-    )
-)
+mean_median_df = pd.DataFrame(res_grouped.Dice.mean()).rename(columns={"Dice": "Dice mean"})
+mean_median_df["Dice median"] = res_grouped.Dice.median()
+display_dataframe(mean_median_df)
 
-display_markdown("Model Comparison (internal)")
-display_dataframe(
-    pd.DataFrame(
-        results.query(
-            "version == 'best' & before_therapy & postprocessed" + " & not external"
-        )
-        .groupby(["train_location", "normalization", "network"])
-        .Dice.median()
-    )
-)
-display_markdown("Model Comparison (external)")
-display_dataframe(
-    pd.DataFrame(
-        results.query("version == 'best' & before_therapy & postprocessed & external")
-        .groupby(["train_location", "normalization", "network"])
-        .Dice.median()
-    )
-)
+display_markdown("Difference between training and external testset")
+display_dataframe(mean_median_df.xs(False, level=1) - mean_median_df.xs(True, level=1))
 
 # %%
 
