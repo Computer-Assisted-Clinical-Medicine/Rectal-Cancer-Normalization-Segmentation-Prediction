@@ -13,8 +13,13 @@ tf_logger = logging.getLogger("tensorflow")
 os.environ["TF_CPP_MIN_LOG_LEVEL"] = "3"
 # pylint: disable=wrong-import-position
 
+from tensorflow.keras import mixed_precision
+
 from SegClassRegBasis.experiment import Experiment
 from SegClassRegBasis.utils import configure_logging
+
+policy = mixed_precision.Policy("mixed_float16")
+mixed_precision.set_global_policy(policy)
 
 
 def init_argparse():
