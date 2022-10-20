@@ -109,9 +109,8 @@ GROUP_BASE_NAME = "Normalization_Experiment"
 exp_group_base_dir = experiment_dir / GROUP_BASE_NAME
 
 # NORM_SUFFIX = ""
-NORM_SUFFIX = "_tog_idg0.50"
-# NORM_SUFFIX = "_4_64_0.50"
-# NORM_SUFFIX = "_0_64_0.50"
+# NORM_SUFFIX = "_tog_idg0.50"
+NORM_SUFFIX = "_3_64_0.50_tog_idg0.20"
 
 # %%
 
@@ -230,6 +229,8 @@ def plot_disc(res: pd.DataFrame, disc_type: str):
         for c in res.columns
         if c.startswith(f"disc_{disc_type}/") and c.endswith("loss") and len(c) > 17
     ]
+    if len(disc) == 0:
+        return
     img_gen_list = [c for c in res.columns if c.startswith("disc_image_gen")]
     image_gen_pres = len(img_gen_list) > 0 and disc_type == "image"
     if image_gen_pres:
