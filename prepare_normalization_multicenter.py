@@ -15,12 +15,14 @@ tf_logger = logging.getLogger("tensorflow")
 os.environ["TF_CPP_MIN_LOG_LEVEL"] = "3"
 # pylint: disable=wrong-import-position, unused-import
 
+import tensorflow as tf
+
 from gan_normalization import GAN_NORMALIZING, train_gan_normalization
 from SegClassRegBasis.architecture import DeepLabv3plus, UNet
 from SegClassRegBasis.experiment import Experiment
 from SegClassRegBasis.normalization import NORMALIZING
 from SegClassRegBasis.preprocessing import preprocess_dataset
-from SegClassRegBasis.utils import export_experiments_run_files
+from SegClassRegBasis.utils import export_experiments_run_files, get_gpu
 from utils import generate_folder_name, get_gan_suffix, split_into_modalities
 
 # set tf thread mode
@@ -69,6 +71,8 @@ if __name__ == "__main__":
     exp_group_base_dir = experiment_dir / GROUP_BASE_NAME
     if not exp_group_base_dir.exists():
         exp_group_base_dir.mkdir(parents=True)
+
+    gpu = tf.device(get_gpu(memory_limit=2000))
 
     # load data
     with open(data_dir / "images.yaml", encoding="utf8") as f:
@@ -190,11 +194,6 @@ if __name__ == "__main__":
         "do_batch_normalization": False,
         "ratio": 2,
     }
-    # network_parameters_DeepLabv3plus = {
-    #     "aspp_rates": (3, 6, 9),  # half because input is half the size
-    #     "clip_value": 50,
-    #     "backbone": "densenet121",
-    # }
     network_parameters = [network_parameters_UNet]
     architectures = [UNet]
 
@@ -306,10 +305,10 @@ if __name__ == "__main__":
     QUANT_DATASET = None
 
     for location in [
-        "all",
         "Frankfurt",
         "Regensburg",
         "Mannheim",
+        "all",
         "Not-Frankfurt",
         "Not-Regensburg",
         "Not-Mannheim",
@@ -396,17 +395,18 @@ if __name__ == "__main__":
                 PASS_MODALITY = True
                 model_paths = []
                 for mod_num in range(N_CHANNELS):
-                    model_paths.append(
-                        train_gan_normalization(
-                            timepoints_train=timepoints_train_norm,
-                            mod_num=mod_num,
-                            preprocessed_dir=PREPROCESSED_DIR,
-                            experiment_group=group_dir_rel,
-                            modality=MODALITIES[mod_num],
-                            gan_suffix=gan_suffix,
-                            **norm_params,
+                    with gpu:
+                        model_paths.append(
+                            train_gan_normalization(
+                                timepoints_train=timepoints_train_norm,
+                                mod_num=mod_num,
+                                preprocessed_dir=PREPROCESSED_DIR,
+                                experiment_group=group_dir_rel,
+                                modality=MODALITIES[mod_num],
+                                gan_suffix=gan_suffix,
+                                **norm_params,
+                            )
                         )
-                    )
                 pre_params["normalization_parameters"]["model_paths"] = tuple(model_paths)
                 # overlap has already been cut
                 CUT_TO_OVERLAP = False

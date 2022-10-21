@@ -183,6 +183,9 @@ class GANModel(Model):
         # Train all discriminators
         if self.disc_real_fake is not None:
             real_image = target_data[self.disc_real_fake_target_numbers[0]]
+            # make sure the types match
+            if not real_image.dtype == generated_images.dtype:
+                real_image = tf.cast(real_image, generated_images.dtype)
             disc_input = tf.concat([generated_images, real_image], axis=0)
             # Assemble labels discriminating real from fake images
             fake_labels = tf.zeros((batch_size, 1))
@@ -249,9 +252,9 @@ class GANModel(Model):
 
         # Train the generator (note that we should *not* update the weights
         # of the discriminator)!
-        gen_loss = tf.convert_to_tensor(0, dtype=tf.float32)
         with tf.GradientTape() as tape:
             generator_output = self(source_images, training=True)
+            gen_loss = tf.convert_to_tensor(0, dtype=generator_output[0].dtype)
             if len(self.outputs) == 1:
                 pred_images = generator_output
             if self.disc_latent is not None:

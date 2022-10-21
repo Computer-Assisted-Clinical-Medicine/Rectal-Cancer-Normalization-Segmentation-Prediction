@@ -13,13 +13,11 @@ tf_logger = logging.getLogger("tensorflow")
 os.environ["TF_CPP_MIN_LOG_LEVEL"] = "3"
 # pylint: disable=wrong-import-position
 
+import tensorflow as tf
 from tensorflow.keras import mixed_precision
 
 from SegClassRegBasis.experiment import Experiment
-from SegClassRegBasis.utils import configure_logging
-
-policy = mixed_precision.Policy("mixed_float16")
-mixed_precision.set_global_policy(policy)
+from SegClassRegBasis.utils import configure_logging, get_gpu
 
 
 def init_argparse():
@@ -92,8 +90,11 @@ def run_experiment_fold(experiment: Experiment, fold: int):
     """
 
     try:
-        experiment.train_fold(fold)
-        experiment.apply_fold(fold)
+        policy = mixed_precision.Policy("mixed_float16")
+        mixed_precision.set_global_policy(policy)
+        with tf.device(get_gpu(memory_limit=2000)):
+            experiment.train_fold(fold)
+            experiment.apply_fold(fold)
     except Exception as exc:  # pylint: disable=broad-except
         logging.exception(str(exc))
         raise exc

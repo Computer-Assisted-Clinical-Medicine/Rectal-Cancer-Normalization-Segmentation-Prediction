@@ -110,7 +110,7 @@ exp_group_base_dir = experiment_dir / GROUP_BASE_NAME
 
 # NORM_SUFFIX = ""
 # NORM_SUFFIX = "_tog_idg0.50"
-NORM_SUFFIX = "_3_64_0.50_tog_idg0.20"
+NORM_SUFFIX = "_3_64_0.50_tog_idg0.10"
 
 # %%
 
