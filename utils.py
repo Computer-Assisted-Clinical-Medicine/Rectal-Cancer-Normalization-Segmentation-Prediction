@@ -110,6 +110,8 @@ def get_gan_suffix(parameters: Dict) -> str:
     f_base = norm_params["filter_base"]
     sigma = norm_params["smoothing_sigma"]
     image_gen_weight = norm_params.get("image_gen_weight", 1)
+    disc_n_conv = norm_params.get("disc_n_conv", 3)
+    disc_filter_base = norm_params.get("disc_filter_base", 32)
     if depth == 3 and f_base == 16 and np.isclose(sigma, 1):
         gan_suffix = ""
     else:
@@ -118,6 +120,10 @@ def get_gan_suffix(parameters: Dict) -> str:
         gan_suffix += "_tog"
         if not np.isclose(image_gen_weight, 1):
             gan_suffix += f"_idg{image_gen_weight:4.2f}"
+    if disc_n_conv != 3:
+        gan_suffix += f"_nc{disc_n_conv}"
+    if disc_filter_base != 32:
+        gan_suffix += f"_fb{disc_filter_base}"
     return gan_suffix
 
 

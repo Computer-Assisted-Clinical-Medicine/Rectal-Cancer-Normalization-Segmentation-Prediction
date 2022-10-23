@@ -13,6 +13,7 @@ import yaml
 # logger has to be set before tensorflow is imported
 tf_logger = logging.getLogger("tensorflow")
 os.environ["TF_CPP_MIN_LOG_LEVEL"] = "3"
+os.environ["CUDA_VISIBLE_DEVICES"] = "0"
 # pylint: disable=wrong-import-position, unused-import
 
 import tensorflow as tf
@@ -253,13 +254,13 @@ if __name__ == "__main__":
                 "filter_base": 64,
                 "min_max": False,
                 "smoothing_sigma": 0.5,
-                "latent_weight": 0.1,
-                "image_weight": 0.1,
-                "image_gen_weight": 0.1,
+                "latent_weight": 1,
+                "image_weight": 1,
+                "image_gen_weight": 0.5,
                 "skip_edges": True,
                 "latent": True,
                 "train_on_gen": True,
-                "n_epochs": 100,
+                "n_epochs": 200,
             },
         ),
         (NORMALIZING.HISTOGRAM_MATCHING, {"mask_quantile": 0}),
@@ -464,25 +465,27 @@ if __name__ == "__main__":
             )
             experiments.append(exp)
 
-    # bring experiments in a custom order
-    def priority(exp_sort):
-        """Define a priority for each experiment"""
-        norm = exp_sort.hyper_parameters["preprocessing_parameters"]["normalizing_method"]
-        norm_priority = {
-            GAN_NORMALIZING.GAN_DISCRIMINATORS: 4,
-            NORMALIZING.QUANTILE: 3,
-            NORMALIZING.HISTOGRAM_MATCHING: 2,
-            NORMALIZING.MEAN_STD: 1,
-            NORMALIZING.HM_QUANTILE: 0,
-        }
+        # bring experiments in a custom order
+        def priority(exp_sort):
+            """Define a priority for each experiment"""
+            norm = exp_sort.hyper_parameters["preprocessing_parameters"][
+                "normalizing_method"
+            ]
+            norm_priority = {
+                GAN_NORMALIZING.GAN_DISCRIMINATORS: 4,
+                NORMALIZING.QUANTILE: 3,
+                NORMALIZING.HISTOGRAM_MATCHING: 2,
+                NORMALIZING.MEAN_STD: 1,
+                NORMALIZING.HM_QUANTILE: 0,
+            }
 
-        arch_priority = {
-            UNet: 10,
-            DeepLabv3plus: 0,
-        }
-        architecture = exp_sort.hyper_parameters["architecture"]
-        return norm_priority[norm] + arch_priority[architecture]
+            arch_priority = {
+                UNet: 10,
+                DeepLabv3plus: 0,
+            }
+            architecture = exp_sort.hyper_parameters["architecture"]
+            return norm_priority[norm] + arch_priority[architecture]
 
-    experiments.sort(key=priority, reverse=True)
-    # export all hyperparameters
-    export_experiments_run_files(exp_group_base_dir, experiments)
+        experiments.sort(key=priority, reverse=True)
+        # export all hyperparameters
+        export_experiments_run_files(exp_group_base_dir, experiments)

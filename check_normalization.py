@@ -1,11 +1,13 @@
 """Check the normalization to see if there are any large deviations"""
 # %%
 
-# pylint:disable=invalid-name
+# pylint:disable=invalid-name, wrong-import-position
 
 import os
 from pathlib import Path
 from typing import List
+
+os.environ["CUDA_VISIBLE_DEVICES"] = "0"
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -14,7 +16,7 @@ import seaborn as sns
 import tensorflow as tf
 import yaml
 from IPython.display import display
-from tqdm.autonotebook import tqdm
+from tqdm import tqdm
 
 from networks import auto_encoder
 from SegClassRegBasis import evaluation
@@ -44,15 +46,7 @@ def read_norm_exp(norm_suffix: str) -> pd.DataFrame:
 
     results_all_list = []
 
-    for loc in [
-        "all",
-        "Frankfurt",
-        "Regensburg",
-        "Mannheim",
-        "Not-Frankfurt",
-        "Not-Regensburg",
-        "Not-Mannheim",
-    ]:
+    for loc in train_locations:
         print(f"Starting with {loc}.")
 
         res_list = []
@@ -110,7 +104,17 @@ exp_group_base_dir = experiment_dir / GROUP_BASE_NAME
 
 # NORM_SUFFIX = ""
 # NORM_SUFFIX = "_tog_idg0.50"
-NORM_SUFFIX = "_3_64_0.50_tog_idg0.10"
+NORM_SUFFIX = "_3_64_0.50_tog_idg0.50"
+
+train_locations = [
+    "Frankfurt",
+    "Regensburg",
+    "Mannheim",
+    "all",
+    "Not-Frankfurt",
+    "Not-Regensburg",
+    "Not-Mannheim",
+]
 
 # %%
 
@@ -169,16 +173,7 @@ if results is not None:
 # %%
 # plot the generator
 
-
-for location in [
-    "all",
-    "Frankfurt",
-    "Regensburg",
-    "Mannheim",
-    "Not-Frankfurt",
-    "Not-Regensburg",
-    "Not-Mannheim",
-]:
+for location in train_locations:
 
     print(f"Starting with {location}.")
 
@@ -334,15 +329,7 @@ training_metrics = [
     "generator/nmi",
 ]
 
-for location in [
-    "all",
-    "Frankfurt",
-    "Regensburg",
-    "Mannheim",
-    "Not-Frankfurt",
-    "Not-Regensburg",
-    "Not-Mannheim",
-]:
+for location in train_locations:
 
     print(f"Starting with {location}.")
 

@@ -101,6 +101,8 @@ def train_gan_normalization(
     skip_edges=True,
     latent=True,
     train_on_gen=False,
+    disc_n_conv=3,
+    disc_filter_base=32,
     gan_suffix="",
     **kwargs,
 ):
@@ -212,11 +214,10 @@ def train_gan_normalization(
     # first discriminator just checks if the image looks good or not
     expanded_tasks = {}
     expanded_tasks["autoencoder"] = "autoencoder"
-    discriminators = [
+    discriminators: List[Dict[str, Any]] = [
         {
             "name": "discriminator_real_fake",
             "input_type": "image",
-            "discriminator_n_conv": 3,
             "loss": "MSE",
             "goal": "confuse",
         }
@@ -298,13 +299,16 @@ def train_gan_normalization(
             # Discriminator arguments
             "disc_real_fake_optimizer": "Adam",
             "disc_real_fake_lr": (lr_sd_type, start_lr, end_lr),
-            "disc_real_fake_n_conv": 3,
+            "disc_real_fake_n_conv": 4,
+            "disc_real_fake_filter_base": 32,
             "disc_image_optimizer": "Adam",
             "disc_image_lr": (lr_sd_type, start_lr, end_lr),
-            "disc_image_n_conv": 3,
+            "disc_image_n_conv": disc_n_conv,
+            "disc_image_filter_base": disc_filter_base,
             "disc_latent_optimizer": "Adam",
             "disc_latent_lr": (lr_sd_type, start_lr, end_lr),
-            "disc_latent_n_conv": 3,
+            "disc_latent_n_conv": disc_n_conv,
+            "disc_latent_filter_base": disc_filter_base,
         },
         "loss": {
             "autoencoder": "MSE",
@@ -424,6 +428,8 @@ class GanDiscriminators(Normalization):
         "skip_edges",
         "latent",
         "train_on_gen",
+        "disc_n_conv",
+        "disc_filter_base",
         "n_epochs",
     ]
 
@@ -442,6 +448,8 @@ class GanDiscriminators(Normalization):
         skip_edges=True,
         latent=True,
         train_on_gen=False,
+        disc_n_conv=3,
+        disc_filter_base=32,
         n_epochs=200,
         **kwargs,
     ) -> None:
@@ -457,6 +465,8 @@ class GanDiscriminators(Normalization):
         self.skip_edges = skip_edges
         self.latent = latent
         self.train_on_gen = train_on_gen
+        self.disc_n_conv = disc_n_conv
+        self.disc_filter_base = disc_filter_base
         self.n_epochs = n_epochs
         self.model = None
         super().__init__(normalize_channelwise=False)

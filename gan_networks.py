@@ -18,6 +18,8 @@ from SegClassRegBasis import config as cfg
 from SegClassRegBasis import tf_utils, utils
 from SegmentationArchitectures.utils import get_regularizer
 
+# pylint:disable=too-many-lines
+
 # configure logger
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.DEBUG)
@@ -654,6 +656,7 @@ class AutoencoderGAN(AutoEncoder):
         regularize: Optional[tuple] = None,
         disc_type="SimpleConv",
         discriminator_n_conv=3,
+        discriminator_filter_base=32,
         model_name=None,
         **kwargs,
     ) -> Tuple[Model, List[str], List[int], List[tf.Tensor]]:
@@ -677,6 +680,8 @@ class AutoencoderGAN(AutoEncoder):
             The type of the discriminator, by default "SimpleConv"
         discriminator_n_conv : int, optional
             The number of the convolutional layers, by default 3
+        discriminator_filter_base : int, optional
+            The number of filters in the first layer, by default 32
         model_name : str, optional
             The model name, if None, the input type, by default None
 
@@ -772,7 +777,7 @@ class AutoencoderGAN(AutoEncoder):
             x = model_input
             for i in range(discriminator_n_conv):
                 x = layers.Conv2D(
-                    32 * 2**i,
+                    discriminator_filter_base * 2**i,
                     (3, 3),
                     strides=(2, 2),
                     padding="same",
@@ -833,6 +838,7 @@ class AutoencoderGAN(AutoEncoder):
                 self.real_fake_disc_list,
                 input_type="image",
                 discriminator_n_conv=self.options["disc_real_fake_n_conv"],
+                discriminator_filter_base=self.options["disc_real_fake_filter_base"],
                 model_name="discriminator_real_fake",
             )
 
@@ -851,6 +857,7 @@ class AutoencoderGAN(AutoEncoder):
                 self.image_discs_list,
                 input_type="image",
                 discriminator_n_conv=self.options["disc_image_n_conv"],
+                discriminator_filter_base=self.options["disc_image_filter_base"],
             )
 
         self.latent_discs_list = [
@@ -866,6 +873,7 @@ class AutoencoderGAN(AutoEncoder):
                 self.latent_discs_list,
                 input_type="latent",
                 discriminator_n_conv=self.options["disc_latent_n_conv"],
+                discriminator_filter_base=self.options["disc_latent_filter_base"],
             )
 
         for name, disc_model, disc_list, disc_tasks in zip(
