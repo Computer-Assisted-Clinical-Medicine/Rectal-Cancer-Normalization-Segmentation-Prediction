@@ -772,8 +772,8 @@ class AutoencoderGAN(AutoEncoder):
         else:
             raise ValueError(f"Input type {input_type} unknown")
 
+        model_input = keras.Input(shape=input_shape, batch_size=cfg.batch_size_train)
         if disc_type == "SimpleConv":
-            model_input = keras.Input(shape=input_shape, batch_size=cfg.batch_size_train)
             x = model_input
             for i in range(discriminator_n_conv):
                 x = layers.Conv2D(
@@ -808,6 +808,60 @@ class AutoencoderGAN(AutoEncoder):
                 outputs,
                 name=model_name,
             )
+        elif disc_type == "BetterConv":
+            x = layers.Conv2D(
+                discriminator_filter_base,
+                (3, 3),
+                strides=(1, 1),
+                padding="same",
+                kernel_regularizer=regularizer,
+            )(model_input)
+            last_filters = discriminator_filter_base
+            for i in range(discriminator_n_conv):
+                # Pool using convolution
+                x = layers.SeparableConvolution2D(
+                    last_filters,
+                    (2, 2),
+                    strides=(2, 2),
+                    padding="same",
+                    kernel_regularizer=regularizer,
+                )(x)
+                x = layers.ELU()(x)
+                x = layers.Conv2D(
+                    discriminator_filter_base * 2**i,
+                    (3, 3),
+                    strides=(1, 1),
+                    padding="same",
+                    kernel_regularizer=regularizer,
+                )(x)
+                last_filters = discriminator_filter_base * 2**i
+                x = layers.ELU()(x)
+                x = layers.SpatialDropout2D(0.2)(x)
+
+            outputs = []
+            for n_out, tsk, out_name in zip(output_shapes, tasks, output_names):
+                out = layers.Conv2D(n_out, kernel_size=1, kernel_regularizer=regularizer)(x)
+
+                if n_out > 1 and "classification" in tsk:
+                    out = layers.Softmax()(out)
+                elif "regression" in tsk:
+                    out = tf.clip_by_value(
+                        out,
+                        clip_value_min=self.regression_min,
+                        clip_value_max=self.regression_max,
+                    )
+
+                out = layers.GlobalAveragePooling2D(name=out_name)(out)
+
+                outputs.append(out)
+
+            discriminator = keras.Model(
+                model_input,
+                outputs,
+                name=model_name,
+            )
+        else:
+            raise ValueError(f"Discriminator {disc_type} unknown")
 
         return discriminator, tasks, target_numbers, target_labels
 
@@ -837,6 +891,8 @@ class AutoencoderGAN(AutoEncoder):
             ) = self.get_discriminator(
                 self.real_fake_disc_list,
                 input_type="image",
+                regularize=self.options["regularize"],
+                disc_type=self.options["disc_real_fake_type"],
                 discriminator_n_conv=self.options["disc_real_fake_n_conv"],
                 discriminator_filter_base=self.options["disc_real_fake_filter_base"],
                 model_name="discriminator_real_fake",
@@ -856,6 +912,8 @@ class AutoencoderGAN(AutoEncoder):
             ) = self.get_discriminator(
                 self.image_discs_list,
                 input_type="image",
+                regularize=self.options["regularize"],
+                disc_type=self.options["disc_image_type"],
                 discriminator_n_conv=self.options["disc_image_n_conv"],
                 discriminator_filter_base=self.options["disc_image_filter_base"],
             )
@@ -872,6 +930,8 @@ class AutoencoderGAN(AutoEncoder):
             ) = self.get_discriminator(
                 self.latent_discs_list,
                 input_type="latent",
+                regularize=self.options["regularize"],
+                disc_type=self.options["disc_latent_type"],
                 discriminator_n_conv=self.options["disc_latent_n_conv"],
                 discriminator_filter_base=self.options["disc_latent_filter_base"],
             )

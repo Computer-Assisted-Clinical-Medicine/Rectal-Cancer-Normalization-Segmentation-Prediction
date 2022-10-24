@@ -101,6 +101,7 @@ def train_gan_normalization(
     skip_edges=True,
     latent=True,
     train_on_gen=False,
+    disc_type="SimpleConv",
     disc_n_conv=3,
     disc_filter_base=32,
     gan_suffix="",
@@ -299,14 +300,17 @@ def train_gan_normalization(
             # Discriminator arguments
             "disc_real_fake_optimizer": "Adam",
             "disc_real_fake_lr": (lr_sd_type, start_lr, end_lr),
+            "disc_real_fake_type": disc_type,
             "disc_real_fake_n_conv": 4,
             "disc_real_fake_filter_base": 32,
             "disc_image_optimizer": "Adam",
             "disc_image_lr": (lr_sd_type, start_lr, end_lr),
+            "disc_image_type": disc_type,
             "disc_image_n_conv": disc_n_conv,
             "disc_image_filter_base": disc_filter_base,
             "disc_latent_optimizer": "Adam",
             "disc_latent_lr": (lr_sd_type, start_lr, end_lr),
+            "disc_latent_type": disc_type,
             "disc_latent_n_conv": disc_n_conv,
             "disc_latent_filter_base": disc_filter_base,
         },
@@ -428,6 +432,7 @@ class GanDiscriminators(Normalization):
         "skip_edges",
         "latent",
         "train_on_gen",
+        "disc_type",
         "disc_n_conv",
         "disc_filter_base",
         "n_epochs",
@@ -448,6 +453,7 @@ class GanDiscriminators(Normalization):
         skip_edges=True,
         latent=True,
         train_on_gen=False,
+        disc_type="SimpleConv",
         disc_n_conv=3,
         disc_filter_base=32,
         n_epochs=200,
@@ -465,6 +471,7 @@ class GanDiscriminators(Normalization):
         self.skip_edges = skip_edges
         self.latent = latent
         self.train_on_gen = train_on_gen
+        self.disc_type = disc_type
         self.disc_n_conv = disc_n_conv
         self.disc_filter_base = disc_filter_base
         self.n_epochs = n_epochs
