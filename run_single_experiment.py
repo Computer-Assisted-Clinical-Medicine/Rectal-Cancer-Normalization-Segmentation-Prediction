@@ -5,6 +5,7 @@ import argparse
 import logging
 import os
 from pathlib import Path
+from threading import Thread
 
 import filelock
 
@@ -78,6 +79,25 @@ def configure_loggers(logger: logging.Logger, log_dir: Path, suffix=""):
     logger.addHandler(fh_debug)
 
 
+def eval_fold(experiment: Experiment, fold: int):
+    """Evaluate the fold of a single experiment
+
+    Parameters
+    ----------
+    experiment : Experiment
+        The current experiment
+    fold : int
+        The Number of the fold
+    """
+    # evaluate the experiment without blocking the process
+    experiment.evaluate_fold(fold)
+
+    if fold == experiment.folds - 1:
+        experiment.evaluate()
+        if experiment.external_test_set is not None:
+            experiment.evaluate_external_testset()
+
+
 def run_experiment_fold(experiment: Experiment, fold: int):
     """Run the fold of a single experiment, this function mainly handles the
     logging and then calls experiment.run_fold(fold)
@@ -89,25 +109,44 @@ def run_experiment_fold(experiment: Experiment, fold: int):
     fold : int
         The Number of the fold
     """
+    assert (
+        fold < experiment.folds
+    ), f"Fold number {fold} is higher than the maximum number {experiment.folds}."
 
-    try:
-        policy = mixed_precision.Policy("mixed_float16")
-        mixed_precision.set_global_policy(policy)
-        with tf.device(get_gpu(memory_limit=2000)):
+    # add more detailed logger for each network, when problems arise, use debug
+    exp_log_dir = experiment.output_path / experiment.fold_dir_names[fold]
+
+    # configure loggers
+    exp_logger = configure_logging(tf_logger)
+    configure_loggers(exp_logger, exp_log_dir)
+
+    # only have one process running for each fold
+    lock_file = exp_log_dir / "lock_fold.txt.lock"
+    with filelock.FileLock(lock_file, timeout=1):
+        try:
+            policy = mixed_precision.Policy("mixed_float16")
+            mixed_precision.set_global_policy(policy)
             experiment.train_fold(fold)
             experiment.apply_fold(fold)
-    except Exception as exc:  # pylint: disable=broad-except
-        logging.exception(str(exc))
-        raise exc
+        except Exception as exc:  # pylint: disable=broad-except
+            logging.exception(str(exc))
+            raise exc
+    if lock_file.exists():
+        lock_file.unlink()
+
+    exp_logger.handlers.clear()
+    configure_loggers(exp_logger, exp_log_dir, "eval_")
+
+    # evaluate the experiment without blocking the process
+    thread = Thread(target=eval_fold, args=(experiment, fold))
+    thread.start()
+    return thread
 
 
 if __name__ == "__main__":
 
     parser = init_argparse()
     args = parser.parse_args()
-
-    # configure loggers
-    exp_logger = configure_logging(tf_logger)
 
     data_dir = Path(os.environ["data_dir"])
     experiment_dir = Path(os.environ["experiment_dir"])
@@ -120,15 +159,5 @@ if __name__ == "__main__":
     assert param_file.exists(), f"Parameter file {param_file} does not exist."
     exp = Experiment.from_file(param_file)
 
-    assert f < exp.folds, f"Fold number {f} is higher than the maximum number {exp.folds}."
-
-    # add more detailed logger for each network, when problems arise, use debug
-    exp_log_dir = exp.output_path / exp.fold_dir_names[f]
-
-    # only have one process running for each fold
-    lock_file = exp_log_dir / "lock_fold.txt.lock"
-    configure_loggers(exp_logger, exp_log_dir)
-    with filelock.FileLock(lock_file, timeout=1):
+    with tf.device(get_gpu(memory_limit=2000)):
         run_experiment_fold(exp, f)
-    if lock_file.exists():
-        lock_file.unlink()

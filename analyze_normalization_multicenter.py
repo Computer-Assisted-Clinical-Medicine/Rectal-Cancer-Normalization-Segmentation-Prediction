@@ -268,22 +268,43 @@ for train_location in results.train_location.unique():
     plt.show()
     plt.close()
 
+    data_not_ext = results.query(
+        f"train_location == '{train_location}'"
+        + " & name != 'combined_models' & not external & postprocessed"
+    )
+
+    if data_not_ext.from_study.unique().size > 1:
+        g = sns.catplot(
+            data=data_not_ext,
+            x="Dice",
+            y="normalization",
+            col="before_therapy",
+            hue="from_study",
+            kind="box",
+            legend=True,
+            legend_out=True,
+        )
+        g.fig.suptitle(
+            f"Location = {train_location} (version = best | external = False | postprocessed = True)"
+        )
+        g.fig.subplots_adjust(top=0.88)
+        plt.show()
+        plt.close()
+
     g = sns.catplot(
         data=results.query(
-            f"train_location == '{train_location}'"
-            + " & name != 'combined_models' & not external & postprocessed"
+            f"version == 'best' & train_location == '{train_location}'"
+            + " & name != 'combined_models' & postprocessed & before_therapy"
         ),
         x="Dice",
         y="normalization",
-        col="before_therapy",
-        hue="from_study",
+        col="external",
+        hue="fold",
         kind="box",
         legend=True,
         legend_out=True,
     )
-    g.fig.suptitle(
-        f"Location = {train_location} (version = best | external = False | postprocessed = True)"
-    )
+    g.fig.suptitle(f"Location = {train_location} (version = best | external = True)")
     g.fig.subplots_adjust(top=0.88)
     plt.show()
     plt.close()
