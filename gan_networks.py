@@ -184,30 +184,41 @@ class GANModel(Model):
 
         # Train all discriminators
         if self.disc_real_fake is not None:
-            real_image = target_data[self.disc_real_fake_target_numbers[0]]
+            real_images = target_data[self.disc_real_fake_target_numbers[0]]
             # make sure the types match
-            if not real_image.dtype == generated_images.dtype:
-                real_image = tf.cast(real_image, generated_images.dtype)
-            disc_input = tf.concat([generated_images, real_image], axis=0)
+            if not real_images.dtype == generated_images.dtype:
+                real_images = tf.cast(real_images, generated_images.dtype)
             # Assemble labels discriminating real from fake images
-            fake_labels = tf.zeros((batch_size, 1))
-            real_labels = tf.ones((batch_size, 1))
-            labels_rf = tf.concat([fake_labels, real_labels], axis=0)
+            labels_real = tf.zeros((batch_size, 1))
+            labels_fake = tf.ones((batch_size, 1))
 
             # Add random noise to the labels - important trick!
-            labels_rf += 0.05 * tf.random.uniform(tf.shape(labels_rf), dtype=tf.float32)
+            labels_real += 0.05 * tf.random.uniform(tf.shape(labels_real), dtype=tf.float32)
+            labels_fake += 0.05 * tf.random.uniform(tf.shape(labels_fake), dtype=tf.float32)
+            labels_rf = tf.concat([labels_fake, labels_real], axis=0)
 
             with tf.GradientTape() as tape:
-                predictions = self.disc_real_fake(disc_input, training=True)
-                dis_loss = self.disc_real_fake.compiled_loss(labels_rf, predictions)
+                predictions_fake = self.disc_real_fake(generated_images, training=True)
+                dis_loss_fake = self.disc_real_fake.compiled_loss(
+                    labels_real, predictions_fake
+                )
+                predictions_real = self.disc_real_fake(real_images, training=True)
+                dis_loss_real = self.disc_real_fake.compiled_loss(
+                    labels_fake, predictions_real
+                )
+                dis_loss = dis_loss_fake + dis_loss_real
             grads = tape.gradient(dis_loss, self.disc_real_fake.trainable_weights)
             grads, max_grad = self.clip_gradients(grads)
             self.disc_real_fake.optimizer.apply_gradients(
                 zip(grads, self.disc_real_fake.trainable_weights)
             )
-            self.write_metrics(self.disc_real_fake, metrics, predictions, labels_rf)
-            metrics["discriminator_real_fake/max_grad"] = max_grad
-            losses["discriminator_real_fake/loss"] = dis_loss
+
+            predictions_rf = tf.concat([predictions_fake, predictions_real], axis=0)
+            self.write_metrics(self.disc_real_fake, metrics, predictions_rf, labels_rf)
+            metrics["disc_real_fake/max_grad"] = max_grad
+            losses["disc_real_fake/loss"] = dis_loss
+            losses["disc_real_fake/loss_fake"] = dis_loss_fake
+            losses["disc_real_fake/loss_real"] = dis_loss_real
 
         if self.disc_image is not None:
             labels_image = tuple(target_data[t] for t in self.disc_image_target_numbers)
@@ -331,9 +342,13 @@ class GANModel(Model):
                 gen_loss += kl_loss
                 losses["generator/kl_loss"] = kl_loss
 
-        grads = tape.gradient(gen_loss, self.trainable_weights)
+        generator_weights = [
+            w for w in self.trainable_weights if not w.name.startswith("disc_")
+        ]
+
+        grads = tape.gradient(gen_loss, generator_weights)
         grads, max_grad = self.clip_gradients(grads)
-        self.optimizer.apply_gradients(zip(grads, self.trainable_weights))
+        self.optimizer.apply_gradients(zip(grads, generator_weights))
         metrics["generator/max_grad"] = max_grad
 
         # Update the metrics.
@@ -382,14 +397,31 @@ class GANModel(Model):
 
         # Train all discriminators
         if self.disc_real_fake is not None:
-            real_image = target_data[self.disc_real_fake_target_numbers[0]]
-            disc_input = tf.concat([generated_images, real_image], axis=0)
+            real_images = target_data[self.disc_real_fake_target_numbers[0]]
+            # make sure the types match
+            if not real_images.dtype == generated_images.dtype:
+                real_images = tf.cast(real_images, generated_images.dtype)
             # Assemble labels discriminating real from fake images
-            fake_labels = tf.zeros((batch_size, 1))
-            real_labels = tf.ones((batch_size, 1))
-            labels_rf = tf.concat([fake_labels, real_labels], axis=0)
-            predictions = self.disc_real_fake(disc_input)
-            self.write_metrics(self.disc_real_fake, metrics, predictions, labels_rf)
+            labels_real = tf.zeros((batch_size, 1))
+            labels_fake = tf.ones((batch_size, 1))
+            labels_rf = tf.concat([labels_fake, labels_real], axis=0)
+
+            # Add random noise to the labels - important trick!
+            labels_real += 0.05 * tf.random.uniform(tf.shape(labels_real), dtype=tf.float32)
+            labels_fake += 0.05 * tf.random.uniform(tf.shape(labels_fake), dtype=tf.float32)
+
+            predictions_fake = self.disc_real_fake(generated_images, training=True)
+            predictions_real = self.disc_real_fake(real_images, training=True)
+            predictions_rf = tf.concat([predictions_fake, predictions_real], axis=0)
+
+            dis_loss_fake = self.disc_real_fake.compiled_loss(labels_real, predictions_fake)
+            dis_loss_real = self.disc_real_fake.compiled_loss(labels_fake, predictions_real)
+            dis_loss = dis_loss_fake + dis_loss_real
+
+            self.write_metrics(self.disc_real_fake, metrics, predictions_rf, labels_rf)
+            losses["disc_real_fake/loss"] = dis_loss
+            losses["disc_real_fake/loss_fake"] = dis_loss_fake
+            losses["disc_real_fake/loss_real"] = dis_loss_real
 
         if self.disc_image is not None:
             labels_image = tuple(target_data[t] for t in self.disc_image_target_numbers)
@@ -782,32 +814,17 @@ class AutoencoderGAN(AutoEncoder):
                     strides=(2, 2),
                     padding="same",
                     kernel_regularizer=regularizer,
+                    name=f"{model_name}_layer_{i}/conv",
                 )(x)
-                x = layers.SpatialDropout2D(0.2)(x)
-                x = layers.LeakyReLU(alpha=0.2)(x)
+                x = layers.SpatialDropout2D(
+                    0.2,
+                    name=f"{model_name}_layer_{i}/dropout",
+                )(x)
+                x = layers.LeakyReLU(
+                    alpha=0.2,
+                    name=f"{model_name}_layer_{i}/ReLu",
+                )(x)
 
-            outputs = []
-            for n_out, tsk, out_name in zip(output_shapes, tasks, output_names):
-                out = layers.Conv2D(n_out, kernel_size=1, kernel_regularizer=regularizer)(x)
-
-                if n_out > 1 and "classification" in tsk:
-                    out = layers.Softmax()(out)
-                elif "regression" in tsk:
-                    out = tf.clip_by_value(
-                        out,
-                        clip_value_min=self.regression_min,
-                        clip_value_max=self.regression_max,
-                    )
-
-                out = layers.GlobalAveragePooling2D(name=out_name)(out)
-
-                outputs.append(out)
-
-            discriminator = keras.Model(
-                model_input,
-                outputs,
-                name=model_name,
-            )
         elif disc_type == "BetterConv":
             x = layers.Conv2D(
                 discriminator_filter_base,
@@ -815,7 +832,10 @@ class AutoencoderGAN(AutoEncoder):
                 strides=(1, 1),
                 padding="same",
                 kernel_regularizer=regularizer,
+                name=f"{model_name}_input/conv",
             )(model_input)
+            x = layers.ELU(name=f"{model_name}_input/ELU")(x)
+            x = layers.SpatialDropout2D(0.2, name=f"{model_name}_input/drop")(x)
             last_filters = discriminator_filter_base
             for i in range(discriminator_n_conv):
                 # Pool using convolution
@@ -825,6 +845,7 @@ class AutoencoderGAN(AutoEncoder):
                     strides=(2, 2),
                     padding="same",
                     kernel_regularizer=regularizer,
+                    name=f"{model_name}_layer_{i}/pool_conv",
                 )(x)
                 x = layers.ELU()(x)
                 x = layers.Conv2D(
@@ -833,35 +854,48 @@ class AutoencoderGAN(AutoEncoder):
                     strides=(1, 1),
                     padding="same",
                     kernel_regularizer=regularizer,
+                    name=f"{model_name}_layer_{i}/conv",
                 )(x)
                 last_filters = discriminator_filter_base * 2**i
-                x = layers.ELU()(x)
-                x = layers.SpatialDropout2D(0.2)(x)
+                x = layers.ELU(
+                    name=f"{model_name}_layer_{i}/ELU",
+                )(x)
+                x = layers.SpatialDropout2D(
+                    0.2,
+                    name=f"{model_name}_layer_{i}/drop",
+                )(x)
 
-            outputs = []
-            for n_out, tsk, out_name in zip(output_shapes, tasks, output_names):
-                out = layers.Conv2D(n_out, kernel_size=1, kernel_regularizer=regularizer)(x)
-
-                if n_out > 1 and "classification" in tsk:
-                    out = layers.Softmax()(out)
-                elif "regression" in tsk:
-                    out = tf.clip_by_value(
-                        out,
-                        clip_value_min=self.regression_min,
-                        clip_value_max=self.regression_max,
-                    )
-
-                out = layers.GlobalAveragePooling2D(name=out_name)(out)
-
-                outputs.append(out)
-
-            discriminator = keras.Model(
-                model_input,
-                outputs,
-                name=model_name,
-            )
         else:
             raise ValueError(f"Discriminator {disc_type} unknown")
+
+        outputs = []
+        for n_out, tsk, out_name in zip(output_shapes, tasks, output_names):
+            out = layers.Conv2D(
+                n_out,
+                kernel_size=1,
+                kernel_regularizer=regularizer,
+                name=f"{model_name}_output_layer_{out_name}",
+            )(x)
+
+            if n_out > 1 and "classification" in tsk:
+                out = layers.Softmax(name=f"{model_name}_softmax_{out_name}")(out)
+            elif "regression" in tsk:
+                out = tf.clip_by_value(
+                    out,
+                    clip_value_min=self.regression_min,
+                    clip_value_max=self.regression_max,
+                    name=f"{model_name}_clip_output_{out_name}",
+                )
+
+            out = layers.GlobalAveragePooling2D(name=out_name)(out)
+
+            outputs.append(out)
+
+        discriminator = keras.Model(
+            model_input,
+            outputs,
+            name=model_name,
+        )
 
         return discriminator, tasks, target_numbers, target_labels
 
@@ -895,7 +929,7 @@ class AutoencoderGAN(AutoEncoder):
                 disc_type=self.options["disc_real_fake_type"],
                 discriminator_n_conv=self.options["disc_real_fake_n_conv"],
                 discriminator_filter_base=self.options["disc_real_fake_filter_base"],
-                model_name="discriminator_real_fake",
+                model_name="disc_real_fake",
             )
 
         self.image_discs_list = [

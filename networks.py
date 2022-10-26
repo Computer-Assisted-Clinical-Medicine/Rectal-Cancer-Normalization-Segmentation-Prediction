@@ -145,20 +145,20 @@ def auto_encoder(
         filters = [filter_base]
     x = inputs
     for i, f in enumerate(filters[:-1]):
-        x = conv_block(x, n_filters=f, regularizer=regularizer, name=f"enc{i}")
+        x = conv_block(x, n_filters=f, regularizer=regularizer, name=f"auto_enc{i}")
 
     if variational:
         z_mean = conv_block(
-            x, n_filters=filters[-1], regularizer=regularizer, name="z_mean"
+            x, n_filters=filters[-1], regularizer=regularizer, name="auto_z_mean"
         )
         z_log_var = conv_block(
-            x, n_filters=filters[-1], regularizer=regularizer, name="z_log_var"
+            x, n_filters=filters[-1], regularizer=regularizer, name="auto_z_log_var"
         )
-        x = Sampling(name="sampling")([z_mean, z_log_var])
+        x = Sampling(name="auto_sampling")([z_mean, z_log_var])
     else:
         if depth > 0:
             x = conv_block(
-                x, n_filters=filters[-1], regularizer=regularizer, name=f"enc{depth-1}"
+                x, n_filters=filters[-1], regularizer=regularizer, name=f"auto_enc{depth-1}"
             )
 
     # we might use the latent dimension as output
@@ -172,10 +172,10 @@ def auto_encoder(
             strides=2,
             padding="same",
             kernel_regularizer=regularizer,
-            name=f"dec{i}/conv",
+            name=f"auto_dec{i}/conv",
         )(x)
-        x = layers.BatchNormalization(name=f"dec{i}/bn")(x)
-        x = layers.Activation("elu", name=f"dec{i}/act")(x)
+        x = layers.BatchNormalization(name=f"auto_dec{i}/bn")(x)
+        x = layers.Activation("elu", name=f"auto_dec{i}/act")(x)
 
     if skip_edges:
         gauss_size = 9
@@ -201,7 +201,7 @@ def auto_encoder(
             padding="valid",
             kernel_initializer=tf.keras.initializers.constant(kernel),
             trainable=False,
-            name="smoothing",
+            name="auto_smoothing",
             use_bias=False,
         )
         smoothed = smoothing_layer(inputs_smoothed)
@@ -217,7 +217,7 @@ def auto_encoder(
             kernel_initializer=tf.keras.initializers.constant(sobel_kernel),
             trainable=False,
             use_bias=False,
-            name="sobel_edges",
+            name="auto_sobel_edges",
         )
         edges = sobel_layer(smoothed)
 
@@ -227,22 +227,24 @@ def auto_encoder(
             strides=2,
             padding="same",
             kernel_regularizer=regularizer,
-            name="dec_final/conv_trans",
+            name="auto_dec_final/conv_trans",
         )(x)
-        x = layers.BatchNormalization(name="dec_final/bn_trans")(x)
-        x = layers.Activation("elu", name="dec_final/act_trans")(x)
+        x = layers.BatchNormalization(name="auto_dec_final/bn_trans")(x)
+        x = layers.Activation("elu", name="auto_dec_final/act_trans")(x)
 
-        x = tf.keras.layers.Concatenate(axis=-1, name="concat_output_edges")([x, edges])
+        x = tf.keras.layers.Concatenate(axis=-1, name="auto_concat_output_edges")(
+            [x, edges]
+        )
         x = layers.Conv2D(
             filters=filters[0],
             kernel_size=3,
             strides=1,
             padding="same",
             kernel_regularizer=regularizer,
-            name="concat/conv",
+            name="auto_concat/conv",
         )(x)
-        x = layers.BatchNormalization(name="concat/bn_trans")(x)
-        x = layers.Activation("elu", name="concat/act_trans")(x)
+        x = layers.BatchNormalization(name="auto_concat/bn_trans")(x)
+        x = layers.Activation("elu", name="auto_concat/act_trans")(x)
 
     else:
         # Do final output without activation
@@ -253,10 +255,10 @@ def auto_encoder(
                 strides=2,
                 padding="same",
                 kernel_regularizer=regularizer,
-                name="dec_final/conv",
+                name="auto_dec_final/conv",
             )(x)
-            x = layers.BatchNormalization(name="dec_final/bn")(x)
-            x = layers.Activation("elu", name="dec_final/act")(x)
+            x = layers.BatchNormalization(name="auto_dec_final/bn")(x)
+            x = layers.Activation("elu", name="auto_dec_final/act")(x)
 
     x = layers.Conv2D(
         filters=filters[0],
@@ -264,10 +266,10 @@ def auto_encoder(
         strides=1,
         padding="same",
         kernel_regularizer=regularizer,
-        name="final_layer_0/conv",
+        name="auto_final_layer_0/conv",
     )(x)
-    x = layers.BatchNormalization(name="final_layer_0/bn")(x)
-    x = layers.Activation("elu", name="final_layer_0/act")(x)
+    x = layers.BatchNormalization(name="auto_final_layer_0/bn")(x)
+    x = layers.Activation("elu", name="auto_final_layer_0/act")(x)
 
     x = layers.Conv2D(
         filters=input_channels,
@@ -275,11 +277,11 @@ def auto_encoder(
         strides=1,
         padding="same",
         kernel_regularizer=regularizer,
-        name="final_layer_1/conv",
+        name="auto_final_layer_1/conv",
     )(x)
 
     if output_min is not None and output_max is not None:
-        x = tf.clip_by_value(x, output_min, output_max, name="clip_output")
+        x = tf.clip_by_value(x, output_min, output_max, name="auto_clip_output")
 
     model_output = [x]
     if output_latent:
@@ -287,7 +289,7 @@ def auto_encoder(
     if variational:
         model_output += [z_mean, z_log_var]
     if identity:
-        model_output = tf.identity(inputs)
+        model_output = tf.identity(inputs, name="auto_identity")
 
     return keras_model(inputs=inputs, outputs=model_output, **model_arguments)
 
