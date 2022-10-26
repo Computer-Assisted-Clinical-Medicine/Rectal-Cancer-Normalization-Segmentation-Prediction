@@ -370,9 +370,16 @@ def train_gan_normalization(
     )
 
     lock_path = experiment_dir / exp_output_path / "lock_fold.txt.lock"
-    if not lock_path.exists():
-        with filelock.FileLock(lock_path, timeout=1):
-            exp.train_fold(0)
+    file_lock = filelock.FileLock(lock_path, timeout=1)
+
+    try:
+        file_lock.acquire()
+    except filelock.Timeout:
+        return model_path_rel
+    try:
+        exp.train_fold(0)
+    finally:
+        file_lock.release()
     if lock_path.exists():
         lock_path.unlink()
 

@@ -1,7 +1,7 @@
 """Check the normalization to see if there are any large deviations"""
 # %%
 
-# pylint:disable=invalid-name, wrong-import-position
+# pylint:disable=invalid-name
 
 import os
 from pathlib import Path

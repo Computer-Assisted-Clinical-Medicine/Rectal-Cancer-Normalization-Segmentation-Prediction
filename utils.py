@@ -8,6 +8,7 @@ from typing import Dict, List, Union
 
 import numpy as np
 import SimpleITK as sitk
+import telegram
 from tqdm.autonotebook import tqdm
 
 from SegClassRegBasis.architecture import DeepLabv3plus, DenseTiramisu, UNet
@@ -177,3 +178,44 @@ def split_into_modalities(
             new_dict[pat_name]["images"].append(new_path / new_name)
 
     return new_dict
+
+
+class TelegramBot:
+
+    """A simple telegram bot, which sends progress messages to the bot with the
+    toke "telegram_bot_token" to the chat with the id "telegram_chat_id" found in
+    the environmental variables."""
+
+    def __init__(self):
+        self.token = os.environ.get("telegram_bot_token", None)
+        self.chat_id = os.environ.get("telegram_chat_id", None)
+        if self.token is not None and self.chat_id is not None:
+            self.bot = telegram.Bot(self.token)
+        else:
+            print("Set telegram_bot_token and telegram_chat_id to use the telegram bot")
+            self.bot = None
+
+    def send_message(self, message: str):
+        """Send a message to the phone if variables present, otherwise, do nothing
+
+        Parameters
+        ----------
+        message : str
+            The message
+        """
+        if self.bot is not None:
+            self.bot.send_message(text=message, chat_id=self.chat_id)
+
+    def send_sticker(
+        self,
+        sticker="CAACAgIAAxkBAAMLY1bguVL3IIg6I5YOMXafXg4ZneEAAkwBAAIw1J0R995vXzeDORwqBA",
+    ):
+        """Send a sticker to the phone if variables present, otherwise, do nothing
+
+        Parameters
+        ----------
+        sticker : str, optional
+            The id of the sticker, by default a celebratory sticker
+        """
+        if self.bot is not None:
+            self.bot.send_sticker(sticker=sticker, chat_id=self.chat_id)

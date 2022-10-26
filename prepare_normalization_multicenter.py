@@ -7,16 +7,16 @@ import os
 from pathlib import Path
 from typing import Any, Dict, List, Union
 
+import numpy as np
 import pandas as pd
-import yaml
 
 # logger has to be set before tensorflow is imported
 tf_logger = logging.getLogger("tensorflow")
 os.environ["TF_CPP_MIN_LOG_LEVEL"] = "3"
 os.environ["CUDA_VISIBLE_DEVICES"] = "0"
-# pylint: disable=wrong-import-position, unused-import
 
 import tensorflow as tf
+import yaml
 
 from gan_normalization import GAN_NORMALIZING, train_gan_normalization
 from SegClassRegBasis.architecture import DeepLabv3plus, UNet
@@ -351,6 +351,8 @@ if __name__ == "__main__":
         "Not-Mannheim",
     ]:
 
+        print(f"Starting with {location}.")
+
         if location == "all":
             timepoints_train = list(
                 timepoints.query("treatment_status=='before therapy' & segmented").index
@@ -444,6 +446,10 @@ if __name__ == "__main__":
                                 **norm_params,
                             )
                         )
+                # see if all paths exist, this is important, if two processes
+                #  are preparing the data
+                if not np.all([(experiment_dir / p).exists() for p in model_paths]):
+                    continue
                 pre_params["normalization_parameters"]["model_paths"] = tuple(model_paths)
                 # overlap has already been cut
                 CUT_TO_OVERLAP = False

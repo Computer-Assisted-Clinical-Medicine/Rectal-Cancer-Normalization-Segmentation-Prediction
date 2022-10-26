@@ -13,7 +13,6 @@ import filelock
 tf_logger = logging.getLogger("tensorflow")
 os.environ["TF_CPP_MIN_LOG_LEVEL"] = "3"
 os.environ["CUDA_VISIBLE_DEVICES"] = "1"
-# pylint: disable=wrong-import-position
 
 import tensorflow as tf
 from tensorflow.keras import mixed_precision
@@ -92,10 +91,13 @@ def eval_fold(experiment: Experiment, fold: int):
     # evaluate the experiment without blocking the process
     experiment.evaluate_fold(fold)
 
-    if fold == experiment.folds - 1:
+    try:
         experiment.evaluate()
         if experiment.external_test_set is not None:
             experiment.evaluate_external_testset()
+    except FileNotFoundError:
+        # this happens when not all folds are complete, it will work on the last one
+        pass
 
 
 def run_experiment_fold(experiment: Experiment, fold: int):
@@ -122,15 +124,19 @@ def run_experiment_fold(experiment: Experiment, fold: int):
 
     # only have one process running for each fold
     lock_file = exp_log_dir / "lock_fold.txt.lock"
-    with filelock.FileLock(lock_file, timeout=1):
-        try:
-            policy = mixed_precision.Policy("mixed_float16")
-            mixed_precision.set_global_policy(policy)
-            experiment.train_fold(fold)
-            experiment.apply_fold(fold)
-        except Exception as exc:  # pylint: disable=broad-except
-            logging.exception(str(exc))
-            raise exc
+    file_lock = filelock.FileLock(lock_file, timeout=1)
+
+    try:
+        file_lock.acquire()
+    except filelock.Timeout:
+        return None
+    try:
+        policy = mixed_precision.Policy("mixed_float16")
+        mixed_precision.set_global_policy(policy)
+        experiment.train_fold(fold)
+        experiment.apply_fold(fold)
+    finally:
+        file_lock.release()
     if lock_file.exists():
         lock_file.unlink()
 

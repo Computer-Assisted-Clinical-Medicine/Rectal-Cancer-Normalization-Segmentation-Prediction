@@ -61,7 +61,8 @@ disable=fixme,
         too-many-function-args,
         trailing-whitespace,
         unnecessary-lambda,
-        unused-argument
+        unused-argument,
+        wrong-import-position
 # Rationales:
 #   fixme: "Yes, yes, I know! That's why I put it there!"
 #   inherit-non-class: false positives on interface declarations
@@ -73,6 +74,7 @@ disable=fixme,
 #   trailing-whitespace: indenting blank lines is more sensible than the opposite, and trailing whitespace is mostly not worth the trouble to keep neat anyway
 #   unnecessary-lambda: false positives (complains about passing functions that happens to be constant)
 #   unused-argument: apparently cannot be prevented when an implementation legitimately does not use an arg
+#   wrong-import-position: some environmental variables have to be set before importing tensorflow
 
 
 [REPORTS]
