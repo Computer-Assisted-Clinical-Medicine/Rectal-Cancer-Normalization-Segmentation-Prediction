@@ -196,6 +196,36 @@ if res_not_all.size > 0:
     plt.show()
     plt.close()
 
+res_all = results.query(
+    "before_therapy & postprocessed & name != 'combined_models' & train_location == 'all'"
+)
+if res_all.size > 0:
+    g = sns.catplot(
+        data=res_all,
+        x="Dice",
+        y="normalization",
+        col="version",
+        kind="box",
+        legend=True,
+        legend_out=True,
+    )
+    g.fig.suptitle(
+        "Performance on all locations (except all) (version = best | before_therapy = True | postprocessed = True)"
+    )
+    g.fig.subplots_adjust(top=0.87)
+    plt.show()
+    plt.close()
+
+display_markdown("Performance when trained on all training locations.")
+res_grouped = results.query(
+    "version == 'best' & before_therapy & postprocessed & network == 'UNet2D'"
+    + " & name != 'combined_models' & train_location == 'all'"
+).groupby(["normalization"])
+
+mean_median_df = pd.DataFrame(res_grouped.Dice.mean()).rename(columns={"Dice": "Dice mean"})
+mean_median_df["Dice median"] = res_grouped.Dice.median()
+display_dataframe(mean_median_df)
+
 display_markdown("All training locations except all.")
 res_grouped = results.query(
     "version == 'best' & before_therapy & postprocessed & network == 'UNet2D'"
