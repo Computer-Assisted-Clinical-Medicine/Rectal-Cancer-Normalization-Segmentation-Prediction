@@ -91,6 +91,7 @@ def train_gan_normalization(
     experiment_group: Path,
     modality: str,
     n_epochs=200,
+    batch_size=256,
     depth=3,
     filter_base=16,
     min_max=False,
@@ -104,6 +105,7 @@ def train_gan_normalization(
     disc_type="SimpleConv",
     disc_n_conv=3,
     disc_filter_base=32,
+    identity=False,
     gan_suffix="",
     **kwargs,
 ):
@@ -165,7 +167,7 @@ def train_gan_normalization(
         "l_r": (lr_sd_type, start_lr, end_lr),
         "optimizer": "Adam",
         "epochs": n_epochs,
-        "batch_size": 256,
+        "batch_size": batch_size,
         "in_plane_dimension": 128,
         # parameters for saving the best model
         "best_model_decay": 0.3,
@@ -285,6 +287,8 @@ def train_gan_normalization(
             "image_weight": image_weight,
             "image_gen_weight": image_gen_weight,
             "smoothing_sigma": smoothing_sigma,
+            # identity for testing
+            "identity": identity,
             "loss_parameters": {
                 "NMI": {
                     "min_val": -1,

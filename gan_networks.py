@@ -973,6 +973,7 @@ class AutoencoderGAN(AutoEncoder):
             output_max=self.options["output_max"],
             variational=self.options["variational"],
             smoothing_sigma=self.options["smoothing_sigma"],
+            identity=self.options.get("identity", False),
             keras_model=GANModel,
             model_arguments={
                 "disc_real_fake": self.disc_real_fake,

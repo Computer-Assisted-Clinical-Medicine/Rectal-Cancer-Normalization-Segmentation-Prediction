@@ -80,6 +80,7 @@ def auto_encoder(
     output_min: Optional[float] = None,
     output_max: Optional[float] = None,
     variational=False,
+    identity=False,
     keras_model: Model = Model,
     model_arguments=None,
     **kwargs,
@@ -109,6 +110,8 @@ def auto_encoder(
     variational : bool, optional
         If a variational autoencoder should be used, the latent space is then sample from
         a distribution and the mean and log_var are added to the output, by default False
+    identity : bool, optional
+        Just output identity, useful for testing, by default False,
     keras_model : object, optional
         The model to use, by default tf.keras.Model
     model_arguments : dict, optional
@@ -283,6 +286,8 @@ def auto_encoder(
         model_output.append(latent)
     if variational:
         model_output += [z_mean, z_log_var]
+    if identity:
+        model_output = tf.identity(inputs)
 
     return keras_model(inputs=inputs, outputs=model_output, **model_arguments)
 
@@ -373,6 +378,7 @@ class AutoEncoder(SegBasisNet):
             output_max=self.options["output_max"],
             variational=self.options["variational"],
             smoothing_sigma=self.options["smoothing_sigma"],
+            identity=self.options.get("identity", False),
         )
 
     def get_hyperparameter_dict(self):
