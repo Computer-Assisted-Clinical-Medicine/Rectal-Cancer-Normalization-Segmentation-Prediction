@@ -105,7 +105,7 @@ def plot_disc(res: pd.DataFrame, disc_type: str):
     plt.close()
 
 
-def plot_with_ma(ax_ma, df, field, N=10):
+def plot_with_ma(ax_ma, df, field, N=5):
     """Plot a line with the value in the background and the moving average on top"""
     for val in ("", "val_"):
         for c in range(3):
@@ -121,7 +121,9 @@ def plot_with_ma(ax_ma, df, field, N=10):
             ax_ma.plot(
                 df_channel.epoch,
                 np.convolve(
-                    np.pad(df_channel[val + field], (N // 2 - 1, N // 2), mode="edge"),
+                    np.pad(
+                        df_channel[val + field], (N // 2 - 1 + N % 2, N // 2), mode="edge"
+                    ),
                     np.ones(N) / N,
                     mode="valid",
                 ),
