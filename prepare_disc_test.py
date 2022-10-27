@@ -92,26 +92,6 @@ preprocessing_parameters: List[Tuple[str, dict]] = [
         },
     ),
     (
-        "_BetterConv",
-        {
-            "depth": 3,
-            "filter_base": 64,
-            "min_max": False,
-            "smoothing_sigma": 0.5,
-            "latent_weight": 1,
-            "image_weight": 1,
-            "image_gen_weight": 0.5,
-            "skip_edges": True,
-            "latent": False,
-            "train_on_gen": False,
-            "disc_type": "BetterConv",
-            "n_epochs": 50,
-            "batch_size": 32,
-            "disc_start_lr": 0.05,
-            "disc_end_lr": 0.001,
-        },
-    ),
-    (
         "_BetterConv_lr_em2",
         {
             "depth": 3,
