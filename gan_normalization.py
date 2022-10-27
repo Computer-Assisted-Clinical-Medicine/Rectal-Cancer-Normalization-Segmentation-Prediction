@@ -464,6 +464,7 @@ class GanDiscriminators(Normalization):
         "disc_n_conv",
         "disc_filter_base",
         "n_epochs",
+        "batch_size",
     ]
 
     # make sure the parameters stay the same
@@ -485,6 +486,7 @@ class GanDiscriminators(Normalization):
         disc_n_conv=3,
         disc_filter_base=32,
         n_epochs=200,
+        batch_size=256,
         **kwargs,
     ) -> None:
         self.depth = depth
@@ -503,6 +505,7 @@ class GanDiscriminators(Normalization):
         self.disc_n_conv = disc_n_conv
         self.disc_filter_base = disc_filter_base
         self.n_epochs = n_epochs
+        self.batch_size = batch_size
         self.model = None
         super().__init__(normalize_channelwise=False)
 
