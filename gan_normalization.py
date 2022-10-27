@@ -105,6 +105,8 @@ def train_gan_normalization(
     disc_type="SimpleConv",
     disc_n_conv=3,
     disc_filter_base=32,
+    disc_start_lr=0.05,
+    disc_end_lr=0.001,
     identity=False,
     gan_suffix="",
     **kwargs,
@@ -320,17 +322,17 @@ def train_gan_normalization(
             },
             # Discriminator arguments
             "disc_real_fake_optimizer": "Adam",
-            "disc_real_fake_lr": (lr_sd_type, start_lr, end_lr),
+            "disc_real_fake_lr": (lr_sd_type, disc_start_lr, disc_end_lr),
             "disc_real_fake_type": disc_type,
             "disc_real_fake_n_conv": 4,
             "disc_real_fake_filter_base": 32,
             "disc_image_optimizer": "Adam",
-            "disc_image_lr": (lr_sd_type, start_lr, end_lr),
+            "disc_image_lr": (lr_sd_type, disc_start_lr, disc_end_lr),
             "disc_image_type": disc_type,
             "disc_image_n_conv": disc_n_conv,
             "disc_image_filter_base": disc_filter_base,
             "disc_latent_optimizer": "Adam",
-            "disc_latent_lr": (lr_sd_type, start_lr, end_lr),
+            "disc_latent_lr": (lr_sd_type, disc_start_lr, disc_end_lr),
             "disc_latent_type": disc_type,
             "disc_latent_n_conv": disc_n_conv,
             "disc_latent_filter_base": disc_filter_base,
@@ -463,6 +465,8 @@ class GanDiscriminators(Normalization):
         "disc_type",
         "disc_n_conv",
         "disc_filter_base",
+        "disc_start_lr",
+        "disc_end_lr",
         "n_epochs",
         "batch_size",
     ]
@@ -485,6 +489,8 @@ class GanDiscriminators(Normalization):
         disc_type="SimpleConv",
         disc_n_conv=3,
         disc_filter_base=32,
+        disc_start_lr=0.05,
+        disc_end_lr=0.001,
         n_epochs=200,
         batch_size=256,
         **kwargs,
@@ -504,6 +510,8 @@ class GanDiscriminators(Normalization):
         self.disc_type = disc_type
         self.disc_n_conv = disc_n_conv
         self.disc_filter_base = disc_filter_base
+        self.disc_start_lr = disc_start_lr
+        self.disc_end_lr = disc_end_lr
         self.n_epochs = n_epochs
         self.batch_size = batch_size
         self.model = None
