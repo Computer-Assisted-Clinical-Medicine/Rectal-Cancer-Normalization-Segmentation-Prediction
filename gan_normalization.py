@@ -159,6 +159,23 @@ def train_gan_normalization(
         modality=modality, targets=targets, column_names=column_names
     )
 
+    # remove outliers in regression
+    reg_df = pd.DataFrame.from_dict(
+        {key: val["regression"] for key, val in dataset.items()}, orient="index"
+    )
+    lower_quant = reg_df.quantile(0.05)
+    upper_quant = reg_df.quantile(0.95)
+    to_correct = np.logical_or(reg_df < lower_quant, reg_df > upper_quant)
+    to_correct = to_correct[to_correct.apply(np.any, axis="columns")]
+
+    for key, vals in to_correct.iterrows():
+        for corr_field in vals[vals].keys():
+            dataset[key]["regression"][corr_field] = np.clip(
+                dataset[key]["regression"][corr_field],
+                a_min=lower_quant[corr_field],
+                a_max=upper_quant[corr_field],
+            )
+
     # set training files
     train_list = [key for key in dataset if key.partition("_img")[0] in timepoints_train]
 
