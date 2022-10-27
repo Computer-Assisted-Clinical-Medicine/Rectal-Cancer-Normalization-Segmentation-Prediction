@@ -118,8 +118,8 @@ def get_gan_suffix(parameters: Dict) -> str:
         gan_suffix = ""
     else:
         gan_suffix = f"_{depth}_{f_base}_{sigma:4.2f}"
-    if norm_params.get("train_on_gen", False):
-        gan_suffix += "_tog"
+    if not norm_params.get("train_on_gen", True):
+        gan_suffix += "_ntog"
         if not np.isclose(image_gen_weight, 1):
             gan_suffix += f"_idg{image_gen_weight:4.2f}"
     if disc_n_conv != 3:

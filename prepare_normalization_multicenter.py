@@ -242,44 +242,12 @@ if __name__ == "__main__":
                 "filter_base": 16,
                 "min_max": False,
                 "smoothing_sigma": 1,
-                "latent_weight": 1,
-                "image_weight": 1,
-                "skip_edges": True,
-                "latent": True,
-                "train_on_gen": False,
-                "n_epochs": 200,
-            },
-        ),
-        (
-            GAN_NORMALIZING.GAN_DISCRIMINATORS,
-            {
-                "depth": 3,
-                "filter_base": 16,
-                "min_max": False,
-                "smoothing_sigma": 1,
-                "latent_weight": 1,
-                "image_weight": 1,
+                "latent_weight": 10,
+                "image_weight": 10,
                 "image_gen_weight": 0.5,
                 "skip_edges": True,
                 "latent": True,
                 "train_on_gen": True,
-                "n_epochs": 200,
-            },
-        ),
-        (
-            GAN_NORMALIZING.GAN_DISCRIMINATORS,
-            {
-                "depth": 3,
-                "filter_base": 64,
-                "min_max": False,
-                "smoothing_sigma": 0.5,
-                "latent_weight": 1,
-                "image_weight": 1,
-                "image_gen_weight": 0.5,
-                "skip_edges": True,
-                "latent": True,
-                "train_on_gen": True,
-                "n_epochs": 200,
             },
         ),
         (
@@ -296,7 +264,22 @@ if __name__ == "__main__":
                 "latent": True,
                 "train_on_gen": True,
                 "disc_type": "BetterConv",
-                "n_epochs": 200,
+                "batch_size": 128,
+            },
+        ),
+        (
+            GAN_NORMALIZING.GAN_DISCRIMINATORS,
+            {
+                "depth": 3,
+                "filter_base": 64,
+                "min_max": False,
+                "smoothing_sigma": 0.5,
+                "latent_weight": 1,
+                "image_weight": 1,
+                "image_gen_weight": 0.5,
+                "skip_edges": True,
+                "latent": True,
+                "train_on_gen": True,
             },
         ),
         (NORMALIZING.HISTOGRAM_MATCHING, {"mask_quantile": 0}),
@@ -358,12 +341,14 @@ if __name__ == "__main__":
                 timepoints.query("treatment_status=='before therapy' & segmented").index
             )
             timepoints_train_norm = list(timepoints.index)
+            N_EPOCHS = 100
         elif location in timepoints.location.unique():
             # only use before therapy images that are segmented
             timepoints_train = timepoints.query(
                 f"treatment_status=='before therapy' & segmented & '{location}' in location"
             ).index
             timepoints_train_norm = timepoints.query(f"'{location}' in location").index
+            N_EPOCHS = 200
         elif "not" in location.lower():
             if location == "Not-Mannheim":
                 timepoints_train = timepoints.query(
@@ -377,6 +362,7 @@ if __name__ == "__main__":
                 timepoints_train_norm = timepoints.query(
                     f"location !='{location.replace('Not-', '')}'"
                 ).index
+            N_EPOCHS = 100
 
         experiment_group_name = f"Normalization_{location}"
         current_exp_dir = experiment_dir / experiment_group_name
@@ -389,29 +375,6 @@ if __name__ == "__main__":
         test_list: List[str] = list(set(dataset.keys()) - set(train_list))
 
         for hyp in hyper_parameters:
-            # use less filters for 3D on local computer
-            if not "CLUSTER" in os.environ:
-                if hyp["architecture"] is UNet:
-                    if hyp["dimensions"] == 3:
-                        F_BASE = 4
-                        n_filters = (
-                            F_BASE * 8,
-                            F_BASE * 16,
-                            F_BASE * 32,
-                            F_BASE * 64,
-                            F_BASE * 128,
-                        )
-                        hyp["network_parameters"]["n_filters"] = n_filters
-                    else:
-                        F_BASE = 8
-                        n_filters = (
-                            F_BASE * 8,
-                            F_BASE * 16,
-                            F_BASE * 32,
-                            F_BASE * 64,
-                            F_BASE * 128,
-                        )
-                        hyp["network_parameters"]["n_filters"] = n_filters
 
             # set number of validation files
             hyp["train_parameters"]["number_of_vald"] = max(len(train_list) // 15, 4)
@@ -443,6 +406,7 @@ if __name__ == "__main__":
                                 experiment_group=group_dir_rel,
                                 modality=MODALITIES[mod_num],
                                 gan_suffix=gan_suffix,
+                                n_epochs=N_EPOCHS,
                                 **norm_params,
                             )
                         )

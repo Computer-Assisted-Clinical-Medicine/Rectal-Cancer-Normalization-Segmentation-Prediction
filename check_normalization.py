@@ -22,7 +22,7 @@ from networks import auto_encoder
 from SegClassRegBasis import evaluation
 
 
-def read_norm_exp(norm_suffix: str) -> pd.DataFrame:
+def read_norm_exp(norm_suffix: str, silent=False) -> pd.DataFrame:
     """Analyze all experiments for one GAN normalization
 
     Parameters
@@ -47,7 +47,8 @@ def read_norm_exp(norm_suffix: str) -> pd.DataFrame:
     results_all_list = []
 
     for loc in train_locations:
-        print(f"Starting with {loc}.")
+        if not silent:
+            print(f"Starting with {loc}.")
 
         res_list = []
         dataset_file = (
@@ -64,13 +65,15 @@ def read_norm_exp(norm_suffix: str) -> pd.DataFrame:
             results_location = pd.read_csv(analysis_file, sep=";", index_col=0)
         else:
             if not dataset_file.exists():
-                print(f"\t{loc} not yet finished.")
+                if not silent:
+                    print(f"\t{loc} not yet finished.")
                 continue
             with open(dataset_file, "r", encoding="utf8") as dataset_file:
                 dataset = yaml.load(dataset_file, yaml.UnsafeLoader)
 
-            print("Start evaluating the generated images.")
-            for pat_name, data in tqdm(dataset.items()):
+            if not silent:
+                print("Start evaluating the generated images.")
+            for pat_name, data in tqdm(dataset.items(), desc=loc, unit="image"):
                 image_gan = experiment_dir / data["image"]
                 image_quant = experiment_dir / quantile_dataset[pat_name]["image"]
 
@@ -102,11 +105,6 @@ experiment_dir = Path(os.environ["experiment_dir"])
 GROUP_BASE_NAME = "Normalization_Experiment"
 exp_group_base_dir = experiment_dir / GROUP_BASE_NAME
 
-# NORM_SUFFIX = ""
-# NORM_SUFFIX = "_tog_idg0.50"
-# NORM_SUFFIX = "_3_64_0.50_tog_idg0.50"
-NORM_SUFFIX = "_3_64_0.50_tog_idg0.50_BetterConv"
-
 train_locations = [
     "Frankfurt",
     "Regensburg",
@@ -117,19 +115,41 @@ train_locations = [
     "Not-Mannheim",
 ]
 
+suffixes = ["", "_3_64_0.50", "_3_64_0.50_BetterConv"]
+
+NORM_SUFFIX = suffixes[1]
+
 # %%
 
-results = read_norm_exp(NORM_SUFFIX)
+res_list_suffix = []
+for s in suffixes:
+    res_suffix = read_norm_exp(s, silent=True)
+    if res_suffix is None:
+        continue
+    res_suffix["normalization_name"] = f"GAN{s}"
+    res_list_suffix.append(res_suffix)
+if len(res_list_suffix) > 0:
+    results = pd.concat(res_list_suffix)
+else:
+    results = None
 
 # %%
 
 if results is not None:
-    sns.catplot(data=results, y="rmse", kind="box", row="location", col="modality")
+    sns.catplot(
+        data=results,
+        x="normalization_name",
+        y="rmse",
+        kind="box",
+        row="location",
+        col="modality",
+    )
     plt.show()
     plt.close()
 
     sns.catplot(
         data=results,
+        x="normalization_name",
         y="structured_similarity_index",
         kind="box",
         row="location",
@@ -140,6 +160,7 @@ if results is not None:
 
     sns.catplot(
         data=results,
+        x="normalization_name",
         y="norm_mutual_inf",
         kind="box",
         row="location",
