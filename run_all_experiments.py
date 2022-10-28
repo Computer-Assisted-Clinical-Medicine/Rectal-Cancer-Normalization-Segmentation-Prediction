@@ -7,7 +7,7 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
-os.environ["CUDA_VISIBLE_DEVICES"] = "1"
+# os.environ["CUDA_VISIBLE_DEVICES"] = "1"
 
 import tensorflow as tf
 
@@ -16,55 +16,66 @@ from SegClassRegBasis.experiment import Experiment
 from SegClassRegBasis.utils import get_gpu
 from utils import TelegramBot
 
-data_dir = Path(os.environ["data_dir"])
 experiment_dir = Path(os.environ["experiment_dir"])
-experiments_file = experiment_dir / "Normalization_Experiment" / "experiments.json"
-experiments = pd.read_json(experiments_file)
-experiments["completed"] = False
 
-bot = TelegramBot()
+
+def get_experiments():
+    """Get all experiments and see which are completed"""
+    experiments_file = experiment_dir / "Normalization_Experiment" / "experiments.json"
+    exp_df = pd.read_json(experiments_file)
+    exp_df["completed"] = False
+
+    for exp_id, exp_row in exp_df.iterrows():
+        exp_path = experiment_dir / exp_row.path
+        if exp_path.exists():
+            result_dirs_exist = []
+            for task in exp_row.tasks.values():
+                versions = exp_row.versions
+                if task == "segmentation":
+                    versions += [f"{ver}-postprocessed" for ver in versions]
+                for ver in versions:
+                    names = ["test"]
+                    if exp_row.external:
+                        names.append("external_testset")
+                    for exp_name in names:
+                        result_dirs_exist.append(
+                            (exp_path / f"results_{exp_name}_{ver}_{task}").exists()
+                        )
+            if np.all(result_dirs_exist):
+                print(f"{exp_row.path} already finished with training and evaluated.")
+                exp_df.loc[exp_id, "completed"] = True
+    return exp_df
+
 
 gpu = tf.device(get_gpu(memory_limit=2000))
 all_threads = []
 
+bot = TelegramBot()
 bot.send_message("Starting with training")
 bot.send_sticker("CAACAgIAAxkBAAO1Y1evsCpQBMjUMVwxuIp-8GND1B8AAk8AA1m7_CVwHhUv2KjsaioE")
 
-for exp_id, exp_pd in experiments.iterrows():
-    exp_path = experiment_dir / exp_pd.path
-    if exp_path.exists():
-        result_dirs_exist = []
-        for task in exp_pd.tasks.values():
-            versions = exp_pd.versions
-            if task == "segmentation":
-                versions += [f"{v}-postprocessed" for v in versions]
-            for v in versions:
-                names = ["test"]
-                if exp_pd.external:
-                    names.append("external_testset")
-                for n in names:
-                    result_dirs_exist.append(
-                        (exp_path / f"results_{n}_{v}_{task}").exists()
-                    )
-        if np.all(result_dirs_exist):
-            print(f"{exp_pd.path} already finished with training and evaluated.")
-            experiments.loc[exp_id, "completed"] = True
-
+experiments = get_experiments()
 num_completed = experiments.completed.sum()
 message = f"{num_completed} of {experiments.shape[0]} experiments already finished."
 print(message)
 bot.send_message(message)
 
-for num, (_, exp_pd) in enumerate(experiments[~experiments.completed].iterrows()):
+# always load all experiments again, because sometimes experiments are prepared
+# during the training
+while True:
+    experiments = get_experiments()
+    if np.all(experiments.completed):
+        break
+    num_completed = experiments.completed.sum()
+    exp_pd = experiments[~experiments.completed].iloc[0]
     print(f"Starting with {exp_pd.path}")
     # load experiment
     param_file = experiment_dir / exp_pd.path / "parameters.yaml"
     assert param_file.exists(), f"Parameter file {param_file} does not exist."
     exp = Experiment.from_file(param_file)
-
     for f in range(exp.folds):
         bot.send_message(
-            f"Starting with {exp_pd.path} ({num+num_completed+1}/{experiments.shape[0]}) "
+            f"Starting with {exp_pd.path} ({num_completed+1}/{experiments.shape[0]}) "
             f"fold {f} ({f+1}/{exp.folds})"
         )
         with gpu:

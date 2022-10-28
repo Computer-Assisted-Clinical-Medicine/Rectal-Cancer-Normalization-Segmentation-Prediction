@@ -213,7 +213,10 @@ class TelegramBot:
             The message
         """
         if self.bot is not None:
-            self.bot.send_message(text=message, chat_id=self.chat_id)
+            try:
+                self.bot.send_message(text=message, chat_id=self.chat_id)
+            except telegram.error.NetworkError:
+                print("Sending of message failed, no internet.")
 
     def send_sticker(
         self,
@@ -227,7 +230,10 @@ class TelegramBot:
             The id of the sticker, by default a celebratory sticker
         """
         if self.bot is not None:
-            self.bot.send_sticker(sticker=sticker, chat_id=self.chat_id)
+            try:
+                self.bot.send_sticker(sticker=sticker, chat_id=self.chat_id)
+            except telegram.error.NetworkError:
+                print("Sending of message failed, no internet.")
 
 
 def plot_disc(res: pd.DataFrame, disc_type: str):

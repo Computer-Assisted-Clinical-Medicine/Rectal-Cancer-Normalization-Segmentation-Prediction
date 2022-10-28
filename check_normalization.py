@@ -121,7 +121,6 @@ experiments = {
     "f_64": "_3_64_0.50",
     "f_64_bc": "_3_64_0.50_BetterConv",
     "f_64_bc_lr": "_3_64_0.50_BetterConv_0.00001",
-    "f_64_bc_lr_iw": "_3_64_0.50_iw10.00_BetterConv_0.00001",
 }
 suffixes = list(experiments.values())
 

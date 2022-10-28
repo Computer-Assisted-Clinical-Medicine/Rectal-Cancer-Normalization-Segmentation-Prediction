@@ -12,7 +12,6 @@ import filelock
 # logger has to be set before tensorflow is imported
 tf_logger = logging.getLogger("tensorflow")
 os.environ["TF_CPP_MIN_LOG_LEVEL"] = "3"
-os.environ["CUDA_VISIBLE_DEVICES"] = "1"
 
 import tensorflow as tf
 from tensorflow.keras import mixed_precision
