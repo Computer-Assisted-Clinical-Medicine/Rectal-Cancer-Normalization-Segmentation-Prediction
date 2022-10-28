@@ -310,6 +310,7 @@ def plot_disc(res: pd.DataFrame, disc_type: str):
 
 def plot_disc_exp(res, experiments, prefixes, disc_type, channel=0):
     "Plot one channel over multiple experiments"
+    res = res.query(f"channel=='{channel}'")
     if res.size == 0:
         return
     disc_list = [
@@ -332,7 +333,7 @@ def plot_disc_exp(res, experiments, prefixes, disc_type, channel=0):
     )
 
     for experiment, pre in zip(experiments, prefixes):
-        res_exp = res.query(f"experiment == '{experiment}' & channel=='{channel}'")
+        res_exp = res.query(f"experiment == '{experiment}'")
         if res_exp.size == 0:
             continue
         if np.any(res_exp.epoch.value_counts() > 1):

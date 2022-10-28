@@ -199,12 +199,12 @@ class GANModel(Model):
 
             with tf.GradientTape() as tape:
                 predictions_fake = self.disc_real_fake(generated_images, training=True)
-                dis_loss_fake = self.disc_real_fake.compiled_loss(
-                    labels_real, predictions_fake
+                dis_loss_fake = self.disc_real_fake.compute_loss(
+                    generated_images, labels_real, predictions_fake
                 )
                 predictions_real = self.disc_real_fake(real_images, training=True)
-                dis_loss_real = self.disc_real_fake.compiled_loss(
-                    labels_fake, predictions_real
+                dis_loss_real = self.disc_real_fake.compute_loss(
+                    real_images, labels_fake, predictions_real
                 )
                 dis_loss = dis_loss_fake + dis_loss_real
             grads = tape.gradient(dis_loss, self.disc_real_fake.trainable_weights)
@@ -224,11 +224,13 @@ class GANModel(Model):
             labels_image = tuple(target_data[t] for t in self.disc_image_target_numbers)
             with tf.GradientTape() as tape:
                 predictions = self.disc_image(source_images, training=True)
-                dis_loss = self.disc_image.compiled_loss(labels_image, predictions)
+                dis_loss = self.disc_image.compute_loss(
+                    source_images, labels_image, predictions
+                )
                 if self.train_on_gen:
                     predictions_gen = self.disc_image(generated_images, training=True)
-                    dis_loss_gen = self.disc_image.compiled_loss(
-                        labels_image, predictions_gen
+                    dis_loss_gen = self.disc_image.compute_loss(
+                        generated_images, labels_image, predictions_gen
                     )
                     dis_loss += dis_loss_gen * self.image_gen_weight
             grads = tape.gradient(dis_loss, self.disc_image.trainable_weights)
@@ -253,7 +255,9 @@ class GANModel(Model):
             labels_latent = tuple(target_data[t] for t in self.disc_latent_target_numbers)
             with tf.GradientTape() as tape:
                 predictions = self.disc_latent(latent_variables, training=True)
-                dis_loss = self.disc_latent.compiled_loss(labels_latent, predictions)
+                dis_loss = self.disc_latent.compute_loss(
+                    latent_variables, labels_latent, predictions
+                )
             grads = tape.gradient(dis_loss, self.disc_latent.trainable_weights)
             grads, max_grad = self.clip_gradients(grads)
             self.disc_latent.optimizer.apply_gradients(
@@ -279,14 +283,16 @@ class GANModel(Model):
                 pred_images = pred_images[0]
             # there might be an extra loss from the autoencoder
             if self.compiled_loss is not None:
-                autoencoder_loss = self.compiled_loss(source_images, pred_images)
+                autoencoder_loss = self.compute_loss(
+                    source_images, source_images, pred_images
+                )
                 losses["generator/autoencoder_loss"] = autoencoder_loss
                 gen_loss += autoencoder_loss
 
             if self.disc_real_fake is not None:
                 predictions = self.disc_real_fake(pred_images)
-                disc_real_fake_loss = self.disc_real_fake.compiled_loss(
-                    self.disc_real_fake_target_labels, predictions
+                disc_real_fake_loss = self.disc_real_fake.compute_loss(
+                    pred_images, self.disc_real_fake_target_labels, predictions
                 )
                 gen_loss += disc_real_fake_loss
                 losses["generator/disc_real_fake_loss"] = disc_real_fake_loss
@@ -301,8 +307,8 @@ class GANModel(Model):
             if self.disc_image is not None:
                 predictions = self.disc_image(pred_images)
                 disc_image_loss = (
-                    self.disc_image.compiled_loss(
-                        self.disc_image_target_labels, predictions
+                    self.disc_image.compute_loss(
+                        pred_images, self.disc_image_target_labels, predictions
                     )
                     * self.image_weight
                 )
@@ -319,8 +325,8 @@ class GANModel(Model):
             if self.disc_latent is not None:
                 predictions = self.disc_latent(latent_variables)
                 disc_latent_loss = (
-                    self.disc_latent.compiled_loss(
-                        self.disc_latent_target_labels, predictions
+                    self.disc_latent.compute_loss(
+                        latent_variables, self.disc_latent_target_labels, predictions
                     )
                     * self.latent_weight
                 )
@@ -414,8 +420,12 @@ class GANModel(Model):
             predictions_real = self.disc_real_fake(real_images, training=True)
             predictions_rf = tf.concat([predictions_fake, predictions_real], axis=0)
 
-            dis_loss_fake = self.disc_real_fake.compiled_loss(labels_real, predictions_fake)
-            dis_loss_real = self.disc_real_fake.compiled_loss(labels_fake, predictions_real)
+            dis_loss_fake = self.disc_real_fake.compute_loss(
+                generated_images, labels_real, predictions_fake
+            )
+            dis_loss_real = self.disc_real_fake.compute_loss(
+                real_images, labels_fake, predictions_real
+            )
             dis_loss = dis_loss_fake + dis_loss_real
 
             self.write_metrics(self.disc_real_fake, metrics, predictions_rf, labels_rf)
@@ -458,13 +468,13 @@ class GANModel(Model):
             pred_images = pred_images[0]
         # there might be an extra loss from the autoencoder
         if self.compiled_loss is not None:
-            autoencoder_loss = self.compiled_loss(source_images, pred_images)
+            autoencoder_loss = self.compute_loss(source_images, source_images, pred_images)
             gen_loss += autoencoder_loss
 
         if self.disc_real_fake is not None:
             predictions = self.disc_real_fake(pred_images)
-            disc_real_fake_loss = self.disc_real_fake.compiled_loss(
-                self.disc_real_fake_target_labels, predictions
+            disc_real_fake_loss = self.disc_real_fake.compute_loss(
+                pred_images, self.disc_real_fake_target_labels, predictions
             )
             gen_loss += disc_real_fake_loss
             losses["generator/disc_real_fake_loss"] = disc_real_fake_loss
@@ -479,7 +489,9 @@ class GANModel(Model):
         if self.disc_image is not None:
             predictions = self.disc_image(pred_images)
             disc_image_loss = (
-                self.disc_image.compiled_loss(self.disc_image_target_labels, predictions)
+                self.disc_image.compute_loss(
+                    pred_images, self.disc_image_target_labels, predictions
+                )
                 * self.image_weight
             )
             gen_loss += disc_image_loss
@@ -495,7 +507,9 @@ class GANModel(Model):
         if self.disc_latent is not None:
             predictions = self.disc_latent(latent_variables)
             disc_latent_loss = (
-                self.disc_latent.compiled_loss(self.disc_latent_target_labels, predictions)
+                self.disc_latent.compute_loss(
+                    latent_variables, self.disc_latent_target_labels, predictions
+                )
                 * self.latent_weight
             )
             gen_loss += disc_latent_loss
