@@ -773,7 +773,7 @@ class AutoencoderGAN(AutoEncoder):
                     mapping = scipy.interpolate.interp1d(
                         list(mapping_dict.values()), list(mapping_dict.keys())
                     )
-                    target_lbl = [int(mapping(disc["target_labels"]))]
+                    target_lbl = [mapping(disc["target_labels"])]
                 else:
                     # create one hot vector
                     target_lbl = np.zeros(out_shape)
