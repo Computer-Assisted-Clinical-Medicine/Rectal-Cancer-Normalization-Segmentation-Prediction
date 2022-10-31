@@ -29,6 +29,16 @@ from SegClassRegBasis.utils import gather_results
 
 experiment_dir = Path(os.environ["experiment_dir"]) / "Normalization_Experiment"
 
+location_order = [
+    "Frankfurt",
+    "Regensburg",
+    "Mannheim",
+    "all",
+    "Not-Frankfurt",
+    "Not-Regensburg",
+    "Not-Mannheim",
+]
+
 # load data
 data_dir = Path(os.environ["data_dir"])
 timepoints = pd.read_csv(data_dir / "timepoints.csv", sep=";", index_col=0)
@@ -60,7 +70,9 @@ results.index = pd.RangeIndex(results.shape[0])
 # set timepoint
 results["timepoint"] = results["File Number"].apply(lambda x: "_".join(x.split("_")[:2]))
 results["network"] = results.name.apply(lambda x: x.split("-")[0])
-results["train_location"] = results.exp_group_name.str.partition("_")[2]
+results["train_location"] = pd.Categorical(
+    results.exp_group_name.str.partition("_")[2], categories=location_order
+)
 # set treatment status
 mask = results.index[~results.timepoint.str.startswith("99")]
 results.loc[mask, "treatment_status"] = timepoints.loc[
@@ -241,7 +253,7 @@ display_dataframe(mean_median_df.xs(False, level=1) - mean_median_df.xs(True, le
 
 # %%
 
-for train_location in results.train_location.unique():
+for train_location in location_order:
     g = sns.catplot(
         data=results.query(
             f"version == 'best' & train_location == '{train_location}'"
@@ -278,32 +290,36 @@ for train_location in results.train_location.unique():
     plt.show()
     plt.close()
 
-    g = sns.catplot(
-        data=results.query(
-            f"version == 'best' & train_location == '{train_location}'"
-            + " & name != 'combined_models' & external & postprocessed"
-        ),
-        x="Dice",
-        y="normalization",
-        col="before_therapy",
-        hue="from_study",
-        kind="box",
-        legend=True,
-        legend_out=True,
-    )
-    g.fig.suptitle(
-        f"Location = {train_location} (version = best | external = True | postprocessed = True)"
-    )
-    g.fig.subplots_adjust(top=0.88)
-    plt.show()
-    plt.close()
+    if train_location != "all":
+        g = sns.catplot(
+            data=results.query(
+                f"version == 'best' & train_location == '{train_location}'"
+                + " & name != 'combined_models' & external & postprocessed"
+            ),
+            x="Dice",
+            y="normalization",
+            col="before_therapy",
+            hue="from_study",
+            kind="box",
+            legend=True,
+            legend_out=True,
+        )
+        g.fig.suptitle(
+            f"Location = {train_location} (version = best | external = True | postprocessed = True)"
+        )
+        g.fig.subplots_adjust(top=0.88)
+        plt.show()
+        plt.close()
 
     data_not_ext = results.query(
         f"train_location == '{train_location}'"
         + " & name != 'combined_models' & not external & postprocessed"
     )
 
-    if data_not_ext.from_study.unique().size > 1:
+    if (
+        data_not_ext.from_study.unique().size > 1
+        and data_not_ext.before_therapy.unique() > 1
+    ):
         g = sns.catplot(
             data=data_not_ext,
             x="Dice",
@@ -321,23 +337,24 @@ for train_location in results.train_location.unique():
         plt.show()
         plt.close()
 
-    g = sns.catplot(
-        data=results.query(
-            f"version == 'best' & train_location == '{train_location}'"
-            + " & name != 'combined_models' & postprocessed & before_therapy"
-        ),
-        x="Dice",
-        y="normalization",
-        col="external",
-        hue="fold",
-        kind="box",
-        legend=True,
-        legend_out=True,
-    )
-    g.fig.suptitle(f"Location = {train_location} (version = best | external = True)")
-    g.fig.subplots_adjust(top=0.88)
-    plt.show()
-    plt.close()
+    if train_location != "all":
+        g = sns.catplot(
+            data=results.query(
+                f"version == 'best' & train_location == '{train_location}'"
+                + " & name != 'combined_models' & postprocessed & before_therapy"
+            ),
+            x="Dice",
+            y="normalization",
+            col="external",
+            hue="fold",
+            kind="box",
+            legend=True,
+            legend_out=True,
+        )
+        g.fig.suptitle(f"Location = {train_location} (version = best | external = True)")
+        g.fig.subplots_adjust(top=0.88)
+        plt.show()
+        plt.close()
 
 # %%
 

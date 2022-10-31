@@ -13,7 +13,6 @@ import pandas as pd
 # logger has to be set before tensorflow is imported
 tf_logger = logging.getLogger("tensorflow")
 os.environ["TF_CPP_MIN_LOG_LEVEL"] = "3"
-os.environ["CUDA_VISIBLE_DEVICES"] = "0"
 
 import tensorflow as tf
 import yaml
@@ -64,23 +63,34 @@ def vary_hyperparameters(parameters, keys: tuple, values: list) -> List[Dict[str
     return params_new
 
 
-def priority(exp_sort):
+def priority(hp_params):
     """Define a priority for each experiment"""
-    norm = exp_sort.hyper_parameters["preprocessing_parameters"]["normalizing_method"]
-    norm_priority = {
-        GAN_NORMALIZING.GAN_DISCRIMINATORS: 4,
-        NORMALIZING.QUANTILE: 3,
-        NORMALIZING.HISTOGRAM_MATCHING: 2,
-        NORMALIZING.MEAN_STD: 1,
-        NORMALIZING.HM_QUANTILE: 0,
-    }
-
+    prio = 0
     arch_priority = {
-        UNet: 10,
+        UNet: 100,
         DeepLabv3plus: 0,
     }
-    architecture = exp_sort.hyper_parameters["architecture"]
-    return norm_priority[norm] + arch_priority[architecture]
+    architecture = hp_params["architecture"]
+    prio += arch_priority.get(architecture, 0)
+
+    norm = hp_params["preprocessing_parameters"]["normalizing_method"]
+    norm_priority = {
+        GAN_NORMALIZING.GAN_DISCRIMINATORS: 40,
+        NORMALIZING.QUANTILE: 30,
+        NORMALIZING.HISTOGRAM_MATCHING: 20,
+        NORMALIZING.MEAN_STD: 10,
+        NORMALIZING.HM_QUANTILE: 0,
+    }
+    prio += norm_priority.get(norm, 0)
+
+    if norm == GAN_NORMALIZING.GAN_DISCRIMINATORS:
+        suffix = get_gan_suffix(hp_params)
+        suffix_priority = {
+            "_3_64_0.50_BetterConv_0.00001": 9,
+        }
+        prio += suffix_priority.get(suffix, 0)
+
+    return prio
 
 
 if __name__ == "__main__":
@@ -487,10 +497,11 @@ if __name__ == "__main__":
                 num_channels=N_CHANNELS,
                 folds_dir_rel=group_dir_rel / "folds",
                 tensorboard_images=True,
+                priority=priority(hyp),
             )
             experiments.append(exp)
 
-        # bring experiments in a custom order
-        experiments.sort(key=priority, reverse=True)
-        # export all hyperparameters
-        export_experiments_run_files(exp_group_base_dir, experiments)
+            # bring experiments in a custom order
+            experiments.sort(key=lambda x: x.priority, reverse=True)
+            # export all hyperparameters
+            export_experiments_run_files(exp_group_base_dir, experiments)

@@ -7,7 +7,7 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
-# os.environ["CUDA_VISIBLE_DEVICES"] = "1"
+os.environ["CUDA_VISIBLE_DEVICES"] = "3"
 
 import tensorflow as tf
 
@@ -48,7 +48,6 @@ def get_experiments():
 
 
 gpu = tf.device(get_gpu(memory_limit=2000))
-all_threads = []
 
 bot = TelegramBot()
 bot.send_message("Starting with training")
@@ -64,33 +63,38 @@ bot.send_message(message)
 # during the training
 while True:
     experiments = get_experiments()
+    all_threads = []
     if np.all(experiments.completed):
         break
     num_completed = experiments.completed.sum()
-    exp_pd = experiments[~experiments.completed].iloc[0]
-    print(f"Starting with {exp_pd.path}")
-    # load experiment
-    param_file = experiment_dir / exp_pd.path / "parameters.yaml"
-    assert param_file.exists(), f"Parameter file {param_file} does not exist."
-    exp = Experiment.from_file(param_file)
-    for f in range(exp.folds):
-        bot.send_message(
-            f"Starting with {exp_pd.path} ({num_completed+1}/{experiments.shape[0]}) "
-            f"fold {f} ({f+1}/{exp.folds})"
-        )
-        with gpu:
-            try:
-                all_threads.append(run_experiment_fold(exp, f))
-            except Exception as exc:  # pylint:disable=broad-except
-                message = f"{exp_pd.path} failed with {exc}"
-                print(message)
-                bot.send_message(message)
-        bot.send_message(f"Finished with fold {f}")
+    for num, (_, exp_pd) in enumerate(experiments[~experiments.completed].iterrows()):
+        print(f"Starting with {exp_pd.path}")
+        # load experiment
+        param_file = experiment_dir / exp_pd.path / "parameters.yaml"
+        assert param_file.exists(), f"Parameter file {param_file} does not exist."
+        try:
+            exp = Experiment.from_file(param_file)
+        except FileNotFoundError:
+            print("Files are missing for this experiment")
+            continue
+        for f in range(exp.folds):
+            bot.send_message(
+                f"Starting with {exp_pd.path} ({num_completed+num+1}/{experiments.shape[0]}) "
+                f"fold {f} ({f+1}/{exp.folds})"
+            )
+            with gpu:
+                try:
+                    all_threads.append(run_experiment_fold(exp, f))
+                except Exception as exc:  # pylint:disable=broad-except
+                    message = f"{exp_pd.path} failed with {exc}"
+                    print(message)
+                    bot.send_message(message)
+            bot.send_message(f"Finished with fold {f}")
 
-    bot.send_message(f"Finished with {exp_pd.path}")
+        bot.send_message(f"Finished with {exp_pd.path}")
 
-for thread in all_threads:
-    thread.join()
+    for thread in all_threads:
+        thread.join()
 
 bot.send_message("Finished")
 bot.send_sticker()

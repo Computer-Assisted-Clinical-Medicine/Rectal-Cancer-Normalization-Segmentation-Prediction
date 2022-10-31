@@ -210,38 +210,39 @@ for location in train_locations:
     experiment_group_name = f"Normalization_{location}"
 
     for channel in range(3):
-        norm_exp_dir = (
-            exp_group_base_dir
-            / experiment_group_name
-            / f"Train_Normalization_GAN{NORM_SUFFIX}"
-            / f"Train_Normalization_GAN_{channel}{NORM_SUFFIX}"
-        )
+        for suffix in suffixes:
+            norm_exp_dir = (
+                exp_group_base_dir
+                / experiment_group_name
+                / f"Train_Normalization_GAN{suffix}"
+                / f"Train_Normalization_GAN_{channel}{suffix}"
+            )
 
-        if not norm_exp_dir.exists():
-            continue
+            if not norm_exp_dir.exists():
+                continue
 
-        model_file = norm_exp_dir / "generator_with_shapes.png"
-        if model_file.exists():
-            continue
+            model_file = norm_exp_dir / "generator_with_shapes.png"
+            if model_file.exists():
+                continue
 
-        with open(norm_exp_dir / "parameters.yaml", "r", encoding="utf8") as f:
-            norm_settings = yaml.load(f, yaml.UnsafeLoader)
+            with open(norm_exp_dir / "parameters.yaml", "r", encoding="utf8") as f:
+                norm_settings = yaml.load(f, yaml.UnsafeLoader)
 
-        print("\tGenerating Model")
-        hp_train = norm_settings["hyper_parameters"]["train_parameters"]
-        model = auto_encoder(
-            inputs=tf.keras.Input(
-                (hp_train["in_plane_dimension"], hp_train["in_plane_dimension"], 1),
-                batch_size=hp_train["batch_size"],
-            ),
-            **norm_settings["hyper_parameters"]["network_parameters"],
-        )
-        tf.keras.utils.plot_model(
-            model,
-            to_file=model_file,
-            show_shapes=True,
-        )
-        print("\tPlotting finished")
+            print("\tGenerating Model")
+            hp_train = norm_settings["hyper_parameters"]["train_parameters"]
+            model = auto_encoder(
+                inputs=tf.keras.Input(
+                    (hp_train["in_plane_dimension"], hp_train["in_plane_dimension"], 1),
+                    batch_size=hp_train["batch_size"],
+                ),
+                **norm_settings["hyper_parameters"]["network_parameters"],
+            )
+            tf.keras.utils.plot_model(
+                model,
+                to_file=model_file,
+                show_shapes=True,
+            )
+            print("\tPlotting finished")
 
 # %%
 
