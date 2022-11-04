@@ -87,6 +87,7 @@ def priority(hp_params):
         suffix = get_gan_suffix(hp_params)
         suffix_priority = {
             "_3_64_0.50_BetterConv_0.00001": 9,
+            "_3_64_0.50_BetterConv_0.00001_all_image": 8,
         }
         prio += suffix_priority.get(suffix, 0)
 
@@ -262,6 +263,26 @@ if __name__ == "__main__":
                 "batch_size": 128,
                 "disc_start_lr": 1e-5,
                 "disc_end_lr": 1e-5,
+            },
+        ),
+        (
+            GAN_NORMALIZING.GAN_DISCRIMINATORS,
+            {
+                "depth": 3,
+                "filter_base": 64,
+                "min_max": False,
+                "smoothing_sigma": 0.5,
+                "latent_weight": 1,
+                "image_weight": 1,
+                "image_gen_weight": 0.5,
+                "skip_edges": True,
+                "latent": True,
+                "train_on_gen": True,
+                "disc_type": "BetterConv",
+                "batch_size": 128,
+                "disc_start_lr": 1e-5,
+                "disc_end_lr": 1e-5,
+                "all_image": True,
             },
         ),
         (

@@ -107,6 +107,7 @@ def train_gan_normalization(
     disc_filter_base=32,
     disc_start_lr=0.05,
     disc_end_lr=0.001,
+    all_image=False,
     identity=False,
     gan_suffix="",
     **kwargs,
@@ -267,6 +268,9 @@ def train_gan_normalization(
         "pixel_spacing": "image",
         "location": "latent",
     }
+    if all_image:
+        for key in input_types:
+            input_types[key] = "image"
     for col in column_names.values():
         if column_tasks[col] == "cat":
             disc_loss = "CEL"
@@ -467,6 +471,7 @@ class GanDiscriminators(Normalization):
         "disc_filter_base",
         "disc_start_lr",
         "disc_end_lr",
+        "all_image",
         "n_epochs",
         "batch_size",
     ]
@@ -491,6 +496,7 @@ class GanDiscriminators(Normalization):
         disc_filter_base=32,
         disc_start_lr=0.05,
         disc_end_lr=0.001,
+        all_image=False,
         n_epochs=200,
         batch_size=256,
         **kwargs,
@@ -512,6 +518,7 @@ class GanDiscriminators(Normalization):
         self.disc_filter_base = disc_filter_base
         self.disc_start_lr = disc_start_lr
         self.disc_end_lr = disc_end_lr
+        self.all_image = all_image
         self.n_epochs = n_epochs
         self.batch_size = batch_size
         self.model = None

@@ -20,7 +20,7 @@ from tqdm import tqdm
 
 from networks import auto_encoder
 from SegClassRegBasis import evaluation
-from utils import plot_disc, plot_disc_exp, plot_with_ma
+from utils import plot_disc, plot_with_ma
 
 
 def read_norm_exp(norm_suffix: str, silent=False) -> pd.DataFrame:
@@ -121,6 +121,7 @@ experiments = {
     "f_64": "_3_64_0.50",
     "f_64_bc": "_3_64_0.50_BetterConv",
     "f_64_bc_lr": "_3_64_0.50_BetterConv_0.00001",
+    "f_64_bc_lr_img": "_3_64_0.50_BetterConv_0.00001_all_image",
 }
 suffixes = list(experiments.values())
 
@@ -150,6 +151,7 @@ if results is not None:
         y="rmse",
         kind="box",
         row="location",
+        row_order=train_locations,
         col="modality",
     )
     plt.show()
@@ -161,6 +163,7 @@ if results is not None:
         y="structured_similarity_index",
         kind="box",
         row="location",
+        row_order=train_locations,
         col="modality",
     )
     plt.show()
@@ -172,6 +175,7 @@ if results is not None:
         y="norm_mutual_inf",
         kind="box",
         row="location",
+        row_order=train_locations,
         col="modality",
     )
     plt.show()
@@ -316,14 +320,3 @@ for location in train_locations:
     plot_disc(train_res_loc, "latent")
     print("Image Discriminators")
     plot_disc(train_res_loc, "image")
-
-# %%
-
-for location in train_locations:
-    print(location)
-    plot_disc_exp(
-        train_results.query(f"location == '{location}'"),
-        list(experiments.keys()),
-        [f"{e}-" for e in experiments],
-        "image",
-    )

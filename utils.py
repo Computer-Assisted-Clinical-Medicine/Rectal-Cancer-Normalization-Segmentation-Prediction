@@ -118,6 +118,7 @@ def get_gan_suffix(parameters: Dict) -> str:
     disc_filter_base = norm_params.get("disc_filter_base", 32)
     disc_type = norm_params.get("disc_type", "SimpleConv")
     disc_start_lr = norm_params.get("disc_start_lr", 0.05)
+    all_image = norm_params.get("all_image", False)
     if depth == 3 and f_base == 16 and np.isclose(sigma, 1):
         gan_suffix = ""
     else:
@@ -137,6 +138,8 @@ def get_gan_suffix(parameters: Dict) -> str:
         gan_suffix += f"_{disc_type}"
     if not np.isclose(disc_start_lr, 0.05):
         gan_suffix += f"_{disc_start_lr:.5f}"
+    if all_image:
+        gan_suffix += "_all_image"
     return gan_suffix
 
 
@@ -238,6 +241,7 @@ class TelegramBot:
 
 def plot_disc(res: pd.DataFrame, disc_type: str):
     """Plot the image or latent discriminators"""
+    res = res.dropna(axis="columns")
     disc = [
         c[6 + len(disc_type) : -5]
         for c in res.columns
