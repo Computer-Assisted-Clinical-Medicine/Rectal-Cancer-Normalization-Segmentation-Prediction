@@ -14,6 +14,7 @@ from matplotlib import pyplot as plt
 from tqdm.autonotebook import tqdm
 
 from SegClassRegBasis.architecture import DeepLabv3plus, DenseTiramisu, UNet
+from SegClassRegBasis.normalization import NORMALIZING
 
 
 def generate_folder_name(parameters):
@@ -119,6 +120,7 @@ def get_gan_suffix(parameters: Dict) -> str:
     disc_type = norm_params.get("disc_type", "SimpleConv")
     disc_start_lr = norm_params.get("disc_start_lr", 0.05)
     all_image = norm_params.get("all_image", False)
+    init_norm_method = norm_params.get("init_norm_method", NORMALIZING.QUANTILE)
     if depth == 3 and f_base == 16 and np.isclose(sigma, 1):
         gan_suffix = ""
     else:
@@ -140,6 +142,8 @@ def get_gan_suffix(parameters: Dict) -> str:
         gan_suffix += f"_{disc_start_lr:.5f}"
     if all_image:
         gan_suffix += "_all_image"
+    if init_norm_method is not NORMALIZING.QUANTILE:
+        gan_suffix += f"_{init_norm_method.name}"
     return gan_suffix
 
 

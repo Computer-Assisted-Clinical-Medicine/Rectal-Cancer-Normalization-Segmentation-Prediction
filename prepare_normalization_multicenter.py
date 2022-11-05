@@ -17,7 +17,7 @@ os.environ["TF_CPP_MIN_LOG_LEVEL"] = "3"
 import tensorflow as tf
 import yaml
 
-from gan_normalization import GAN_NORMALIZING, train_gan_normalization
+from gan_normalization import GAN_NORMALIZING, get_norm_params, train_gan_normalization
 from SegClassRegBasis.architecture import DeepLabv3plus, UNet
 from SegClassRegBasis.experiment import Experiment
 from SegClassRegBasis.normalization import NORMALIZING
@@ -282,6 +282,26 @@ if __name__ == "__main__":
                 "batch_size": 128,
                 "disc_start_lr": 1e-5,
                 "disc_end_lr": 1e-5,
+                "init_norm_method": NORMALIZING.WINDOW,
+            },
+        ),
+        (
+            GAN_NORMALIZING.GAN_DISCRIMINATORS,
+            {
+                "depth": 3,
+                "filter_base": 64,
+                "min_max": False,
+                "smoothing_sigma": 0.5,
+                "latent_weight": 1,
+                "image_weight": 1,
+                "image_gen_weight": 0.5,
+                "skip_edges": True,
+                "latent": True,
+                "train_on_gen": True,
+                "disc_type": "BetterConv",
+                "batch_size": 128,
+                "disc_start_lr": 1e-5,
+                "disc_end_lr": 1e-5,
                 "all_image": True,
             },
         ),
@@ -438,6 +458,29 @@ if __name__ == "__main__":
             norm_type = pre_params["normalizing_method"]
 
             if norm_type == GAN_NORMALIZING.GAN_DISCRIMINATORS:
+                # make the base dat set
+                pre_params_gan_base = copy.deepcopy(preprocessing_parameters)
+                gan_base_norm = pre_params["normalization_parameters"].get(
+                    "init_norm_method", NORMALIZING.QUANTILE
+                )
+                gan_base_params = get_norm_params(gan_base_norm)
+                pre_params_gan_base["normalizing_method"] = gan_base_norm
+                pre_params_gan_base["normalization_parameters"] = gan_base_params
+                DATASET_TO_PROCESS = split_into_modalities(
+                    preprocess_dataset(
+                        data_set=dataset,
+                        num_channels=N_CHANNELS,
+                        base_dir=experiment_dir,
+                        data_dir=data_dir,
+                        preprocessed_dir=PREPROCESSED_DIR / gan_base_norm.name,
+                        train_dataset=train_list,
+                        preprocessing_parameters=pre_params_gan_base,
+                        pass_modality=False,
+                        cut_to_overlap=True,
+                    ),
+                    n_channels=N_CHANNELS,
+                )
+                # do the actual normalization
                 norm_params = pre_params["normalization_parameters"]
                 depth = norm_params["depth"]
                 f_base = norm_params["filter_base"]
@@ -468,8 +511,6 @@ if __name__ == "__main__":
                 # overlap has already been cut
                 CUT_TO_OVERLAP = False
                 assert QUANT_DATASET is not None
-                # the quant dataset lives in the experiment dir
-                DATASET_TO_PROCESS = QUANT_DATASET
                 preprocess_base_dir = experiment_dir
             else:
                 PASS_MODALITY = False

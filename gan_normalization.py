@@ -108,6 +108,7 @@ def train_gan_normalization(
     disc_start_lr=0.05,
     disc_end_lr=0.001,
     all_image=False,
+    init_norm_method=NORMALIZING.QUANTILE,
     identity=False,
     gan_suffix="",
     **kwargs,
@@ -217,14 +218,13 @@ def train_gan_normalization(
         "write_tensorboard": False,
     }
 
+    norm_params = get_norm_params(init_norm_method)
+
     preprocessing_parameters = {
         "resample": True,
         "target_spacing": (1, 1, 3),
-        "normalizing_method": NORMALIZING.QUANTILE,
-        "normalization_parameters": {
-            "lower_q": 0.05,
-            "upper_q": 0.95,
-        },
+        "normalizing_method": init_norm_method,
+        "normalization_parameters": norm_params,
     }
 
     constant_parameters = {
@@ -416,6 +416,27 @@ def train_gan_normalization(
     return model_path_rel
 
 
+def get_norm_params(init_norm_method):
+    """Depending on the initial normalization, select the parameters for that
+    normalization to make it consistent with the preprocessing"""
+    if init_norm_method is NORMALIZING.QUANTILE:
+        norm_params = {
+            "lower_q": 0.05,
+            "upper_q": 0.95,
+        }
+    elif init_norm_method is NORMALIZING.WINDOW:
+        norm_params = [
+            {"lower": 0, "upper": 3000},
+            {"lower": 0, "upper": 1000},
+            {"lower": 0, "upper": 3000},
+        ]
+    elif init_norm_method is NORMALIZING.NO_NORM:
+        norm_params = {}
+    else:
+        raise Exception(f"Unknown normalization {init_norm_method}")
+    return norm_params
+
+
 class GAN_NORMALIZING(Enum):  # pylint:disable=invalid-name
     """The different normalization types
     To get the corresponding class, call get_class
@@ -472,6 +493,7 @@ class GanDiscriminators(Normalization):
         "disc_start_lr",
         "disc_end_lr",
         "all_image",
+        "init_norm_method",
         "n_epochs",
         "batch_size",
     ]
@@ -497,6 +519,7 @@ class GanDiscriminators(Normalization):
         disc_start_lr=0.05,
         disc_end_lr=0.001,
         all_image=False,
+        init_norm_method=NORMALIZING.QUANTILE,
         n_epochs=200,
         batch_size=256,
         **kwargs,
@@ -519,6 +542,7 @@ class GanDiscriminators(Normalization):
         self.disc_start_lr = disc_start_lr
         self.disc_end_lr = disc_end_lr
         self.all_image = all_image
+        self.init_norm_method = init_norm_method
         self.n_epochs = n_epochs
         self.batch_size = batch_size
         self.model = None

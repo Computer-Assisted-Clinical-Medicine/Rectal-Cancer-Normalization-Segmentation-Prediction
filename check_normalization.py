@@ -20,6 +20,7 @@ from tqdm import tqdm
 
 from networks import auto_encoder
 from SegClassRegBasis import evaluation
+from SegClassRegBasis.normalization import NORMALIZING
 from utils import plot_disc, plot_with_ma
 
 
@@ -39,15 +40,32 @@ def read_norm_exp(norm_suffix: str, silent=False) -> pd.DataFrame:
 
     exp_dir = Path(os.environ["experiment_dir"])
 
-    quantile_location = exp_dir / GROUP_BASE_NAME / "data_preprocessed" / "QUANTILE"
-    # read dataset
-    quantile_dataset_file = quantile_location / "preprocessing_dataset.yaml"
-    with open(quantile_dataset_file, "r", encoding="utf8") as quant_file:
-        quantile_dataset = yaml.load(quant_file, yaml.UnsafeLoader)
-
     results_all_list = []
 
     for loc in train_locations:
+        norm_file = (
+            exp_dir
+            / GROUP_BASE_NAME
+            / f"Normalization_{loc}"
+            / "data_preprocessed"
+            / f"GAN_DISCRIMINATORS{norm_suffix}"
+            / "normalization_mod0.yaml"
+        )
+        if not norm_file.exists():
+            continue
+        with open(norm_file, "r", encoding="utf8") as quant_file:
+            norm_params = yaml.load(quant_file, yaml.UnsafeLoader)
+
+        input_norm = (
+            norm_params["parameters"].get("init_norm_method", NORMALIZING.QUANTILE).name
+        )
+
+        input_location = exp_dir / GROUP_BASE_NAME / "data_preprocessed" / input_norm
+        # read dataset
+        input_dataset_file = input_location / "preprocessing_dataset.yaml"
+        with open(input_dataset_file, "r", encoding="utf8") as quant_file:
+            input_dataset = yaml.load(quant_file, yaml.UnsafeLoader)
+
         if not silent:
             print(f"Starting with {loc}.")
 
@@ -76,11 +94,11 @@ def read_norm_exp(norm_suffix: str, silent=False) -> pd.DataFrame:
                 print("Start evaluating the generated images.")
             for pat_name, data in tqdm(dataset.items(), desc=loc, unit="image"):
                 image_gan = experiment_dir / data["image"]
-                image_quant = experiment_dir / quantile_dataset[pat_name]["image"]
+                image_inp = experiment_dir / input_dataset[pat_name]["image"]
 
                 for c in range(3):
                     result_metrics = evaluation.evaluate_autoencoder_prediction(
-                        str(image_gan), str(image_quant), channel=c
+                        str(image_gan), str(image_inp), channel=c
                     )
                     result_metrics["modality"] = c
                     result_metrics["location"] = loc
@@ -121,7 +139,8 @@ experiments = {
     "f_64": "_3_64_0.50",
     "f_64_bc": "_3_64_0.50_BetterConv",
     "f_64_bc_lr": "_3_64_0.50_BetterConv_0.00001",
-    "f_64_bc_lr_img": "_3_64_0.50_BetterConv_0.00001_all_image",
+    "f6bl_img": "_3_64_0.50_BetterConv_0.00001_all_image",
+    "f6bl_win": "_3_64_0.50_BetterConv_0.00001_WINDOW",
 }
 suffixes = list(experiments.values())
 
@@ -196,6 +215,7 @@ if results is not None:
         results.sort_values("structured_similarity_index")[
             [
                 "patient_id",
+                "modality",
                 "location",
                 "rmse",
                 "norm_mutual_inf",
@@ -320,3 +340,37 @@ for location in train_locations:
     plot_disc(train_res_loc, "latent")
     print("Image Discriminators")
     plot_disc(train_res_loc, "image")
+
+# %%
+
+# Get the min and max values for the dataset
+
+# import SimpleITK as sitk
+
+# dataset_file = exp_group_base_dir / "dataset.yaml"
+# with open(dataset_file, "r", encoding="utf8") as quant_file:
+#     exp_dataset = yaml.load(quant_file, yaml.UnsafeLoader)
+
+# percentiles = [0, 1, 95, 98, 99, 100]
+# img_values_list = []
+# for img_id, img_data in tqdm(exp_dataset.items()):
+#     images = img_data["images"]
+#     for img, name in zip(images, ["T2", "b800", "ADC"]):
+#         path = data_dir / img
+#         assert path.exists()
+
+#         data = sitk.GetArrayFromImage(sitk.ReadImage(str(path)))
+#         data_dict = {f"perc_{p:03d}" : np.percentile(data, p) for p in percentiles}
+
+#         data_dict["modality"] = name
+
+#         img_values_list.append(data_dict)
+
+# img_values = pd.DataFrame(img_values_list)
+
+# img_values_grouped = img_values.groupby("modality")
+# for method in ["min", "mean", "median", "max"]:
+#     print(method)
+#     display(getattr(img_values_grouped, method)())
+# print("99th percentile")
+# display(img_values_grouped.quantile(0.99))
