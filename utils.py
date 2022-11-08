@@ -236,6 +236,40 @@ class TelegramBot:
                 print("Sending of message failed, no internet.")
 
 
+def plot_metrics(data: pd.DataFrame, metrics: List[str]):
+    """Plot the listed metrics including the validation
+
+    Parameters
+    ----------
+    data : pd.DataFrame
+        The data to plot
+    metrics : List[str]
+        The metrics to plot
+    """
+    data = data.dropna(axis="columns")
+    metrics_present = [t for t in metrics if f"val_{t}" in data]
+    if len(metrics_present) == 0:
+        return
+    nrows = int(np.ceil(len(metrics_present) / 4))
+    _, axes = plt.subplots(
+        nrows=nrows,
+        ncols=4,
+        sharex=True,
+        sharey=False,
+        figsize=(16, nrows * 3.5),
+    )
+    for metric, ax in zip(metrics_present, axes.flat):
+        plot_with_ma(ax, data, metric)
+        ax.set_ylabel(metric)
+    for ax in axes.flat[3 : 4 : len(metrics_present)]:
+        ax.legend()
+    for ax in axes.flat[len(metrics_present) :]:
+        ax.set_axis_off()
+    plt.tight_layout()
+    plt.show()
+    plt.close()
+
+
 def plot_disc(res: pd.DataFrame, disc_type: str):
     """Plot the image or latent discriminators"""
     disc = [

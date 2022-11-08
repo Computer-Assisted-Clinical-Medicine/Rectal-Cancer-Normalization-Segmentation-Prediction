@@ -4,7 +4,7 @@ GAN model, which offers multiple choices of discriminators
 import logging
 from collections import OrderedDict
 from pathlib import Path
-from typing import Callable, Collection, Iterable, List, Optional, Tuple, Union
+from typing import Callable, Collection, Dict, Iterable, List, Optional, Tuple, Union
 
 import numpy as np
 import scipy
@@ -16,6 +16,7 @@ from tensorflow.keras import Model, layers
 from networks import AutoEncoder, auto_encoder
 from SegClassRegBasis import config as cfg
 from SegClassRegBasis import tf_utils, utils
+from SegmentationArchitectures.unets import unet
 from SegmentationArchitectures.utils import get_regularizer
 
 # pylint:disable=too-many-lines
@@ -53,6 +54,8 @@ class GANModel(Model):
         latent_weight=1.0,
         image_weight=1.0,
         image_gen_weight=1.0,
+        segmentation_network=None,
+        segmentation_target_numbers=None,
         **kwargs,
     ):
         super().__init__(*args, **kwargs)
@@ -87,8 +90,16 @@ class GANModel(Model):
         self.image_weight = float(image_weight)
         self.image_gen_weight = float(image_gen_weight)
 
+        self.segmentation_network = segmentation_network
+        self.segmentation_target_numbers = segmentation_target_numbers
+
         # make sure the discriminators are compiled
-        for disc in [self.disc_real_fake, self.disc_image, self.disc_latent]:
+        for disc in [
+            self.disc_real_fake,
+            self.disc_image,
+            self.disc_latent,
+            self.segmentation_network,
+        ]:
             if disc is None:
                 continue
             if disc.compiled_loss is None:
@@ -133,11 +144,15 @@ class GANModel(Model):
             The maximum gradient (before clipping)
         """
         # pylint:disable=invalid-unary-operand-type
-        gradients = [g for g in gradients if g is not None]
-        max_grad = tf.reduce_max([tf.reduce_max(tf.abs(g)) for g in gradients])
+        max_grad = tf.reduce_max(
+            [tf.reduce_max(tf.abs(g)) for g in gradients if g is not None]
+        )
         if self.clip_value is not None:
             gradients = [
-                tf.clip_by_value(g, -self.clip_value, self.clip_value) for g in gradients
+                None
+                if g is None
+                else tf.clip_by_value(g, -self.clip_value, self.clip_value)
+                for g in gradients
             ]
         return gradients, max_grad
 
@@ -267,6 +282,38 @@ class GANModel(Model):
             metrics["disc_latent/max_grad"] = max_grad
             losses["disc_latent/loss"] = dis_loss
 
+        if self.segmentation_network is not None:
+            assert (
+                len(self.segmentation_target_numbers) == 1
+            ), "There should be just one seg label"
+            labels_seg = target_data[self.segmentation_target_numbers[0]]
+            # keep mask to remove NaN values from prediction
+            mask = tf.math.logical_not(
+                tf.math.logical_or(tf.math.is_nan(labels_seg), tf.math.less(labels_seg, 0))
+            )
+            mask_batch_seg = tf.math.reduce_any(mask, axis=(1, 2, 3))
+            labels_seg = labels_seg[mask_batch_seg]
+            metrics["seg/perc_labels"] = tf.math.reduce_sum(
+                tf.cast(mask_batch_seg, tf.float32)
+            ) / tf.cast(batch_size, tf.float32)
+
+            with tf.GradientTape() as tape:
+                predictions = self.segmentation_network(source_images, training=True)
+                predictions = predictions[mask_batch_seg]
+
+                seg_loss = self.segmentation_network.compute_loss(
+                    source_images, labels_seg, predictions
+                )
+            grads = tape.gradient(seg_loss, self.segmentation_network.trainable_weights)
+            grads, max_grad = self.clip_gradients(grads)
+            self.segmentation_network.optimizer.apply_gradients(
+                zip(grads, self.segmentation_network.trainable_weights)
+            )
+
+            self.write_metrics(self.segmentation_network, metrics, predictions, labels_seg)
+            metrics["seg/max_grad"] = max_grad
+            losses["seg/loss"] = seg_loss
+
         # Train the generator (note that we should *not* update the weights
         # of the discriminator)!
         with tf.GradientTape() as tape:
@@ -340,6 +387,22 @@ class GANModel(Model):
                     disc_name="generator-latent",
                 )
 
+            if self.segmentation_network is not None:
+                predictions = self.segmentation_network(source_images)
+                predictions = predictions[mask_batch_seg]
+                disc_seg_loss = self.segmentation_network.compute_loss(
+                    source_images, labels_seg, predictions
+                )
+                gen_loss += disc_seg_loss
+                losses["generator/seg_loss"] = disc_seg_loss
+                self.write_metrics(
+                    self.segmentation_network,
+                    metrics,
+                    predictions,
+                    labels_seg,
+                    disc_name="seg",
+                )
+
             if self.variational:
                 # Add KL divergence regularization loss.
                 kl_loss = -0.5 * tf.reduce_mean(
@@ -349,7 +412,7 @@ class GANModel(Model):
                 losses["generator/kl_loss"] = kl_loss
 
         generator_weights = [
-            w for w in self.trainable_weights if not w.name.startswith("disc_")
+            w for w in self.trainable_weights if w.name.startswith("auto_")
         ]
 
         grads = tape.gradient(gen_loss, generator_weights)
@@ -453,6 +516,31 @@ class GANModel(Model):
             predictions = self.disc_latent(latent_variables)
             self.write_metrics(self.disc_latent, metrics, predictions, labels_latent)
 
+        if self.segmentation_network is not None:
+            assert (
+                len(self.segmentation_target_numbers) == 1
+            ), "There should be just one seg label"
+            labels_seg = target_data[self.segmentation_target_numbers[0]]
+            # keep mask to remove NaN values from prediction
+            mask = tf.math.logical_not(
+                tf.math.logical_or(tf.math.is_nan(labels_seg), tf.math.less(labels_seg, 0))
+            )
+            mask_batch_seg = tf.math.reduce_any(mask, axis=(1, 2, 3))
+            labels_seg = labels_seg[mask_batch_seg]
+            metrics["seg/perc_labels"] = tf.math.reduce_sum(
+                tf.cast(mask_batch_seg, tf.float32)
+            ) / tf.cast(batch_size, tf.float32)
+
+            predictions = self.segmentation_network(source_images, training=True)
+            predictions = predictions[mask_batch_seg]
+
+            seg_loss = self.segmentation_network.compute_loss(
+                source_images, labels_seg, predictions
+            )
+
+            self.write_metrics(self.segmentation_network, metrics, predictions, labels_seg)
+            losses["seg/loss"] = seg_loss
+
         # Train the generator (note that we should *not* update the weights
         # of the discriminator)!
         gen_loss = tf.convert_to_tensor(0, dtype=tf.float32)
@@ -520,6 +608,22 @@ class GANModel(Model):
                 predictions,
                 self.disc_latent_target_labels,
                 disc_name="generator-latent",
+            )
+
+        if self.segmentation_network is not None:
+            predictions = self.segmentation_network(source_images)
+            predictions = predictions[mask_batch_seg]
+            disc_seg_loss = self.segmentation_network.compute_loss(
+                source_images, labels_seg, predictions
+            )
+            gen_loss += disc_seg_loss
+            losses["generator/seg_loss"] = disc_seg_loss
+            self.write_metrics(
+                self.segmentation_network,
+                metrics,
+                predictions,
+                labels_seg,
+                disc_name="seg",
             )
 
         if self.variational:
@@ -650,6 +754,9 @@ class AutoencoderGAN(AutoEncoder):
         self.disc_latent_tasks = None
         self.disc_latent_target_numbers = None
         self.disc_latent_target_labels = None
+
+        self.segmentation_network = None
+        self.segmentation_target_number = None
 
         self.regression_min = regression_min
         self.regression_max = regression_max
@@ -923,6 +1030,7 @@ class AutoencoderGAN(AutoEncoder):
                 tf.keras.metrics.AUC,
             ),
             "discriminator-regression": (tf.keras.metrics.RootMeanSquaredError,),
+            "segmentation": ("dice", "acc", "meanIoU"),
         }
 
         self.real_fake_disc_list = [
@@ -984,6 +1092,27 @@ class AutoencoderGAN(AutoEncoder):
                 discriminator_filter_base=self.options["disc_latent_filter_base"],
             )
 
+        if "segmentation" in self.tasks:
+            self.segmentation_network = unet(
+                input_tensor=self.inputs["x"],
+                out_channels=cfg.num_classes_seg,
+                loss="DICE",
+                model_name="seg",
+                **self.options.get("unet_parameters", {}),
+            )
+            metric_objects = [self.get_metric(m) for m in task_metrics_dict["segmentation"]]
+            self.segmentation_network.compile(
+                optimizer=tf_utils.get_optimizer(
+                    optimizer=self.options.get("seg_optimizer", "Adam"),
+                    l_r=0.001,
+                ),
+                loss=self.get_loss("DICE"),
+                metrics=metric_objects,
+            )
+            self.segmentation_target_numbers = [
+                n for n, tsk in enumerate(self.task_names) if tsk == "segmentation"
+            ]
+
         for name, disc_model, disc_list, disc_tasks in zip(
             ["real_fake", "image", "latent"],
             [self.disc_real_fake, self.disc_image, self.disc_latent],
@@ -1042,14 +1171,18 @@ class AutoencoderGAN(AutoEncoder):
                 "latent_weight": self.options["latent_weight"],
                 "image_weight": self.options["image_weight"],
                 "image_gen_weight": self.options["image_gen_weight"],
+                "segmentation_network": self.segmentation_network,
+                "segmentation_target_numbers": self.segmentation_target_numbers,
             },
         )
 
-    def _get_task_metrics(
-        self, metrics: List[Union[str, Callable, Collection]], tasks: List[str]
+    def get_task_metrics(
+        self, metrics: Dict[str, Union[str, Callable, Collection]], tasks: List[str]
     ):
-        metric_objects = super()._get_task_metrics(metrics, tasks)
-        metric_objects = tuple(m for m in metric_objects if len(m))
+        assert "autoencoder" in tasks
+        metrics = {"autoencoder": metrics["autoencoder"]}
+        tasks = ["autoencoder"]
+        metric_objects = super().get_task_metrics(metrics, tasks)
         if len(metric_objects) == 1:
             metric_objects = metric_objects[0]
         return metric_objects
@@ -1059,7 +1192,12 @@ class AutoencoderGAN(AutoEncoder):
         return loss_objects
 
     def plot_model(self, save_dir: Path):
-        for disc in [self.disc_real_fake, self.disc_image, self.disc_latent]:
+        for disc in [
+            self.disc_real_fake,
+            self.disc_image,
+            self.disc_latent,
+            self.segmentation_network,
+        ]:
             if disc is None:
                 continue
             tf.keras.utils.plot_model(

@@ -9,12 +9,10 @@ from typing import List
 
 os.environ["CUDA_VISIBLE_DEVICES"] = "3"
 
-import matplotlib.pyplot as plt
-import numpy as np
 import pandas as pd
 
 from prepare_disc_test import preprocessing_parameters
-from utils import plot_disc, plot_disc_exp, plot_with_ma
+from utils import plot_disc, plot_disc_exp, plot_metrics
 
 # %%
 
@@ -57,33 +55,23 @@ training_metrics = [
     "generator/total_loss",
     "generator/root_mean_squared_error",
 ]
+segmentation_metrics = [
+    "seg/dice",
+    "seg/loss",
+    "seg/mean_io_u",
+    "seg/perc_labels",
+]
 
 for suffix, _ in preprocessing_parameters:
     print(f"Starting with disc{suffix}.")
     exp_data = train_results.query(f"experiment == 'disc{suffix}'")
     if exp_data.size == 0:
         continue
-    training_metrics_present = [t for t in training_metrics if f"val_{t}" in exp_data]
-    nrows = int(np.ceil(len(training_metrics_present) / 4))
-    fig, axes = plt.subplots(
-        nrows=nrows,
-        ncols=4,
-        sharex=True,
-        sharey=False,
-        figsize=(16, nrows * 3.5),
-    )
-    for metric, ax in zip(training_metrics_present, axes.flat):
-        plot_with_ma(ax, exp_data, metric)
-        ax.set_ylabel(metric)
-    for ax in axes.flat[3 : 4 : len(training_metrics_present)]:
-        ax.legend()
-    for ax in axes.flat[len(training_metrics_present) :]:
-        ax.set_axis_off()
-    plt.tight_layout()
-    plt.show()
-    plt.close()
+    plot_metrics(exp_data, training_metrics)
     print("Image Discriminators")
     plot_disc(exp_data, "image")
+    print("Segmentation")
+    plot_metrics(exp_data, segmentation_metrics)
 
 print("finished")
 

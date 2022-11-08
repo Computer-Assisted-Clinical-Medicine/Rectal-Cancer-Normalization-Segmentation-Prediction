@@ -3,7 +3,7 @@ import os
 from collections import OrderedDict
 from enum import Enum
 from pathlib import Path
-from typing import Any, Dict, List, Union
+from typing import Any, Collection, Dict, List, Union
 
 import filelock
 import numpy as np
@@ -21,7 +21,10 @@ from SegClassRegBasis.segbasisnet import SegBasisNet
 
 
 def make_normalization_dataset(
-    modality: str, targets: Dict[str, str], column_names: Dict[str, str]
+    modality: str,
+    targets: Dict[str, str],
+    column_names: Dict[str, str],
+    use_segmentation=False,
 ) -> Dict[str, Dict[str, Union[List[str], str, dict]]]:
     """Make a dataset for the training of the normalization. It will return
     all images with the given modality that are found in data_dir/images.yaml
@@ -36,6 +39,8 @@ def make_normalization_dataset(
     column_names : Dict[str, str]
         The new names for the columns, the keys should be the same as in target,
         only the values should be the new names
+    use_segmentation: bool, optional
+        If the segmentation labels should be added, by default false.
 
     Returns
     -------
@@ -46,9 +51,12 @@ def make_normalization_dataset(
     # load data
     with open(data_dir / "images.yaml", encoding="utf8") as f:
         found_images = yaml.load(f, Loader=yaml.Loader)
+    if use_segmentation:
+        with open(data_dir / "segmented_images.yaml", encoding="utf8") as f:
+            segmented_images = yaml.load(f, Loader=yaml.Loader)
     # create dict with all points. The names have the format:
     # patient_timepoint_l{label_number}_d{diffusion_number}
-    dataset: Dict[str, Dict[str, Union[List[str], str, dict]]] = {}
+    dataset: Dict[str, Dict[str, Union[Collection[str], str, dict]]] = {}
     for timepoint, found_data in found_images.items():
         if not modality in found_data:
             continue
@@ -58,14 +66,14 @@ def make_normalization_dataset(
             image_dir = (data_dir / img).parent
             param_file = image_dir / "acquisition_parameters.csv"
             params = pd.read_csv(param_file, sep=";", index_col=0)
-            t2_name = Path(img).with_suffix("").with_suffix("").name
+            img_name = Path(img).with_suffix("").with_suffix("").name
             missing_columns = [c for c in targets.keys() if c not in params]
             if len(missing_columns) > 0:
                 raise ValueError(f"{missing_columns} not found")
-            params_t2 = params.loc[t2_name, targets.keys()]
+            img_params = params.loc[img_name, targets.keys()]
             cat_dict: Dict[str, str] = {}
             reg_dict: Dict[str, float] = {}
-            for col, param_val in params_t2.iteritems():
+            for col, param_val in img_params.iteritems():
                 col_name = column_names.get(col, col)
                 col_type = targets[col]
                 if col_type == "reg":
@@ -74,13 +82,30 @@ def make_normalization_dataset(
                     cat_dict[col_name] = str(param_val).strip()
             # add location to scanner
             cat_dict["model_name"] = cat_dict["location"] + " - " + cat_dict["model_name"]
-            dataset[name] = {
+            img_dict = {
                 "images": [image],
                 "classification": cat_dict,
                 "regression": reg_dict,
                 "autoencoder": "image",
             }
 
+            if use_segmentation:
+                label_image = None
+                if timepoint in segmented_images:
+                    if modality == "T2 axial":
+                        seg = [
+                            img_seg
+                            for img_seg in segmented_images[timepoint]
+                            if img_seg["name"] == img_name
+                        ]
+                    else:
+                        seg = segmented_images[timepoint][:1]
+                    if len(seg) > 0:
+                        label_image = seg[0]["labels"].replace(
+                            "Images", "Images registered and N4 corrected"
+                        )
+                img_dict["labels"] = label_image
+            dataset[name] = img_dict
     return dataset
 
 
@@ -107,9 +132,10 @@ def train_gan_normalization(
     disc_filter_base=32,
     disc_start_lr=0.05,
     disc_end_lr=0.001,
+    train_on_segmentation=False,
+    unet_parameters=None,
     identity=False,
     gan_suffix="",
-    **kwargs,
 ):
     """Train the GAN Normalization"""
 
@@ -127,6 +153,9 @@ def train_gan_normalization(
     start_lr = 0.05
     end_lr = 0.001
     lr_sd_type = "exponential_half"
+
+    if unet_parameters is None:
+        unet_parameters = {}
 
     if model_path.exists():
         return model_path_rel
@@ -158,7 +187,10 @@ def train_gan_normalization(
     column_tasks = {column_names[field]: tsk for field, tsk in targets.items()}
 
     dataset = make_normalization_dataset(
-        modality=modality, targets=targets, column_names=column_names
+        modality=modality,
+        targets=targets,
+        column_names=column_names,
+        use_segmentation=train_on_segmentation,
     )
 
     # remove outliers in regression
@@ -214,6 +246,15 @@ def train_gan_normalization(
         "max_resolution_augment": 0.9,
         # no tensorboard callback (slow)
         "write_tensorboard": False,
+        # add the metrics
+        "metrics": {
+            "segmentation": ("dice", "acc", "meanIoU"),
+            "classification": ("precision", "recall", "auc"),
+            "discriminator-classification": (),
+            "regression": ("rmse",),
+            "discriminator-regression": (),
+            "autoencoder": ("rmse", "nmi"),
+        },
     }
 
     preprocessing_parameters = {
@@ -229,13 +270,18 @@ def train_gan_normalization(
     constant_parameters = {
         "train_parameters": train_parameters,
         "preprocessing_parameters": preprocessing_parameters,
-        "dataloader_parameters": {"drop_remainder": True},
+        "dataloader_parameters": {
+            "drop_remainder": True,
+            "load_incomplete_labels": train_on_segmentation,
+        },
         "dimensions": 2,
     }
 
     # first discriminator just checks if the image looks good or not
     expanded_tasks = {}
     expanded_tasks["autoencoder"] = "autoencoder"
+    if train_on_segmentation:
+        expanded_tasks["segmentation"] = "segmentation"
     discriminators: List[Dict[str, Any]] = [
         {
             "name": "discriminator_real_fake",
@@ -336,6 +382,8 @@ def train_gan_normalization(
             "disc_latent_type": disc_type,
             "disc_latent_n_conv": disc_n_conv,
             "disc_latent_filter_base": disc_filter_base,
+            "train_on_segmentation": train_on_segmentation,
+            "unet_parameters": unet_parameters,
         },
         "loss": {
             "autoencoder": "MSE",
@@ -343,6 +391,7 @@ def train_gan_normalization(
             "regression": "MSE",
             "discriminator-classification": "CEL",
             "discriminator-regression": "MSE",
+            "segmentation": "DICE",
         },
     }
     if min_max:
@@ -376,6 +425,11 @@ def train_gan_normalization(
 
     fold_dir_rel = exp_output_path.parent / f"folds_norm_{modality.replace(' ', '_')}"
 
+    if train_on_segmentation:
+        tasks = ("autoencoder", "segmentation")
+    else:
+        tasks = ("autoencoder",)
+
     exp = Experiment(
         hyper_parameters=hyperparameters,
         name=experiment_name,
@@ -388,7 +442,7 @@ def train_gan_normalization(
         folds_dir_rel=fold_dir_rel,
         tensorboard_images=True,
         versions=["final"],
-        tasks=("autoencoder"),
+        tasks=tasks,
         expanded_tasks=expanded_tasks,
     )
 
