@@ -112,7 +112,8 @@ def get_gan_suffix(parameters: Dict) -> str:
     norm_params = parameters["preprocessing_parameters"]["normalization_parameters"]
     depth = norm_params["depth"]
     f_base = norm_params["filter_base"]
-    sigma = norm_params["smoothing_sigma"]
+    skip_edges = norm_params["skip_edges"]
+    sigma = norm_params.get("smoothing_sigma", 1)
     image_weight = norm_params.get("image_weight", 1)
     image_gen_weight = norm_params.get("image_gen_weight", 1)
     disc_n_conv = norm_params.get("disc_n_conv", 3)
@@ -121,10 +122,15 @@ def get_gan_suffix(parameters: Dict) -> str:
     disc_start_lr = norm_params.get("disc_start_lr", 0.05)
     all_image = norm_params.get("all_image", False)
     init_norm_method = norm_params.get("init_norm_method", NORMALIZING.QUANTILE)
-    if depth == 3 and f_base == 16 and np.isclose(sigma, 1):
+    if depth == 3 and f_base == 16:
         gan_suffix = ""
     else:
-        gan_suffix = f"_{depth}_{f_base}_{sigma:4.2f}"
+        gan_suffix = f"_{depth}_{f_base}"
+    if skip_edges:
+        if not np.isclose(sigma, 1):
+            gan_suffix += f"_{sigma:4.2f}"
+    else:
+        gan_suffix += "_n-skp"
     if not np.isclose(image_weight, 1):
         gan_suffix += f"_iw{image_weight:.2f}"
     if not norm_params.get("train_on_gen", True):

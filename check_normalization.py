@@ -21,7 +21,7 @@ from tqdm import tqdm
 from networks import auto_encoder
 from SegClassRegBasis import evaluation
 from SegClassRegBasis.normalization import NORMALIZING
-from utils import plot_disc, plot_with_ma
+from utils import plot_disc, plot_disc_exp, plot_with_ma
 
 
 def read_norm_exp(norm_suffix: str, silent=False) -> pd.DataFrame:
@@ -141,6 +141,7 @@ experiments = {
     "f_64_bc_lr": "_3_64_0.50_BetterConv_0.00001",
     "f6bl_img": "_3_64_0.50_BetterConv_0.00001_all_image",
     "f6bl_win": "_3_64_0.50_BetterConv_0.00001_WINDOW",
+    "f6bl_win_ns": "_3_64_n-skp_BetterConv_0.00001_WINDOW",
 }
 suffixes = list(experiments.values())
 
@@ -340,6 +341,18 @@ for location in train_locations:
     plot_disc(train_res_loc, "latent")
     print("Image Discriminators")
     plot_disc(train_res_loc, "image")
+
+# %%
+
+for location in train_locations:
+    print(location)
+    plot_disc_exp(
+        train_results.query(f"location == '{location}'"),
+        list(experiments.keys()),
+        [f"{e}-" for e in experiments],
+        "image",
+    )
+
 
 # %%
 
