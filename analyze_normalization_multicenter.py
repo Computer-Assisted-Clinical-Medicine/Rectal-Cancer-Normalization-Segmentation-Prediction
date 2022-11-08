@@ -678,7 +678,10 @@ display_markdown("## Publication figures")
 
 new_names = {
     "GAN_DISCRIMINATORS": "GAN",
-    "GAN_DISCRIMINATORS_tog_idg0.50": "GAN_tog",
+    "GAN_DISCRIMINATORS_3_64_0.50": "GAN_3_64",
+    "GAN_DISCRIMINATORS_3_64_0.50_BetterConv": "GAN_3_64_BC",
+    "GAN_DISCRIMINATORS_3_64_0.50_BetterConv_0.00001": "GAN_3_64_BC_lr",
+    "GAN_DISCRIMINATORS_3_64_0.50_BetterConv_0.00001_all_image": "GAN_3_64_BC_lr_img",
     "QUANTILE": "Perc",
     "HM_QUANTILE": "Perc-HM",
     "MEAN_STD": "M-Std",
@@ -725,7 +728,7 @@ for ax, tlt in zip(g.axes[0], titles):
 save_pub("performance_ABC")
 
 g = sns.catplot(
-    data=data,
+    data=data.replace(new_names),
     y="Dice",
     x="normalization",
     order=norm_order,
@@ -753,7 +756,7 @@ for name_df, name in zip(data.external.unique(), titles):
     else:
         query = f"external == {name_df}"
     g = sns.catplot(
-        data=data.query(query),
+        data=data.query(query).replace(new_names),
         y="Dice",
         x="normalization",
         order=norm_order,
@@ -804,17 +807,16 @@ for ax, tlt in zip(axes, titles):
 
 save_pub("params", bbox_inches="tight")
 
-raw_data = (
+grouped_data = (
     results.query(
         "version == 'best' & before_therapy & postprocessed"
         + " & name != 'combined_models'"
     )
     .replace(new_names)
-    .groupby(["normalization", "network"])
+    .groupby(["normalization"])
 )
-data = pd.DataFrame(raw_data.Dice.mean()).drop("Dice", axis="columns")
-for group in raw_data.groups:
-    group_data = raw_data.get_group(group)
+data = pd.DataFrame(grouped_data.Dice.mean()).drop("Dice", axis="columns")
+for group, group_data in grouped_data:
     mean_all = group_data[group_data.train_location == "all"].Dice.mean()
     data.loc[group, "all"] = mean_all
     mean_internal = group_data[
@@ -1221,27 +1223,24 @@ save_pub("mean-std-stat")
 # %%
 display_markdown("## Compare networks")
 
-custom_names = {**new_names}
-custom_names["DeepLabv3plus2D"] = "DLv3+"
-
-raw_data = (
+grouped_data = (
     results.query(
         "version == 'best' & before_therapy & postprocessed"
         + " & name != 'combined_models' & train_location == 'all'"
     )
-    .replace(custom_names)
-    .groupby(["normalization", "network"])
+    .replace(new_names)
+    .groupby("normalization")
     .Dice
 )
-data = pd.DataFrame(raw_data.median())
+data = pd.DataFrame(grouped_data.median())
 
 display_markdown("Models trained on all images.")
 display_dataframe(data.round(2))
 differences = pd.DataFrame(index=data.index, columns=data.index)
 
-for first in data.index:
-    for second in data.index:
-        tscore, pvalue = ttest_ind(raw_data.get_group(first), raw_data.get_group(second))
+for first, first_data in grouped_data:
+    for second, second_data in grouped_data:
+        tscore, pvalue = ttest_ind(first_data, second_data)
         differences.loc[first, second] = np.round(pvalue, 3)
 display_markdown("P-Values")
 display_dataframe(differences.round(2))
@@ -1250,20 +1249,20 @@ display_dataframe(differences < 0.05)
 display_markdown("## Compare Normalization")
 
 display_markdown("### all")
-raw_data = (
+grouped_data = (
     results.query(
         "version == 'best' & before_therapy & postprocessed"
         + " & name != 'combined_models' & train_location == 'all' & not external"
     )
-    .replace(custom_names)
-    .groupby(["normalization", "network"])
+    .replace(new_names)
+    .groupby("normalization")
     .Dice
 )
-data = pd.DataFrame(raw_data.mean())
+data = pd.DataFrame(grouped_data.mean())
 differences = pd.DataFrame(index=data.index, columns=data.index)
-for first in data.index:
-    for second in data.index:
-        tscore, pvalue = ttest_ind(raw_data.get_group(first), raw_data.get_group(second))
+for first, first_data in grouped_data:
+    for second, second_data in grouped_data:
+        tscore, pvalue = ttest_ind(first_data, second_data)
         differences.loc[first, second] = np.round(pvalue, 3)
 display_dataframe(data.round(2))
 display_markdown("P-Values")
@@ -1271,20 +1270,20 @@ display_dataframe(differences)
 display_dataframe(differences < 0.05)
 
 display_markdown("### internal")
-raw_data = (
+grouped_data = (
     results.query(
         "version == 'best' & before_therapy & postprocessed"
         + " & name != 'combined_models' & train_location != 'all' & not external"
     )
-    .replace(custom_names)
-    .groupby(["normalization", "network"])
+    .replace(new_names)
+    .groupby("normalization")
     .Dice
 )
-data = pd.DataFrame(raw_data.mean())
+data = pd.DataFrame(grouped_data.mean())
 differences = pd.DataFrame(index=data.index, columns=data.index)
-for first in data.index:
-    for second in data.index:
-        tscore, pvalue = ttest_ind(raw_data.get_group(first), raw_data.get_group(second))
+for first, first_data in grouped_data:
+    for second, second_data in grouped_data:
+        tscore, pvalue = ttest_ind(first_data, second_data)
         differences.loc[first, second] = np.round(pvalue, 3)
 display_dataframe(data.round(2))
 display_markdown("P-Values")
@@ -1292,20 +1291,20 @@ display_dataframe(differences)
 display_dataframe(differences < 0.05)
 
 display_markdown("### external")
-raw_data = (
+grouped_data = (
     results.query(
         "version == 'best' & before_therapy & postprocessed"
         + " & name != 'combined_models' & train_location != 'all' & external"
     )
-    .replace(custom_names)
-    .groupby(["normalization", "network"])
+    .replace(new_names)
+    .groupby("normalization")
     .Dice
 )
-data = pd.DataFrame(raw_data.mean())
+data = pd.DataFrame(grouped_data.mean())
 differences = pd.DataFrame(index=data.index, columns=data.index)
-for first in data.index:
-    for second in data.index:
-        tscore, pvalue = ttest_ind(raw_data.get_group(first), raw_data.get_group(second))
+for first, first_data in grouped_data:
+    for second, second_data in grouped_data:
+        tscore, pvalue = ttest_ind(first_data, second_data)
         differences.loc[first, second] = np.round(pvalue, 5)
 display_dataframe(data.round(2))
 display_markdown("P-Values")

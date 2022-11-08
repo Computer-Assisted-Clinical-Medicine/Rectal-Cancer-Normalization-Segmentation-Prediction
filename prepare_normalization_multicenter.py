@@ -17,7 +17,7 @@ os.environ["TF_CPP_MIN_LOG_LEVEL"] = "3"
 import tensorflow as tf
 import yaml
 
-from gan_normalization import GAN_NORMALIZING, train_gan_normalization
+from gan_normalization import GAN_NORMALIZING, get_norm_params, train_gan_normalization
 from SegClassRegBasis.architecture import DeepLabv3plus, UNet
 from SegClassRegBasis.experiment import Experiment
 from SegClassRegBasis.normalization import NORMALIZING
@@ -87,6 +87,8 @@ def priority(hp_params):
         suffix = get_gan_suffix(hp_params)
         suffix_priority = {
             "_3_64_0.50_BetterConv_0.00001": 9,
+            "_3_64_0.50_BetterConv_0.00001_WINDOW": 8,
+            "_3_64_0.50_BetterConv_0.00001_all_image": 7,
         }
         prio += suffix_priority.get(suffix, 0)
 
@@ -239,10 +241,22 @@ if __name__ == "__main__":
     ### normalization method ###
     normalization_methods = [
         (
-            NORMALIZING.QUANTILE,
+            GAN_NORMALIZING.GAN_DISCRIMINATORS,
             {
-                "lower_q": 0.05,
-                "upper_q": 0.95,
+                "depth": 3,
+                "filter_base": 64,
+                "min_max": False,
+                "smoothing_sigma": 0.5,
+                "latent_weight": 1,
+                "image_weight": 1,
+                "image_gen_weight": 0.5,
+                "skip_edges": True,
+                "latent": True,
+                "train_on_gen": True,
+                "disc_type": "BetterConv",
+                "batch_size": 128,
+                "disc_start_lr": 1e-5,
+                "disc_end_lr": 1e-5,
             },
         ),
         (
@@ -262,6 +276,46 @@ if __name__ == "__main__":
                 "batch_size": 128,
                 "disc_start_lr": 1e-5,
                 "disc_end_lr": 1e-5,
+                "init_norm_method": NORMALIZING.WINDOW,
+            },
+        ),
+        (
+            GAN_NORMALIZING.GAN_DISCRIMINATORS,
+            {
+                "depth": 3,
+                "filter_base": 64,
+                "min_max": False,
+                "latent_weight": 1,
+                "image_weight": 1,
+                "image_gen_weight": 0.5,
+                "skip_edges": False,
+                "latent": True,
+                "train_on_gen": True,
+                "disc_type": "BetterConv",
+                "batch_size": 128,
+                "disc_start_lr": 1e-5,
+                "disc_end_lr": 1e-5,
+                "init_norm_method": NORMALIZING.WINDOW,
+            },
+        ),
+        (
+            GAN_NORMALIZING.GAN_DISCRIMINATORS,
+            {
+                "depth": 3,
+                "filter_base": 64,
+                "min_max": False,
+                "smoothing_sigma": 0.5,
+                "latent_weight": 1,
+                "image_weight": 1,
+                "image_gen_weight": 0.5,
+                "skip_edges": True,
+                "latent": True,
+                "train_on_gen": True,
+                "disc_type": "BetterConv",
+                "batch_size": 128,
+                "disc_start_lr": 1e-5,
+                "disc_end_lr": 1e-5,
+                "all_image": True,
             },
         ),
         (
@@ -311,9 +365,17 @@ if __name__ == "__main__":
                 "train_on_gen": True,
             },
         ),
+        (
+            NORMALIZING.QUANTILE,
+            {
+                "lower_q": 0.05,
+                "upper_q": 0.95,
+            },
+        ),
         (NORMALIZING.HISTOGRAM_MATCHING, {"mask_quantile": 0}),
         (NORMALIZING.MEAN_STD, {}),
         (NORMALIZING.HM_QUANTILE, {}),
+        (NORMALIZING.WINDOW, get_norm_params(NORMALIZING.WINDOW)),
     ]
     # add all methods with their hyperparameters
     hyper_parameters_new = []
@@ -417,10 +479,29 @@ if __name__ == "__main__":
             norm_type = pre_params["normalizing_method"]
 
             if norm_type == GAN_NORMALIZING.GAN_DISCRIMINATORS:
-                norm_params = pre_params["normalization_parameters"]
-                depth = norm_params["depth"]
-                f_base = norm_params["filter_base"]
-                sigma = norm_params["smoothing_sigma"]
+                # make the base dat set
+                pre_params_gan_base = copy.deepcopy(preprocessing_parameters)
+                gan_base_norm = pre_params["normalization_parameters"].get(
+                    "init_norm_method", NORMALIZING.QUANTILE
+                )
+                gan_base_params = get_norm_params(gan_base_norm)
+                pre_params_gan_base["normalizing_method"] = gan_base_norm
+                pre_params_gan_base["normalization_parameters"] = gan_base_params
+                DATASET_TO_PROCESS = split_into_modalities(
+                    preprocess_dataset(
+                        data_set=dataset,
+                        num_channels=N_CHANNELS,
+                        base_dir=experiment_dir,
+                        data_dir=data_dir,
+                        preprocessed_dir=PREPROCESSED_DIR / gan_base_norm.name,
+                        train_dataset=train_list,
+                        preprocessing_parameters=pre_params_gan_base,
+                        pass_modality=False,
+                        cut_to_overlap=True,
+                    ),
+                    n_channels=N_CHANNELS,
+                )
+                # do the actual normalization
                 gan_suffix = get_gan_suffix(hyp)
                 preprocessing_name = norm_type.name + gan_suffix
                 PASS_MODALITY = True
@@ -436,7 +517,7 @@ if __name__ == "__main__":
                                 modality=MODALITIES[mod_num],
                                 gan_suffix=gan_suffix,
                                 n_epochs=N_EPOCHS,
-                                **norm_params,
+                                **pre_params["normalization_parameters"],
                             )
                         )
                 # see if all paths exist, this is important, if two processes
@@ -447,8 +528,6 @@ if __name__ == "__main__":
                 # overlap has already been cut
                 CUT_TO_OVERLAP = False
                 assert QUANT_DATASET is not None
-                # the quant dataset lives in the experiment dir
-                DATASET_TO_PROCESS = QUANT_DATASET
                 preprocess_base_dir = experiment_dir
             else:
                 PASS_MODALITY = False

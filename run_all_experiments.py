@@ -7,8 +7,6 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
-os.environ["CUDA_VISIBLE_DEVICES"] = "3"
-
 import tensorflow as tf
 
 from run_single_experiment import run_experiment_fold
