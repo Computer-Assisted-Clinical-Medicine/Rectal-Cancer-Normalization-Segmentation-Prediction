@@ -10,7 +10,6 @@ from typing import List
 os.environ["CUDA_VISIBLE_DEVICES"] = "3"
 
 import matplotlib.pyplot as plt
-import numpy as np
 import pandas as pd
 import seaborn as sns
 import tensorflow as tf
@@ -21,7 +20,7 @@ from tqdm import tqdm
 from networks import auto_encoder
 from SegClassRegBasis import evaluation
 from SegClassRegBasis.normalization import NORMALIZING
-from utils import plot_disc, plot_disc_exp, plot_with_ma
+from utils import plot_disc, plot_disc_exp, plot_metrics
 
 
 def read_norm_exp(norm_suffix: str, silent=False) -> pd.DataFrame:
@@ -142,6 +141,7 @@ experiments = {
     "f6bl_img": "_3_64_0.50_BetterConv_0.00001_all_image",
     "f6bl_win": "_3_64_0.50_BetterConv_0.00001_WINDOW",
     "f6bl_win_ns": "_3_64_n-skp_BetterConv_0.00001_WINDOW",
+    "f6bl_seg": "_3_64_0.50_BetterConv_0.00001_seg",
 }
 suffixes = list(experiments.values())
 
@@ -204,14 +204,7 @@ if results is not None:
 # %%
 
 if results is not None:
-    mean_results = results.groupby(["patient_id", "modality"]).median()
-
-    display(
-        mean_results.sort_values("structured_similarity_index")[
-            ["rmse", "norm_mutual_inf", "structured_similarity_index"]
-        ]
-    )
-
+    print("Results per image, modality and normalization method")
     display(
         results.sort_values("structured_similarity_index")[
             [
@@ -222,6 +215,14 @@ if results is not None:
                 "norm_mutual_inf",
                 "structured_similarity_index",
             ]
+        ]
+    )
+
+    print("Average results for each image")
+    mean_results = results.groupby(["patient_id", "modality"]).median()
+    display(
+        mean_results.sort_values("structured_similarity_index")[
+            ["rmse", "norm_mutual_inf", "structured_similarity_index"]
         ]
     )
 
@@ -310,6 +311,12 @@ training_metrics = [
     "generator/root_mean_squared_error",
     "generator/nmi",
 ]
+segmentation_metrics = [
+    "seg/dice",
+    "seg/loss",
+    "seg/mean_io_u",
+    "seg/perc_labels",
+]
 
 for location in train_locations:
     print(f"Starting with {location}.")
@@ -318,29 +325,13 @@ for location in train_locations:
     )
     if train_res_loc.size == 0:
         continue
-    training_metrics_present = [t for t in training_metrics if f"val_{t}" in train_res_loc]
-    nrows = int(np.ceil(len(training_metrics_present) / 4))
-    fig, axes = plt.subplots(
-        nrows=nrows,
-        ncols=4,
-        sharex=True,
-        sharey=False,
-        figsize=(16, nrows * 3.5),
-    )
-    for metric, ax in zip(training_metrics_present, axes.flat):
-        plot_with_ma(ax, train_res_loc, metric)
-        ax.set_ylabel(metric)
-    for ax in axes.flat[3 : 4 : len(training_metrics_present)]:
-        ax.legend()
-    for ax in axes.flat[len(training_metrics_present) :]:
-        ax.set_axis_off()
-    plt.tight_layout()
-    plt.show()
-    plt.close()
+    plot_metrics(train_res_loc, training_metrics)
     print("Latent Discriminators")
     plot_disc(train_res_loc, "latent")
     print("Image Discriminators")
     plot_disc(train_res_loc, "image")
+    print("Segmentation")
+    plot_metrics(train_res_loc, segmentation_metrics)
 
 # %%
 

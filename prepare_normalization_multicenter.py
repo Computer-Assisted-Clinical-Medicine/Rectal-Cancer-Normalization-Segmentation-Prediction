@@ -89,6 +89,7 @@ def priority(hp_params):
             "_3_64_0.50_BetterConv_0.00001": 9,
             "_3_64_0.50_BetterConv_0.00001_WINDOW": 8,
             "_3_64_0.50_BetterConv_0.00001_all_image": 7,
+            "_3_64_0.50_BetterConv_0.00001_seg": 6,
         }
         prio += suffix_priority.get(suffix, 0)
 
@@ -315,6 +316,27 @@ if __name__ == "__main__":
                 "batch_size": 128,
                 "disc_start_lr": 1e-5,
                 "disc_end_lr": 1e-5,
+                "train_on_segmentation": True,
+                "unet_parameters": network_parameters_UNet,
+            },
+        ),
+        (
+            GAN_NORMALIZING.GAN_DISCRIMINATORS,
+            {
+                "depth": 3,
+                "filter_base": 64,
+                "min_max": False,
+                "smoothing_sigma": 0.5,
+                "latent_weight": 1,
+                "image_weight": 1,
+                "image_gen_weight": 0.5,
+                "skip_edges": True,
+                "latent": True,
+                "train_on_gen": True,
+                "disc_type": "BetterConv",
+                "batch_size": 128,
+                "disc_start_lr": 1e-5,
+                "disc_end_lr": 1e-5,
                 "all_image": True,
             },
         ),
@@ -412,8 +434,6 @@ if __name__ == "__main__":
 
     # set up all experiments
     experiments: List[Experiment] = []
-
-    QUANT_DATASET = None
 
     for location in [
         "Frankfurt",
@@ -527,7 +547,6 @@ if __name__ == "__main__":
                 pre_params["normalization_parameters"]["model_paths"] = tuple(model_paths)
                 # overlap has already been cut
                 CUT_TO_OVERLAP = False
-                assert QUANT_DATASET is not None
                 preprocess_base_dir = experiment_dir
             else:
                 PASS_MODALITY = False
@@ -560,9 +579,6 @@ if __name__ == "__main__":
                 pass_modality=PASS_MODALITY,
                 cut_to_overlap=CUT_TO_OVERLAP,
             )
-
-            if QUANT_DATASET is None and norm_type == NORMALIZING.QUANTILE:
-                QUANT_DATASET = split_into_modalities(exp_dataset, n_channels=N_CHANNELS)
 
             exp = Experiment(
                 hyper_parameters=hyp,

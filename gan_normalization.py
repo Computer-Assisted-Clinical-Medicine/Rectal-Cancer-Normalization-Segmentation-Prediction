@@ -138,6 +138,7 @@ def train_gan_normalization(
     unet_parameters=None,
     identity=False,
     gan_suffix="",
+    **_,
 ):
     """Train the GAN Normalization"""
 

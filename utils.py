@@ -122,6 +122,7 @@ def get_gan_suffix(parameters: Dict) -> str:
     disc_start_lr = norm_params.get("disc_start_lr", 0.05)
     all_image = norm_params.get("all_image", False)
     init_norm_method = norm_params.get("init_norm_method", NORMALIZING.QUANTILE)
+    train_on_segmentation = norm_params.get("train_on_segmentation", False)
     if depth == 3 and f_base == 16:
         gan_suffix = ""
     else:
@@ -150,6 +151,8 @@ def get_gan_suffix(parameters: Dict) -> str:
         gan_suffix += "_all_image"
     if init_norm_method is not NORMALIZING.QUANTILE:
         gan_suffix += f"_{init_norm_method.name}"
+    if train_on_segmentation:
+        gan_suffix += "_seg"
     return gan_suffix
 
 
