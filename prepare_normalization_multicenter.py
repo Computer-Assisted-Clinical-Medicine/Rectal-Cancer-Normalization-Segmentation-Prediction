@@ -90,6 +90,7 @@ def priority(hp_params):
             "_3_64_0.50_BetterConv_0.00001_WINDOW": 8,
             "_3_64_0.50_BetterConv_0.00001_all_image": 7,
             "_3_64_0.50_BetterConv_0.00001_seg": 6,
+            "_3_64_0.50_BetterConv_0.00001_WINDOW_seg": 5,
         }
         prio += suffix_priority.get(suffix, 0)
 
@@ -297,6 +298,28 @@ if __name__ == "__main__":
                 "disc_start_lr": 1e-5,
                 "disc_end_lr": 1e-5,
                 "init_norm_method": NORMALIZING.WINDOW,
+            },
+        ),
+        (
+            GAN_NORMALIZING.GAN_DISCRIMINATORS,
+            {
+                "depth": 3,
+                "filter_base": 64,
+                "min_max": False,
+                "smoothing_sigma": 0.5,
+                "latent_weight": 1,
+                "image_weight": 1,
+                "image_gen_weight": 0.5,
+                "skip_edges": True,
+                "latent": True,
+                "train_on_gen": True,
+                "disc_type": "BetterConv",
+                "batch_size": 128,
+                "disc_start_lr": 1e-5,
+                "disc_end_lr": 1e-5,
+                "init_norm_method": NORMALIZING.WINDOW,
+                "train_on_segmentation": True,
+                "unet_parameters": network_parameters_UNet,
             },
         ),
         (

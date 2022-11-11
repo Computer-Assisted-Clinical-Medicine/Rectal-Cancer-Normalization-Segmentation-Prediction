@@ -142,6 +142,7 @@ experiments = {
     "f6bl_win": "_3_64_0.50_BetterConv_0.00001_WINDOW",
     "f6bl_win_ns": "_3_64_n-skp_BetterConv_0.00001_WINDOW",
     "f6bl_seg": "_3_64_0.50_BetterConv_0.00001_seg",
+    "f6bl_win_seg": "_3_64_0.50_BetterConv_0.00001_WINDOW_seg",
 }
 suffixes = list(experiments.values())
 
@@ -165,7 +166,7 @@ else:
 # %%
 
 if results is not None:
-    sns.catplot(
+    rmse = sns.catplot(
         data=results,
         x="experiment_name",
         y="rmse",
@@ -174,10 +175,11 @@ if results is not None:
         row_order=train_locations,
         col="modality",
     )
+    rmse.fig.autofmt_xdate()
     plt.show()
     plt.close()
 
-    sns.catplot(
+    ssi = sns.catplot(
         data=results,
         x="experiment_name",
         y="structured_similarity_index",
@@ -186,10 +188,11 @@ if results is not None:
         row_order=train_locations,
         col="modality",
     )
+    ssi.fig.autofmt_xdate()
     plt.show()
     plt.close()
 
-    sns.catplot(
+    nmi = sns.catplot(
         data=results,
         x="experiment_name",
         y="norm_mutual_inf",
@@ -198,6 +201,7 @@ if results is not None:
         row_order=train_locations,
         col="modality",
     )
+    nmi.fig.autofmt_xdate()
     plt.show()
     plt.close()
 

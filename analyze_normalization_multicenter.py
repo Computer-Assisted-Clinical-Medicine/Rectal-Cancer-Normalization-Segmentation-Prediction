@@ -154,6 +154,12 @@ acquisition_params.rename(columns=column_names, inplace=True)
 # set location
 results = results.merge(right=acquisition_params.location, on="File Number")
 
+# %%
+
+# See which locations are finished
+
+results.groupby("normalization").train_location.nunique()
+
 # %% [markdown]
 
 # ## Analyze the data
@@ -188,8 +194,47 @@ g.fig.subplots_adjust(top=0.87)
 plt.show()
 plt.close()
 
+g = sns.catplot(
+    data=results[results.normalization.str.startswith("GAN_")].query(
+        "version == 'best' & before_therapy & postprocessed & name != 'combined_models'"
+    ),
+    x="Dice",
+    y="train_location",
+    col="external",
+    hue="normalization",
+    hue_order=[n for n in results.normalization.cat.categories if n.startswith("GAN_")],
+    kind="box",
+    legend=True,
+    legend_out=True,
+)
+g.fig.suptitle(
+    "Overall Performance for GANs (version = best | before_therapy = True | postprocessed = True)"
+)
+g.fig.subplots_adjust(top=0.87)
+plt.show()
+plt.close()
+
+g = sns.catplot(
+    data=results.query(
+        "version == 'best' & before_therapy & postprocessed & name != 'combined_models'"
+    ),
+    x="Dice",
+    y="normalization",
+    col="external",
+    hue="train_location",
+    kind="box",
+    legend=True,
+    legend_out=True,
+)
+g.fig.suptitle(
+    "Overall Performance (version = best | before_therapy = True | postprocessed = True)"
+)
+g.fig.subplots_adjust(top=0.87)
+plt.show()
+plt.close()
+
 res_not_all = results.query(
-    "version == 'best' & before_therapy & postprocessed & name != 'combined_models' & train_location != 'all'"
+    "before_therapy & postprocessed & name != 'combined_models' & train_location != 'all'"
 )
 if res_not_all.size > 0:
     g = sns.catplot(
@@ -202,7 +247,8 @@ if res_not_all.size > 0:
         legend_out=True,
     )
     g.fig.suptitle(
-        "Performance on all locations (except all) (version = best | before_therapy = True | postprocessed = True)"
+        "Performance on all training locations (except all) "
+        + "(version = best | before_therapy = True | postprocessed = True)"
     )
     g.fig.subplots_adjust(top=0.87)
     plt.show()
@@ -222,7 +268,55 @@ if res_all.size > 0:
         legend_out=True,
     )
     g.fig.suptitle(
-        "Performance on all locations (except all) (version = best | before_therapy = True | postprocessed = True)"
+        "Performance on all training locations (before_therapy = True | postprocessed = True)"
+    )
+    g.fig.subplots_adjust(top=0.87)
+    plt.show()
+    plt.close()
+
+res_single_center = results.query(
+    "before_therapy & postprocessed & name != 'combined_models'"
+)
+res_single_center = res_single_center[
+    res_single_center.train_location.apply(
+        lambda x: x in ["Frankfurt", "Regensburg", "Mannheim"]
+    )
+]
+if res_single_center.size > 0:
+    g = sns.catplot(
+        data=res_single_center,
+        x="Dice",
+        y="normalization",
+        col="external",
+        kind="box",
+        legend=True,
+        legend_out=True,
+    )
+    g.fig.suptitle(
+        "Performance on the single centers (version = best | before_therapy = True | postprocessed = True)"
+    )
+    g.fig.subplots_adjust(top=0.87)
+    plt.show()
+    plt.close()
+
+res_except_one = results.query("before_therapy & postprocessed & name != 'combined_models'")
+res_except_one = res_except_one[
+    res_except_one.train_location.apply(
+        lambda x: x in ["Not-Frankfurt", "Not-Regensburg", "Not-Mannheim"]
+    )
+]
+if res_except_one.size > 0:
+    g = sns.catplot(
+        data=res_except_one,
+        x="Dice",
+        y="normalization",
+        col="external",
+        kind="box",
+        legend=True,
+        legend_out=True,
+    )
+    g.fig.suptitle(
+        "Performance on the centers except one (version = best | before_therapy = True | postprocessed = True)"
     )
     g.fig.subplots_adjust(top=0.87)
     plt.show()
