@@ -15,7 +15,7 @@ from tensorflow.keras import Model, layers
 
 from networks import AutoEncoder, auto_encoder
 from SegClassRegBasis import config as cfg
-from SegClassRegBasis import tf_utils, utils
+from SegClassRegBasis import tf_utils, utils, loss
 from SegmentationArchitectures.unets import unet
 from SegmentationArchitectures.utils import get_regularizer
 
@@ -711,7 +711,7 @@ class AutoencoderGAN(AutoEncoder):
     def __init__(
         self,
         loss_name: str,
-        tasks: OrderedDict,
+        tasks: OrderedDict = None,
         depth=4,
         filter_base=16,
         skip_edges=False,
@@ -738,6 +738,9 @@ class AutoencoderGAN(AutoEncoder):
             discriminators = []
         elif not isinstance(discriminators, list):
             raise ValueError("discriminators should be a list of dictionaries")
+
+        if tasks is None:
+            tasks = OrderedDict(autoencoder="autoencoder")
 
         self.discriminators = []
         self.discriminator_targets = []
@@ -781,22 +784,27 @@ class AutoencoderGAN(AutoEncoder):
             regularize=regularize,
             discriminators=discriminators,
             clip_value=clip_value,
+            custom_objects={
+                "ExponentialDecayMin": tf_utils.ExponentialDecayMin,
+                "mean_squared_error_loss": loss.mean_squared_error_loss,
+            },
             **kwargs,
         )
 
         # remove all losses that are just a discriminator
-        self.outputs["loss"] = [
-            loss
-            for loss, tsk in zip(self.outputs["loss"], self.tasks)
-            if tsk == "autoencoder"
-        ]
-        assert len(self.outputs["loss"]) == 1
-        # Use no loss for the latent output
-        if self.disc_latent is not None:
-            self.outputs["loss"].append(None)
-        if self.options["variational"]:
-            self.outputs["loss"].append(None)
-            self.outputs["loss"].append(None)
+        if self.outputs["loss"] is not None:
+            self.outputs["loss"] = [
+                loss
+                for loss, tsk in zip(self.outputs["loss"], self.tasks)
+                if tsk == "autoencoder"
+            ]
+            assert len(self.outputs["loss"]) == 1
+            # Use no loss for the latent output
+            if self.disc_latent is not None:
+                self.outputs["loss"].append(None)
+            if self.options["variational"]:
+                self.outputs["loss"].append(None)
+                self.outputs["loss"].append(None)
 
     @staticmethod
     def get_name():
@@ -1112,6 +1120,8 @@ class AutoencoderGAN(AutoEncoder):
             self.segmentation_target_numbers = [
                 n for n, tsk in enumerate(self.task_names) if tsk == "segmentation"
             ]
+        else:
+            self.segmentation_target_numbers = None
 
         for name, disc_model, disc_list, disc_tasks in zip(
             ["real_fake", "image", "latent"],

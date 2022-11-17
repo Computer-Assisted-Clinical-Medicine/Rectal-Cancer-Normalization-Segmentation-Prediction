@@ -29,40 +29,6 @@ from utils import generate_folder_name, get_gan_suffix, split_into_modalities
 os.environ["TF_GPU_THREAD_MODE"] = "gpu_private"
 
 
-def vary_hyperparameters(parameters, keys: tuple, values: list) -> List[Dict[str, Any]]:
-    """Vary the hyperparameter given by the keys by the values given. A list of
-    parameters as a dict is taken as input and the returned list will be
-    len(values) times bigger than the input list. The hyperparameter will be added
-    for each existing entry.
-
-    Parameters
-    ----------
-    parameters : List[Dict[str, Any]]
-        The current hyperparameters
-    keys : tuple
-        The parameter to vary with the dict keys as tuple, this is then used to
-        write to a nested dict, with the first value as key for the first dict.
-        All keys besides the last have to already exist
-    values : list
-        list of values to set as parameter
-
-    Returns
-    -------
-    List[Dict[str, Any]]
-        The new hyperparameter list with increased size
-    """
-    params_new = []
-    for param_set in parameters:
-        for val in values:
-            param_set_new = copy.deepcopy(param_set)
-            to_vary = param_set_new
-            for k in keys[:-1]:
-                to_vary = to_vary[k]
-            to_vary[keys[-1]] = val
-            params_new.append(param_set_new)
-    return params_new
-
-
 def priority(hp_params):
     """Define a priority for each experiment"""
     prio = 0
@@ -75,22 +41,21 @@ def priority(hp_params):
 
     norm = hp_params["preprocessing_parameters"]["normalizing_method"]
     norm_priority = {
-        GAN_NORMALIZING.GAN_DISCRIMINATORS: 40,
-        NORMALIZING.QUANTILE: 30,
-        NORMALIZING.HISTOGRAM_MATCHING: 20,
-        NORMALIZING.MEAN_STD: 10,
-        NORMALIZING.HM_QUANTILE: 0,
+        NORMALIZING.QUANTILE: 40,
+        NORMALIZING.HM_QUANTILE: 30,
+        GAN_NORMALIZING.GAN_DISCRIMINATORS: 20,
+        NORMALIZING.HISTOGRAM_MATCHING: 10,
+        NORMALIZING.MEAN_STD: 0,
     }
     prio += norm_priority.get(norm, 0)
 
     if norm == GAN_NORMALIZING.GAN_DISCRIMINATORS:
         suffix = get_gan_suffix(hp_params)
         suffix_priority = {
-            "_3_64_0.50_BetterConv_0.00001": 9,
-            "_3_64_0.50_BetterConv_0.00001_WINDOW": 8,
-            "_3_64_0.50_BetterConv_0.00001_all_image": 7,
-            "_3_64_0.50_BetterConv_0.00001_seg": 6,
-            "_3_64_0.50_BetterConv_0.00001_WINDOW_seg": 5,
+            "_3_64_0.50_BetterConv_0.00001_WINDOW_seg": 9,
+            "_3_64_0.50_BetterConv_0.00001": 8,
+            "_3_64_0.50_BetterConv_0.00001_seg": 7,
+            "_3_64_0.50": 6,
         }
         prio += suffix_priority.get(suffix, 0)
 
@@ -187,6 +152,7 @@ if __name__ == "__main__":
         "finetune_epoch": None,
         # sampling parameters
         "samples_per_volume": 32,
+        "percent_of_object_samples": 0.4,
         "background_label_percentage": 0.15,
         # Augmentation parameters
         "add_noise": False,
@@ -195,6 +161,8 @@ if __name__ == "__main__":
         "max_resolution_augment": 0.9,
         # no tensorboard callback (slow)
         "write_tensorboard": False,
+        # do not save complete models (needs too much storage)
+        "save_mode": "weights",
     }
 
     preprocessing_parameters = {
@@ -206,6 +174,7 @@ if __name__ == "__main__":
         "train_parameters": train_parameters,
         "preprocessing_parameters": preprocessing_parameters,
         "loss": "DICE",
+        "dimensions": 2,
     }
     # define constant parameters
     hyper_parameters: List[Dict[str, Any]] = [
@@ -216,20 +185,24 @@ if __name__ == "__main__":
 
     ### architecture ###
     F_BASE = 8
-    network_parameters_UNet = {
+    np_UNet = {
         "regularize": (True, "L2", 1e-5),
-        "drop_out": (True, 0.01),
+        "drop_out": (True, 0.2),
         "activation": "elu",
         "cross_hair": False,
         "clip_value": 1,
         "res_connect": True,
         "n_filters": (F_BASE * 8, F_BASE * 16, F_BASE * 32, F_BASE * 64, F_BASE * 128),
-        "do_bias": True,
-        "do_batch_normalization": False,
+        "do_bias": False,
+        "do_batch_normalization": True,
         "ratio": 2,
+        "attention": False,
+        "encoder_attention": None,
     }
-    network_parameters = [network_parameters_UNet]
-    architectures = [UNet]
+    np_UNet_nb = copy.deepcopy(np_UNet)
+    np_UNet_nb["do_batch_normalization"] = False
+    network_parameters = [np_UNet, np_UNet_nb]
+    architectures = [UNet, UNet]
 
     hyper_parameters_new = []
     for hyp in hyper_parameters:
@@ -319,7 +292,7 @@ if __name__ == "__main__":
                 "disc_end_lr": 1e-5,
                 "init_norm_method": NORMALIZING.WINDOW,
                 "train_on_segmentation": True,
-                "unet_parameters": network_parameters_UNet,
+                "unet_parameters": np_UNet,
             },
         ),
         (
@@ -340,7 +313,7 @@ if __name__ == "__main__":
                 "disc_start_lr": 1e-5,
                 "disc_end_lr": 1e-5,
                 "train_on_segmentation": True,
-                "unet_parameters": network_parameters_UNet,
+                "unet_parameters": np_UNet,
             },
         ),
         (
@@ -431,26 +404,6 @@ if __name__ == "__main__":
             hyp_new["preprocessing_parameters"]["normalization_parameters"] = params
             hyper_parameters_new.append(hyp_new)
     hyper_parameters = hyper_parameters_new
-
-    ### dimension ###
-    dimensions = [2]
-    hyper_parameters = vary_hyperparameters(hyper_parameters, ("dimensions",), dimensions)
-
-    ### percent_of_object_samples ###
-    pos_values = [0.4]
-    hyper_parameters = vary_hyperparameters(
-        hyper_parameters, ("train_parameters", "percent_of_object_samples"), pos_values
-    )
-
-    attention = [False]
-    hyper_parameters = vary_hyperparameters(
-        hyper_parameters, ("network_parameters", "attention"), attention
-    )
-
-    encoder_attention = [None]
-    hyper_parameters = vary_hyperparameters(
-        hyper_parameters, ("network_parameters", "encoder_attention"), encoder_attention
-    )
 
     # set config
     PREPROCESSED_DIR = Path(GROUP_BASE_NAME) / "data_preprocessed"
@@ -623,3 +576,5 @@ if __name__ == "__main__":
             experiments.sort(key=lambda x: x.priority, reverse=True)
             # export all hyperparameters
             export_experiments_run_files(exp_group_base_dir, experiments)
+
+            print(f"Exported {location} - {experiment_name}")

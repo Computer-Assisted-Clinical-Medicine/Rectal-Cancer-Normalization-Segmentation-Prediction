@@ -17,7 +17,6 @@ from SegClassRegBasis import config as cfg
 from SegClassRegBasis.experiment import Experiment
 from SegClassRegBasis.normalization import NORMALIZING, Normalization, all_subclasses
 from SegClassRegBasis.preprocessing import preprocess_dataset
-from SegClassRegBasis.segbasisnet import SegBasisNet
 
 
 def make_normalization_dataset(
@@ -605,8 +604,8 @@ class GanDiscriminators(Normalization):
 
     def load_model(self):
         exp_dir = Path(os.environ["experiment_dir"])
-        self.model = SegBasisNet(
-            {"segmentation": "DICE"},
+        self.model = gan_networks.AutoencoderGAN(
+            None,
             model_path=exp_dir / self.model_paths[self.mod_num],
             is_training=False,
         )

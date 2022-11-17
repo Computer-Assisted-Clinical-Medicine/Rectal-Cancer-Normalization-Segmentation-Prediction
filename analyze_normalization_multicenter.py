@@ -18,6 +18,7 @@ import pandas as pd
 import seaborn as sns
 import SimpleITK as sitk
 import yaml
+from IPython.display import display
 from matplotlib.transforms import Bbox
 from scipy.stats import ttest_ind
 from sklearn.cluster import DBSCAN, KMeans
@@ -90,10 +91,11 @@ def get_norm(model_name):
     if model_name == "combined_models":
         return "combined"
     else:
-        return model_name.split("-")[-3]
+        return model_name.partition("DO-")[-1].partition("-obj_")[0]
 
 
 results["normalization"] = results.name.apply(get_norm)
+results.normalization = pd.Categorical(results.normalization)
 results["from_study"] = ~results["File Number"].str.startswith("99")
 
 root = data_dir / "Images registered and N4 corrected"
@@ -158,7 +160,21 @@ results = results.merge(right=acquisition_params.location, on="File Number")
 
 # See which locations are finished
 
-results.groupby("normalization").train_location.nunique()
+n_finished = pd.DataFrame(
+    index=results.normalization.cat.categories, columns=["BN", "nBN", "total"]
+)
+n_finished.BN = (
+    results.query("do_batch_normalization")
+    .groupby("normalization")
+    .train_location.nunique()
+)
+n_finished.nBN = (
+    results.query("not do_batch_normalization")
+    .groupby("normalization")
+    .train_location.nunique()
+)
+n_finished.total = n_finished.BN + n_finished.nBN
+display(n_finished.sort_values("total", ascending=False))
 
 # %% [markdown]
 
@@ -181,8 +197,9 @@ g = sns.catplot(
     ),
     x="Dice",
     y="train_location",
-    col="external",
     hue="normalization",
+    col="external",
+    row="do_batch_normalization",
     kind="box",
     legend=True,
     legend_out=True,
@@ -196,19 +213,21 @@ plt.close()
 
 g = sns.catplot(
     data=results[results.normalization.str.startswith("GAN_")].query(
-        "version == 'best' & before_therapy & postprocessed & name != 'combined_models'"
+        "version == 'best' & before_therapy & postprocessed & not do_batch_normalization"
     ),
     x="Dice",
     y="train_location",
-    col="external",
     hue="normalization",
     hue_order=[n for n in results.normalization.cat.categories if n.startswith("GAN_")],
+    col="external",
+    row="do_batch_normalization",
     kind="box",
     legend=True,
     legend_out=True,
 )
 g.fig.suptitle(
-    "Overall Performance for GANs (version = best | before_therapy = True | postprocessed = True)"
+    "Overall Performance for GANs (version = best | before_therapy = True"
+    + " | postprocessed = True | do_batch_normalization = False)"
 )
 g.fig.subplots_adjust(top=0.87)
 plt.show()
@@ -216,18 +235,20 @@ plt.close()
 
 g = sns.catplot(
     data=results.query(
-        "version == 'best' & before_therapy & postprocessed & name != 'combined_models'"
+        "version == 'best' & before_therapy & postprocessed & not do_batch_normalization"
     ),
     x="Dice",
     y="normalization",
-    col="external",
     hue="train_location",
+    col="external",
+    row="do_batch_normalization",
     kind="box",
     legend=True,
     legend_out=True,
 )
 g.fig.suptitle(
-    "Overall Performance (version = best | before_therapy = True | postprocessed = True)"
+    "Overall Performance (version = best | before_therapy = True"
+    + " | postprocessed = True | do_batch_normalization = False)"
 )
 g.fig.subplots_adjust(top=0.87)
 plt.show()
@@ -241,6 +262,7 @@ if res_not_all.size > 0:
         data=res_not_all,
         x="Dice",
         y="normalization",
+        hue="do_batch_normalization",
         col="external",
         kind="box",
         legend=True,
@@ -262,6 +284,7 @@ if res_all.size > 0:
         data=res_all,
         x="Dice",
         y="normalization",
+        hue="do_batch_normalization",
         col="version",
         kind="box",
         legend=True,
@@ -287,6 +310,7 @@ if res_single_center.size > 0:
         data=res_single_center,
         x="Dice",
         y="normalization",
+        hue="do_batch_normalization",
         col="external",
         kind="box",
         legend=True,
@@ -310,6 +334,7 @@ if res_except_one.size > 0:
         data=res_except_one,
         x="Dice",
         y="normalization",
+        hue="do_batch_normalization",
         col="external",
         kind="box",
         legend=True,
@@ -441,6 +466,24 @@ for train_location in location_order:
             y="normalization",
             col="external",
             hue="fold",
+            kind="box",
+            legend=True,
+            legend_out=True,
+        )
+        g.fig.suptitle(f"Location = {train_location} (version = best | external = True)")
+        g.fig.subplots_adjust(top=0.88)
+        plt.show()
+        plt.close()
+
+        g = sns.catplot(
+            data=results.query(
+                f"version == 'best' & train_location == '{train_location}'"
+                + " & name != 'combined_models' & postprocessed & before_therapy"
+            ),
+            x="Dice",
+            y="fold",
+            col="external",
+            hue="normalization",
             kind="box",
             legend=True,
             legend_out=True,
