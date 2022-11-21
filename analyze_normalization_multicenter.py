@@ -348,27 +348,43 @@ if res_except_one.size > 0:
     plt.close()
 
 display_markdown("Performance when trained on all training locations.")
-res_grouped = results.query(
+res_grouped_all = results.query(
     "version == 'best' & before_therapy & postprocessed & network == 'UNet2D'"
     + " & name != 'combined_models' & train_location == 'all'"
-).groupby(["normalization"])
+).groupby(["normalization", "do_batch_normalization"])
 
-mean_median_df = pd.DataFrame(res_grouped.Dice.mean()).rename(columns={"Dice": "Dice mean"})
-mean_median_df["Dice median"] = res_grouped.Dice.median()
+mean_median_df = pd.DataFrame(res_grouped_all.Dice.mean()).rename(
+    columns={"Dice": "Dice mean"}
+)
+mean_median_df["Dice median"] = res_grouped_all.Dice.median()
 display_dataframe(mean_median_df)
 
 display_markdown("All training locations except all.")
-res_grouped = results.query(
+res_grouped_not_all = results.query(
     "version == 'best' & before_therapy & postprocessed & network == 'UNet2D'"
     + " & name != 'combined_models' & train_location != 'all'"
-).groupby(["normalization", "external"])
+).groupby(["normalization", "do_batch_normalization", "external"])
 
-mean_median_df = pd.DataFrame(res_grouped.Dice.mean()).rename(columns={"Dice": "Dice mean"})
-mean_median_df["Dice median"] = res_grouped.Dice.median()
-display_dataframe(mean_median_df)
-
-display_markdown("Difference between training and external testset")
-display_dataframe(mean_median_df.xs(False, level=1) - mean_median_df.xs(True, level=1))
+res_summary = pd.DataFrame()
+res_summary["Dice all mean"] = res_grouped_all.Dice.mean()
+res_summary["Dice all med."] = res_grouped_all.Dice.median()
+res_summary["Dice int. mean"] = res_grouped_not_all.Dice.mean().xs(False, level=-1)
+res_summary["Dice int. med."] = res_grouped_not_all.Dice.median().xs(False, level=-1)
+res_summary["Dice ext. mean"] = res_grouped_not_all.Dice.mean().xs(True, level=-1)
+res_summary["Dice ext. med."] = res_grouped_not_all.Dice.median().xs(True, level=-1)
+res_summary["Dice diff mean"] = (
+    res_summary["Dice int. mean"] - res_summary["Dice ext. mean"]
+)
+res_summary["Dice diff med."] = (
+    res_summary["Dice int. med."] - res_summary["Dice ext. med."]
+)
+res_summary.index.set_names(["normalization", "do batch norm"], inplace=True)
+display_dataframe(res_summary.round(2))
+display_dataframe(
+    res_summary[
+        (res_summary["Dice int. med."] > 0.7) & (res_summary["Dice ext. med."] > 0.5)
+    ].round(2)
+)
 
 # %%
 
