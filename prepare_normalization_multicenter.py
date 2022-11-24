@@ -5,25 +5,31 @@ import copy
 import logging
 import os
 from pathlib import Path
-from typing import Any, Dict, List, Union
+from typing import Any, Dict, List
 
 import numpy as np
 import pandas as pd
+import yaml
 
 # logger has to be set before tensorflow is imported
 tf_logger = logging.getLogger("tensorflow")
 os.environ["TF_CPP_MIN_LOG_LEVEL"] = "3"
 
 import tensorflow as tf
-import yaml
 
 from gan_normalization import GAN_NORMALIZING, get_norm_params, train_gan_normalization
+from networks import ResNet
 from SegClassRegBasis.architecture import DeepLabv3plus, UNet
 from SegClassRegBasis.experiment import Experiment
 from SegClassRegBasis.normalization import NORMALIZING
 from SegClassRegBasis.preprocessing import preprocess_dataset
 from SegClassRegBasis.utils import export_experiments_run_files, get_gpu
-from utils import generate_folder_name, get_gan_suffix, split_into_modalities
+from utils import (
+    create_dataset,
+    generate_folder_name,
+    get_gan_suffix,
+    split_into_modalities,
+)
 
 # set tf thread mode
 os.environ["TF_GPU_THREAD_MODE"] = "gpu_private"
@@ -74,16 +80,7 @@ if __name__ == "__main__":
     gpu = tf.device(get_gpu(memory_limit=2000))
 
     # load data
-    with open(data_dir / "images.yaml", encoding="utf8") as f:
-        found_images = yaml.load(f, Loader=yaml.Loader)
-    with open(data_dir / "segmented_images.yaml", encoding="utf8") as f:
-        segmented_images = yaml.load(f, Loader=yaml.Loader)
     timepoints = pd.read_csv(data_dir / "timepoints.csv", sep=";", index_col=0)
-
-    unsegmented_images = list(
-        set(list(found_images.keys())) - set(list(segmented_images.keys()))
-    )
-    unsegmented_images.sort()
 
     K_FOLD = 5
     N_CHANNELS = 3
@@ -94,44 +91,16 @@ if __name__ == "__main__":
 
     # create dict with all points. The names have the format:
     # patient_timepoint_l{label_number}_d{diffusion_number}
-    dataset: Dict[str, Dict[str, Union[List[str], str]]] = {}
-    for timepoint, data in segmented_images.items():
-        for label_num, label_data in enumerate(data):
-            assert MODALITIES[0] in label_data["name"]
-            found_data = found_images[timepoint]
-            if not "ADC axial original" in found_data:
-                continue
-            if not "Diff axial b800" in found_data:
-                if "Diff axial b800 recalculated" in found_data:
-                    B_NAME = "Diff axial b800 recalculated"
-                else:
-                    print("No b800 image found but an ADC image")
-                    continue
-            else:
-                B_NAME = "Diff axial b800"
-            for diff_num, (adc, b800) in enumerate(
-                zip(found_data["ADC axial original"], found_data[B_NAME])
-            ):
-                name = f"{timepoint}_l{label_num}_d{diff_num}"
-                if name in ignore:
-                    continue
-                image = label_data["image"].replace(
-                    "Images", "Images registered and N4 corrected"
-                )
-                b800 = b800.replace("Images", "Images registered and N4 corrected")
-                adc = adc.replace("Images", "Images registered and N4 corrected")
-                label = label_data["labels"].replace(
-                    "Images", "Images registered and N4 corrected"
-                )
-                dataset[name] = {
-                    "images": [image, b800, adc],
-                    "labels": label,
-                }
+    dataset_seg = create_dataset(ignore=ignore)
+    dataset_class_reg = create_dataset(ignore=ignore, load_labels=False)
 
-    # export dataset
+    # export datasets
     dataset_file = exp_group_base_dir / "dataset.yaml"
     with open(dataset_file, "w", encoding="utf8") as f:
-        yaml.dump(dataset, f, sort_keys=False)
+        yaml.dump(dataset_seg, f, sort_keys=False)
+    dataset_class_reg_file = exp_group_base_dir / "dataset_class_reg.yaml"
+    with open(dataset_class_reg_file, "w", encoding="utf8") as f:
+        yaml.dump(dataset_class_reg, f, sort_keys=False)
 
     # define the parameters that are constant
     train_parameters = {
@@ -173,7 +142,7 @@ if __name__ == "__main__":
     constant_parameters = {
         "train_parameters": train_parameters,
         "preprocessing_parameters": preprocessing_parameters,
-        "loss": "DICE",
+        "loss": {"segmentation": "DICE", "classification": "CEL", "regression": "MSE"},
         "dimensions": 2,
     }
     # define constant parameters
@@ -201,8 +170,11 @@ if __name__ == "__main__":
     }
     np_UNet_nb = copy.deepcopy(np_UNet)
     np_UNet_nb["do_batch_normalization"] = False
-    network_parameters = [np_UNet, np_UNet_nb]
-    architectures = [UNet, UNet]
+
+    np_ResNet = {"weights": None, "resnet_type": "ResNet50"}
+
+    network_parameters = [np_ResNet, np_UNet, np_UNet_nb]
+    architectures = [ResNet, UNet, UNet]
 
     hyper_parameters_new = []
     for hyp in hyper_parameters:
@@ -210,11 +182,24 @@ if __name__ == "__main__":
             hyp_new = copy.deepcopy(hyp)
             hyp_new["architecture"] = arch
             hyp_new["network_parameters"] = network_params
+            if arch is ResNet:
+                hyp_new["train_parameters"]["percent_of_object_samples"] = 0
             hyper_parameters_new.append(hyp_new)
     hyper_parameters = hyper_parameters_new
 
     ### normalization method ###
     normalization_methods = [
+        (
+            NORMALIZING.QUANTILE,
+            {
+                "lower_q": 0.05,
+                "upper_q": 0.95,
+            },
+        ),
+        (NORMALIZING.HISTOGRAM_MATCHING, {"mask_quantile": 0}),
+        (NORMALIZING.MEAN_STD, {}),
+        (NORMALIZING.HM_QUANTILE, {}),
+        (NORMALIZING.WINDOW, get_norm_params(NORMALIZING.WINDOW)),
         (
             GAN_NORMALIZING.GAN_DISCRIMINATORS,
             {
@@ -383,17 +368,6 @@ if __name__ == "__main__":
                 "train_on_gen": True,
             },
         ),
-        (
-            NORMALIZING.QUANTILE,
-            {
-                "lower_q": 0.05,
-                "upper_q": 0.95,
-            },
-        ),
-        (NORMALIZING.HISTOGRAM_MATCHING, {"mask_quantile": 0}),
-        (NORMALIZING.MEAN_STD, {}),
-        (NORMALIZING.HM_QUANTILE, {}),
-        (NORMALIZING.WINDOW, get_norm_params(NORMALIZING.WINDOW)),
     ]
     # add all methods with their hyperparameters
     hyper_parameters_new = []
@@ -423,45 +397,64 @@ if __name__ == "__main__":
 
         print(f"Starting with {location}.")
 
-        if location == "all":
-            timepoints_train = list(
-                timepoints.query("treatment_status=='before therapy' & segmented").index
-            )
-            timepoints_train_norm = list(timepoints.index)
-            N_EPOCHS = 100
-        elif location in timepoints.location.unique():
-            # only use before therapy images that are segmented
-            timepoints_train = timepoints.query(
-                f"treatment_status=='before therapy' & segmented & '{location}' in location"
-            ).index
-            timepoints_train_norm = timepoints.query(f"'{location}' in location").index
-            N_EPOCHS = 200
-        elif "not" in location.lower():
-            if location == "Not-Mannheim":
-                timepoints_train = timepoints.query(
-                    "treatment_status=='before therapy' & segmented & 'Mannheim' not in location"
-                ).index
-                timepoints_train_norm = timepoints.query("'Mannheim' not in location").index
-            else:
-                timepoints_train = timepoints.query(
-                    f"treatment_status=='before therapy' & segmented & location !='{location.replace('Not-', '')}'"
-                ).index
-                timepoints_train_norm = timepoints.query(
-                    f"location !='{location.replace('Not-', '')}'"
-                ).index
-            N_EPOCHS = 100
-
-        experiment_group_name = f"Normalization_{location}"
-        current_exp_dir = experiment_dir / experiment_group_name
-        group_dir_rel = Path(GROUP_BASE_NAME) / experiment_group_name
-
-        # set training files
-        train_list = [key for key in dataset if key.partition("_l")[0] in timepoints_train]
-
-        # set test files (just use the rest)
-        test_list: List[str] = list(set(dataset.keys()) - set(train_list))
-
         for hyp in hyper_parameters:
+
+            if hyp["architecture"] is ResNet:
+                # use before and after therapy images
+                timepoints_to_use = timepoints.query(
+                    "treatment_status in ('before therapy', 'before OP')"
+                )
+            else:
+                # only use before therapy images that are segmented
+                timepoints_to_use = timepoints.query(
+                    "treatment_status=='before therapy' & segmented"
+                )
+
+            if location == "all":
+                query = ""  # pylint:disable=invalid-name
+                N_EPOCHS = 100
+            elif location in timepoints_to_use.location.unique():
+                if location == "Mannheim":
+                    query = "location in ('Mannheim', 'Mannheim-not-from-study')"  # pylint:disable=invalid-name
+                else:
+                    query = f"'{location}' in location"
+                N_EPOCHS = 200
+            elif "Not" in location:
+                if location == "Not-Mannheim":
+                    query = "location not in ('Mannheim', 'Mannheim-not-from-study')"  # pylint:disable=invalid-name
+                else:
+                    query = f"'{location.partition('-')[2]}' != location"
+                N_EPOCHS = 100
+
+            timepoints_train = timepoints_to_use.query(query).index
+            timepoints_train_norm = timepoints.query(query).index
+
+            experiment_group_name = f"Normalization_{location}"
+            current_exp_dir = experiment_dir / experiment_group_name
+            group_dir_rel = Path(GROUP_BASE_NAME) / experiment_group_name
+
+            if hyp["architecture"] is ResNet:
+
+                hyp_dataset = dataset_class_reg
+
+                # set training files
+                train_list = [
+                    key for key in hyp_dataset if key.partition("_l")[0] in timepoints_train
+                ]
+
+                # set test files (just use the rest)
+                test_list: List[str] = list(set(hyp_dataset.keys()) - set(train_list))
+
+            else:
+                hyp_dataset = dataset_seg
+
+                # set training files
+                train_list = [
+                    key for key in hyp_dataset if key.partition("_l")[0] in timepoints_train
+                ]
+
+                # set test files (just use the rest)
+                test_list = list(set(hyp_dataset.keys()) - set(train_list))
 
             # set number of validation files
             hyp["train_parameters"]["number_of_vald"] = max(len(train_list) // 15, 4)
@@ -485,7 +478,7 @@ if __name__ == "__main__":
                 pre_params_gan_base["normalization_parameters"] = gan_base_params
                 DATASET_TO_PROCESS = split_into_modalities(
                     preprocess_dataset(
-                        data_set=dataset,
+                        data_set=hyp_dataset,
                         num_channels=N_CHANNELS,
                         base_dir=experiment_dir,
                         data_dir=data_dir,
@@ -527,7 +520,7 @@ if __name__ == "__main__":
             else:
                 PASS_MODALITY = False
                 CUT_TO_OVERLAP = True
-                DATASET_TO_PROCESS = dataset
+                DATASET_TO_PROCESS = hyp_dataset
                 preprocess_base_dir = data_dir
                 preprocessing_name = norm_type.name
 
@@ -556,6 +549,13 @@ if __name__ == "__main__":
                 cut_to_overlap=CUT_TO_OVERLAP,
             )
 
+            if hyp["architecture"] is ResNet:
+                tasks = ("classification", "regression")
+                fold_dir = group_dir_rel / "folds_class_reg"
+            else:
+                tasks = ("segmentation",)
+                fold_dir = group_dir_rel / "folds"
+
             exp = Experiment(
                 hyper_parameters=hyp,
                 name=experiment_name,
@@ -563,10 +563,11 @@ if __name__ == "__main__":
                 data_set=exp_dataset,
                 crossvalidation_set=train_list,
                 external_test_set=test_list,
+                tasks=tasks,
                 folds=K_FOLD,
                 seed=42,
                 num_channels=N_CHANNELS,
-                folds_dir_rel=group_dir_rel / "folds",
+                folds_dir_rel=fold_dir,
                 tensorboard_images=True,
                 priority=priority(hyp),
             )

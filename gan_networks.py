@@ -718,7 +718,7 @@ class AutoencoderGAN(AutoEncoder):
         discriminators=None,
         is_training=True,
         do_finetune=False,
-        model_path="",
+        model_path=None,
         regularize=(True, "L2", 0.00001),
         clip_value=None,
         regression_min=0,

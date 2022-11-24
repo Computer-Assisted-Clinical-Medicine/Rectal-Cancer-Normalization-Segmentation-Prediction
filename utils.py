@@ -12,9 +12,163 @@ import SimpleITK as sitk
 import telegram
 from matplotlib import pyplot as plt
 from tqdm.autonotebook import tqdm
+import yaml
 
 from SegClassRegBasis.architecture import DeepLabv3plus, DenseTiramisu, UNet
 from SegClassRegBasis.normalization import NORMALIZING
+from networks import ResNet
+
+
+def make_int(number):
+    if number is None:
+        return None
+    else:
+        return int(number)
+
+
+def make_float(number):
+    if number is None:
+        return None
+    else:
+        return float(number)
+
+
+def create_dataset(
+    ignore=None,
+    load_labels=True,
+) -> Dict[str, Dict[str, Union[List[str], str]]]:
+    """Create the dataset for segmentation or classification/regression
+
+    Parameters
+    ----------
+    ignore : list, optional
+        Which timepoints should be ignored, by default None
+    load_labels : bool, optional
+        If the labels should be used, then only timepoints with labels are loaded, by default True
+
+    Returns
+    -------
+    Dict[str, Dict[str, Union[List[str], str]]]
+        The dictionary containing images, labels and classification and regression data
+    """
+    if ignore is None:
+        ignore = []
+    patient_data = read_patient_data()
+    data_dir = Path(os.environ["data_dir"])
+    with open(data_dir / "segmented_images.yaml", encoding="utf8") as f:
+        segmented_images = yaml.load(f, Loader=yaml.Loader)
+    with open(data_dir / "images.yaml", encoding="utf8") as f:
+        found_images = yaml.load(f, Loader=yaml.Loader)
+    timepoints = pd.read_csv(data_dir / "timepoints.csv", sep=";", index_col=0)
+
+    # create dict with all points. The names have the format:
+    # patient_timepoint_l{label_number}_d{diffusion_number}
+    dataset: Dict[str, Dict[str, Union[List[str], str]]] = {}
+    for t_p, data in found_images.items():
+        class_reg_labels = get_timepoint_patient_data(patient_data, timepoints, t_p)
+        # either iterate the labeled image pairs or the T2 images
+        if t_p in segmented_images:
+            to_iterate_img = segmented_images[t_p]
+        elif load_labels:
+            continue
+        else:
+            if not "T2 axial" in data:
+                continue
+            to_iterate_img = [{"image": img} for img in data["T2 axial"]]
+        for label_num, label_data in enumerate(to_iterate_img):
+            found_data = found_images[t_p]
+            t2_image = label_data["image"]
+            image = t2_image.replace("Images", "Images registered and N4 corrected")
+            if load_labels:
+                label = label_data["labels"].replace(
+                    "Images", "Images registered and N4 corrected"
+                )
+                label_dict = {
+                    "labels": label,
+                }
+            else:
+                label_dict = {}
+
+            # look if all modalities are there
+            if not "ADC axial original" in found_data:
+                continue
+            if not "Diff axial b800" in found_data:
+                if "Diff axial b800 recalculated" in found_data:
+                    b_name = "Diff axial b800 recalculated"
+                else:
+                    print("No b800 image found but an ADC image")
+                    continue
+            else:
+                b_name = "Diff axial b800"
+
+            for diff_num, (adc, b800) in enumerate(
+                zip(found_data["ADC axial original"], found_data[b_name])
+            ):
+                name = f"{t_p}_l{label_num}_d{diff_num}"
+                if name in ignore:
+                    continue
+                b800 = b800.replace("Images", "Images registered and N4 corrected")
+                adc = adc.replace("Images", "Images registered and N4 corrected")
+                img_dict = {
+                    "images": [image, b800, adc],
+                }
+                dataset[name] = class_reg_labels | img_dict | label_dict
+
+    return dataset
+
+
+def get_timepoint_patient_data(patient_data, timepoints, t_p) -> dict:
+    """Get the patient data from the dataframe and put it in the dictionary for
+    use as labels
+
+    Parameters
+    ----------
+    patient_data : pd.DataFrame
+        The patient data
+    timepoints : pd.DataFrame
+        the timepoints
+    t_p : str
+        The name of the timepoint
+
+    Returns
+    -------
+    dict
+        The data as dict will classification and regression as keys
+    """
+    pat_data = patient_data.loc[int(t_p.partition("_")[0])].copy()
+    # None is better for compatibility than pd.NA
+    pat_data[pd.isna(pat_data)] = None
+
+    tp_data = timepoints.loc[t_p]
+    if tp_data.treatment_status == "before therapy":
+        pre_therapy_t = pat_data.T_stage_pre_therapy
+        pre_therapy_t_pat = pat_data.T_stage_patho
+        pre_therapy_dworak = pat_data.dworak
+    else:
+        pre_therapy_t, pre_therapy_t_pat, pre_therapy_dworak = None, None, None
+    if tp_data.treatment_status == "before OP":
+        pre_op_t = pat_data.T_stage_pre_OP
+        pre_op_t_pat = pat_data.T_stage_patho
+        pre_op_dworak = pat_data.dworak
+    else:
+        pre_op_t, pre_op_t_pat, pre_op_dworak = None, None, None
+    class_reg_labels = {
+        "classification": {
+            "sex": str(pat_data.sex),
+            "dworak": make_int(pat_data.dworak),
+            "T_stage_pre_therapy": make_int(pre_therapy_t),
+            "T_stage_pre_therapy_patho": make_int(pre_therapy_t_pat),
+            "T_stage_pre_OP": make_int(pre_op_t),
+            "T_stage_pre_OP_patho": make_int(pre_op_t_pat),
+            "dworak_pre_therapy": make_int(pre_therapy_dworak),
+            "dworak_pre_OP": make_int(pre_op_dworak),
+        },
+        "regression": {
+            "age": make_float(pat_data.age),
+        },
+    }
+
+    return class_reg_labels
 
 
 def generate_folder_name(parameters):
@@ -25,10 +179,16 @@ def generate_folder_name(parameters):
 
     params = [
         parameters["architecture"].get_name() + str(parameters["dimensions"]) + "D",
-        parameters["loss"],
     ]
 
-    # TODO: move this logic into the network
+    if parameters["architecture"] in (UNet, DenseTiramisu, DeepLabv3plus):
+        if isinstance(parameters["loss"], str):
+            loss_name = parameters["loss"]
+        elif isinstance(parameters["loss"], dict):
+            loss_name = parameters["loss"]["segmentation"]
+
+        params.append(loss_name)
+
     if parameters["architecture"] is UNet:
         # attention parameters
         if "encoder_attention" in parameters["network_parameters"]:
@@ -72,6 +232,10 @@ def generate_folder_name(parameters):
             "aspp_"
             + "_".join([str(n) for n in parameters["network_parameters"]["aspp_rates"]])
         )
+    elif parameters["architecture"] is ResNet:
+        params.append(parameters["network_parameters"]["resnet_type"])
+        if parameters["network_parameters"]["weights"] == "imagenet":
+            params.append("imagenet")
     else:
         raise NotImplementedError(f'{parameters["architecture"]} not implemented')
 
@@ -203,6 +367,141 @@ def split_into_modalities(
             new_dict[pat_name]["images"].append(new_path / new_name)
 
     return new_dict
+
+
+def read_patient_data() -> pd.DataFrame:
+    """Read the patient data from the Dataset files
+
+    Returns
+    -------
+    pd.DataFrame
+        The patient data with the Patient ID as index
+    """
+    data_dir = Path(os.environ["data_dir"])
+    # select images for processing
+    patient_data_dir = data_dir / "Patient Data"
+    patient_data_study = pd.read_csv(data_dir / "patients.csv", sep=";", index_col=0)
+    patient_data_mannheim = pd.read_excel(
+        patient_data_dir / "patient_data_mannheim.xlsx", index_col=1
+    )
+
+    patient_data = pd.DataFrame(
+        index=list(patient_data_study.index) + list(patient_data_mannheim.index)
+    )
+    patient_data.index.name = "ID"
+
+    _update_patient_data(
+        patient_data,
+        "dworak",
+        patient_data_study,
+        patient_data_mannheim,
+        "post OP regressions Dworak",
+        "Regression",
+        pd.Int16Dtype(),
+        {
+            name: name[5]
+            for name in patient_data_study["post OP regressions Dworak"].dropna().unique()
+        },
+    )
+
+    _update_patient_data(
+        patient_data,
+        "sex",
+        patient_data_study,
+        patient_data_mannheim,
+        "sex",
+        "Geschl",
+        pd.StringDtype(),
+        {"männlich": "m", "weiblich": "f"},
+        {"m": "m", "w": "f"},
+    )
+
+    t_stages_study = {f"T{t}": t for t in range(5)} | {"T4a": 4, "T4b": 4, "Tis": 1}
+    # always use the higher stage
+    t_stages_ma = {
+        "Zwei Läsionen\noben T3\nunten T3": 3,
+        "oben T2\nunten T3": 3,
+        "1 bis 2": 2,
+        "oben T2\nunten T1": 2,
+        "oben T2\nunten T1 bis 2": 2,
+        "fraglich T1,\nkaum noch abzugrenzen": 1,
+        "T1 bis 2": 2,
+    }
+    _update_patient_data(
+        patient_data,
+        "T_stage_pre_therapy",
+        patient_data_study,
+        patient_data_mannheim,
+        "T-stage_first_diagnosis",
+        "praeT",
+        pd.Int16Dtype(),
+        t_stages_study,
+        t_stages_ma,
+    )
+
+    _update_patient_data(
+        patient_data,
+        "T_stage_pre_OP",
+        patient_data_study,
+        patient_data_mannheim,
+        "pre OP T-Stage",
+        "postT",
+        pd.Int16Dtype(),
+        t_stages_study,
+        t_stages_ma,
+    )
+
+    _update_patient_data(
+        patient_data,
+        "T_stage_patho",
+        patient_data_study,
+        patient_data_mannheim,
+        "post OP pathological T-Stage",
+        "pT",
+        pd.Int16Dtype(),
+        t_stages_study,
+        t_stages_ma,
+    )
+
+    # add birthdays
+    bday_study = pd.to_datetime(patient_data_study["birthday"])
+    start_study = pd.to_datetime(patient_data_study["ct_start_date"])
+    age_study = (start_study - bday_study) / np.timedelta64(1, "Y")
+
+    bday_ma = pd.to_datetime(patient_data_mannheim["Geb"])
+    start_ma = pd.to_datetime(patient_data_mannheim["MRT1"])
+    age_ma = (start_ma - bday_ma) / np.timedelta64(1, "Y")
+
+    patient_data["age"] = pd.concat([age_study, age_ma])
+
+    return patient_data
+
+
+def _update_patient_data(
+    patient_data,
+    name,
+    df_study,
+    df_ma,
+    name_study,
+    name_ma,
+    dtype,
+    func_study_dict=None,
+    func_ma_dict=None,
+):
+    data_study = df_study[name_study].dropna()
+    if func_study_dict is not None:
+
+        data_study = data_study.replace(func_study_dict).astype(dtype)
+    else:
+        data_study = data_study.astype(dtype)
+    data_ma = df_ma[name_ma].dropna()
+    if func_ma_dict is not None:
+        data_ma = data_ma.replace(func_ma_dict).astype(dtype)
+    else:
+        data_ma = data_ma.astype(dtype)
+    data = pd.concat([data_study, data_ma]).astype(dtype)
+    patient_data[name] = data
+    patient_data[name] = patient_data[name].astype(dtype)
 
 
 class TelegramBot:
