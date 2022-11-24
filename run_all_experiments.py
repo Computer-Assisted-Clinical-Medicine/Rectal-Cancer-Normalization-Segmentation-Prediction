@@ -92,7 +92,8 @@ while True:
         bot.send_message(f"Finished with {exp_pd.path}")
 
     for thread in all_threads:
-        thread.join()
+        if thread is not None:
+            thread.join()
 
 bot.send_message("Finished")
 bot.send_sticker()
