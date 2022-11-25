@@ -38,10 +38,7 @@ os.environ["TF_GPU_THREAD_MODE"] = "gpu_private"
 def priority(hp_params):
     """Define a priority for each experiment"""
     prio = 0
-    arch_priority = {
-        UNet: 100,
-        DeepLabv3plus: 0,
-    }
+    arch_priority = {UNet: 200, DeepLabv3plus: 100, ResNet: 0}
     architecture = hp_params["architecture"]
     prio += arch_priority.get(architecture, 0)
 

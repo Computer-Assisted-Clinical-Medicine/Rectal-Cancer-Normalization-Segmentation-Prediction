@@ -348,7 +348,8 @@ def split_into_modalities(
     for pat_name, data in tqdm(dataset.items(), desc="split quant"):
         new_dict[pat_name] = {k: v for k, v in data.items() if k not in ["image", "labels"]}
         new_dict[pat_name]["images"] = []
-        new_dict[pat_name]["labels"] = data["labels"]
+        if "labels" in data:
+            new_dict[pat_name]["labels"] = data["labels"]
         image = None
         new_path = data["image"].parent / "channel_wise"
         new_path_abs = experiment_dir / new_path

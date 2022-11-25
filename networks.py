@@ -525,13 +525,10 @@ class ResNet(SegBasisNet):
                 kernel_regularizer=self.options["regularizer"],
                 name=f"{name}-Dense" if task_type == "classification" else name,
             )(features)
-            tf.debugging.assert_all_finite(out, f"NaN in {name} output 1")
+            tf.debugging.assert_all_finite(out, f"NaN in {name} output 1")  # TODO: remove
             if task_type == "classification":
                 out = tf.keras.layers.Softmax(name=f"{name}")(out)
-            tf.debugging.assert_all_finite(out, f"NaN in {name} output 2")
-            n_nan = tf.reduce_mean(tf.cast(tf.math.is_nan(out), tf.float32))
-            tf.keras.backend.print_tensor("Test")
-            tf.keras.backend.print_tensor(n_nan)
+            tf.debugging.assert_all_finite(out, f"NaN in {name} output 2")  # TODO: remove
             outputs.append(out)
 
         model = MaskedModel(inputs=inputs, outputs=outputs)
