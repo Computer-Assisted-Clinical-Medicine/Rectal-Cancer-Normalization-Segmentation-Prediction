@@ -540,8 +540,8 @@ class MaskedModel(tf.keras.Model):
     into zeros and assigned zero sample weight"""
 
     # pylint: disable=too-few-public-methods
-    def train_step(self, data):
-        """Do the training, see tf documentation"""
+
+    def _convert_data(self, data):
         if len(data) == 2:
             (x, y), sample_weights = data, None
         else:
@@ -566,4 +566,19 @@ class MaskedModel(tf.keras.Model):
             tf.debugging.assert_all_finite(y_t, f"NaNs found in y_true Nr. {num}")
         for num, x_t in enumerate(self(x)):
             tf.debugging.assert_all_finite(x_t, f"NaNs found in y_pred Nr. {num}")
+        return x, y, sample_weights
+
+    def train_step(self, data):
+        """Do the training, see tf documentation"""
+        x, y, sample_weights = self._convert_data(data)
         return super().train_step((x, y, sample_weights))
+
+    def test_step(self, data):
+        """Do the testing, see tf documentation"""
+        x, y, sample_weights = self._convert_data(data)
+        return super().test_step((x, y, sample_weights))
+
+    def predict_step(self, data):
+        """Do the prediction, see tf documentation"""
+        x, y, sample_weights = self._convert_data(data)
+        return super().predict_step((x, y, sample_weights))
