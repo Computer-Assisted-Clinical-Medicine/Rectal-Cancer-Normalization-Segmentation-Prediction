@@ -408,7 +408,7 @@ if __name__ == "__main__":
                 )
 
             if location == "all":
-                query = ""  # pylint:disable=invalid-name
+                query = "index == index"  # pylint:disable=invalid-name
                 N_EPOCHS = 100
             elif location in timepoints_to_use.location.unique():
                 if location == "Mannheim":
