@@ -10,13 +10,14 @@ import numpy as np
 import pandas as pd
 import SimpleITK as sitk
 import telegram
+import yaml
 from matplotlib import pyplot as plt
 from tqdm.autonotebook import tqdm
-import yaml
 
+from networks import ResNet
 from SegClassRegBasis.architecture import DeepLabv3plus, DenseTiramisu, UNet
 from SegClassRegBasis.normalization import NORMALIZING
-from networks import ResNet
+from SegClassRegBasis.utils import gather_results
 
 
 def make_int(number):
@@ -800,3 +801,146 @@ def plot_with_ma(
                 linestyle=linestyle,
                 color=color,
             )
+
+
+def gather_all_results() -> pd.DataFrame:
+    """Gather all results from the normalization experiment
+
+    Returns
+    -------
+    pd.DataFrame
+        A dataframe with the results for each patient and timepoint for all tasks,
+        locations and version
+    """
+    experiment_dir = Path(os.environ["experiment_dir"]) / "Normalization_Experiment"
+    data_dir = Path(os.environ["data_dir"])
+    timepoints = pd.read_csv(data_dir / "timepoints.csv", sep=";", index_col=0)
+    with open(experiment_dir / "dataset.yaml", encoding="utf8") as f:
+        orig_dataset = yaml.load(f, Loader=yaml.Loader)
+    with open(experiment_dir / "dataset_class_reg.yaml", encoding="utf8") as f:
+        orig_dataset_class_reg = yaml.load(f, Loader=yaml.Loader)
+    collected_results = []
+    for external in [True, False]:
+        for postprocessed in [True, False]:
+            for version in ["best", "final"]:
+                for task in ["segmentation", "classification", "regression"]:
+                    if postprocessed and task != "segmentation":
+                        continue
+                    loc_results = gather_results(
+                        experiment_dir,
+                        task=task,
+                        external=external,
+                        postprocessed=postprocessed,
+                        version=version,
+                        combined=False,
+                    )
+                    if loc_results is not None:
+                        loc_results["external"] = external
+                        loc_results["postprocessed"] = postprocessed
+                        loc_results["version"] = version
+                        collected_results.append(loc_results)
+
+    results = pd.concat(collected_results)
+    # defragment the frame
+    results = results.copy()
+    # reset index
+    results.index = pd.RangeIndex(results.shape[0])
+    # set timepoint
+    results["timepoint"] = results["File Number"].apply(
+        lambda x: "_".join(x.split("_")[:2])
+    )
+    results["network"] = results.name.apply(lambda x: x.split("-")[0])
+    location_order = [
+        "Frankfurt",
+        "Regensburg",
+        "Mannheim",
+        "all",
+        "Not-Frankfurt",
+        "Not-Regensburg",
+        "Not-Mannheim",
+    ]
+    results["train_location"] = pd.Categorical(
+        results.exp_group_name.str.partition("_")[2], categories=location_order
+    )
+    # set treatment status
+    mask = results.index[~results.timepoint.str.startswith("99")]
+    results.loc[mask, "treatment_status"] = timepoints.loc[
+        results.timepoint[mask]
+    ].treatment_status.values
+    mask = results["File Number"].str.contains("_1_l") & results.timepoint.str.startswith(
+        "99"
+    )
+    results.loc[mask, "treatment_status"] = "before therapy"
+    mask = results["File Number"].str.contains("_2_l") & results.timepoint.str.startswith(
+        "99"
+    )
+    results.loc[mask, "treatment_status"] = "before OP"
+    # set marker for before therapy
+    results["before_therapy"] = results.treatment_status == "before therapy"
+
+    for _, row in results.iterrows():
+        assert row.normalization in row["name"], "normalization not in name"
+    results.normalization = pd.Categorical(
+        results.normalization, categories=sorted(results.normalization.unique())
+    )
+    results["from_study"] = ~results["File Number"].str.startswith("99")
+    root = data_dir / "Images registered and N4 corrected"
+    new_root = data_dir / "Images"
+    # get image metadata
+    param_list = []
+    for number in results["File Number"].unique():
+        if number in orig_dataset:
+            images = [Path(img) for img in orig_dataset[number]["images"]]
+        else:
+            images = [Path(img) for img in orig_dataset_class_reg[number]["images"]]
+        param_file = data_dir / images[0].parent / "acquisition_parameters.csv"
+        param_file = new_root / param_file.relative_to(root)
+        parameters = pd.read_csv(param_file, sep=";", index_col=0)
+        assert isinstance(parameters, pd.DataFrame)
+        t2_params = parameters.loc[parameters.filename == images[0].name].copy()
+        t2_params["File Number"] = number
+        t2_params["name"] = t2_params.index
+        t2_params.set_index("File Number", inplace=True)
+        param_list.append(t2_params)
+    acquisition_params = pd.concat(param_list)
+    # drop columns that are mostly empty or always the same
+    for col in acquisition_params:
+        num_na = acquisition_params[col].isna().sum()
+        if num_na > acquisition_params.shape[0] // 2:
+            acquisition_params.drop(columns=[col], inplace=True)
+            continue
+        same = (acquisition_params[col] == acquisition_params[col].iloc[0]).sum()
+        if same > acquisition_params.shape[0] * 0.9:
+            acquisition_params.drop(columns=[col], inplace=True)
+            continue
+    # correct pixel spacing
+    def func(x):
+        if "\\" in x:
+            return float(x.split("\\")[0])
+        else:
+            return float(x[1:].split(",")[0])
+
+    acquisition_params.pixel_spacing = acquisition_params["0028|0030"].apply(func)
+    # correct location
+    acquisition_params.loc[
+        acquisition_params.index.str.startswith("99"), "location"
+    ] = "Mannheim-not-from-study"
+
+    # filter important parameters
+    column_names = {
+        "0008|1090": "model_name",
+        "0018|0050": "slice_thickness",
+        "0018|0080": "repetition_time",
+        "0018|0095": "pixel_bandwidth",
+        "0018|1314": "flip_angle",
+        "0018|0081": "echo_time",
+        "0018|0087": "field_strength",
+        "pixel_spacing": "pixel_spacing",
+        "location": "location",
+    }
+    acquisition_params = acquisition_params[column_names.keys()]
+    acquisition_params.rename(columns=column_names, inplace=True)
+
+    # set location
+    results = results.merge(right=acquisition_params.location, on="File Number")
+    return results, acquisition_params

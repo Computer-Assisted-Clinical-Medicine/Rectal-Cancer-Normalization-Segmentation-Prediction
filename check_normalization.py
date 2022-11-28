@@ -306,7 +306,7 @@ for exp_name, suffix in experiments.items():
                     print(f"Working on {location}-GAN{suffix}")
                     print(f"\tChannel: {channel+1}/3")
                     n_epochs = 100 if "Not" in location or "all" in location else 200
-                    print(f"\tEpoch: {max_epoch}/{n_epochs}")
+                    print(f"\tEpoch: {max_epoch+2}/{n_epochs}")
 if len(train_results_list) > 0:
     train_results = pd.concat(train_results_list).reset_index()
 

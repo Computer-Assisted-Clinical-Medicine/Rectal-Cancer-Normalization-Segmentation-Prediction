@@ -35,19 +35,19 @@ from utils import (
 os.environ["TF_GPU_THREAD_MODE"] = "gpu_private"
 
 
-def priority(hp_params):
+def priority(hp_params, train_loc):
     """Define a priority for each experiment"""
     prio = 0
-    arch_priority = {UNet: 200, DeepLabv3plus: 100, ResNet: 0}
+    arch_priority = {UNet: 2000, DeepLabv3plus: 1000, ResNet: 0}
     architecture = hp_params["architecture"]
     prio += arch_priority.get(architecture, 0)
 
     norm = hp_params["preprocessing_parameters"]["normalizing_method"]
     norm_priority = {
-        NORMALIZING.QUANTILE: 40,
-        NORMALIZING.HM_QUANTILE: 30,
-        GAN_NORMALIZING.GAN_DISCRIMINATORS: 20,
-        NORMALIZING.HISTOGRAM_MATCHING: 10,
+        NORMALIZING.QUANTILE: 400,
+        NORMALIZING.HM_QUANTILE: 300,
+        GAN_NORMALIZING.GAN_DISCRIMINATORS: 200,
+        NORMALIZING.HISTOGRAM_MATCHING: 100,
         NORMALIZING.MEAN_STD: 0,
     }
     prio += norm_priority.get(norm, 0)
@@ -55,12 +55,23 @@ def priority(hp_params):
     if norm == GAN_NORMALIZING.GAN_DISCRIMINATORS:
         suffix = get_gan_suffix(hp_params)
         suffix_priority = {
-            "_3_64_0.50_BetterConv_0.00001_WINDOW_seg": 9,
-            "_3_64_0.50_BetterConv_0.00001": 8,
-            "_3_64_0.50_BetterConv_0.00001_seg": 7,
-            "_3_64_0.50": 6,
+            "_3_64_0.50_BetterConv_0.00001_WINDOW_seg": 90,
+            "_3_64_0.50_BetterConv_0.00001": 80,
+            "_3_64_0.50_BetterConv_0.00001_seg": 70,
+            "_3_64_0.50": 60,
         }
         prio += suffix_priority.get(suffix, 0)
+
+    loc_priority = {
+        "Frankfurt": 9,
+        "Regensburg": 8,
+        "Mannheim": 7,
+        "all": 6,
+        "Not-Frankfurt": 5,
+        "Not-Regensburg": 4,
+        "Not-Mannheim": 3,
+    }
+    prio += loc_priority.get(train_loc, 0)
 
     return prio
 
@@ -381,6 +392,7 @@ if __name__ == "__main__":
 
     # set up all experiments
     experiments: List[Experiment] = []
+    additional_info: List[Dict[str, Any]] = []
 
     for location in [
         "Frankfurt",
@@ -566,13 +578,17 @@ if __name__ == "__main__":
                 num_channels=N_CHANNELS,
                 folds_dir_rel=fold_dir,
                 tensorboard_images=True,
-                priority=priority(hyp),
+                priority=priority(hyp, location),
             )
             experiments.append(exp)
+            assert preprocessing_name in experiment_name
+            additional_info.append({"normalization": preprocessing_name})
 
             # bring experiments in a custom order
-            experiments.sort(key=lambda x: x.priority, reverse=True)
+            experiments_sorted = sorted(experiments, key=lambda x: x.priority, reverse=True)
             # export all hyperparameters
-            export_experiments_run_files(exp_group_base_dir, experiments)
+            export_experiments_run_files(
+                exp_group_base_dir, experiments, additional_info=additional_info
+            )
 
             print(f"Exported {location} - {experiment_name}")
