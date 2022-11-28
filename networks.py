@@ -340,7 +340,7 @@ class AutoEncoder(SegBasisNet):
         smoothing_sigma=1,
         is_training=True,
         do_finetune=False,
-        model_path="",
+        model_path=None,
         regularize=(True, "L2", 0.00001),
         **kwargs,
     ):
@@ -436,3 +436,149 @@ class AutoEncoder(SegBasisNet):
             return loss_func_red
         else:
             return loss_func
+
+
+class ResNet(SegBasisNet):
+    """Implements a simple resnet
+
+    Parameters
+    ----------
+    loss_name : str
+        Which loss is being used, this will be used to train the autoencoder
+    tasks : OrderedDict[str, str], optional
+        The tasks that should be performed, loss and metrics will be selected accordingly
+    resnet_type : str, optional
+        Which resnet should be used, by default ResNet50, 101 and 152 are also possible
+    weights : str, optional
+        Which weights should be used, can be None, "imagenet", a path or None, by default None
+    is_training : bool, optional
+        If in training, by default True
+    do_finetune : bool, optional
+        If finetuning is being done, by default False
+    model_path : str, optional
+        The path where the model is located for finetuning, by default ""
+    regularize : tuple, optional
+        Which regularizer should be used, by default (True, "L2", 0.00001)
+    """
+
+    def __init__(
+        self,
+        loss_name: str,
+        tasks: OrderedDict,
+        resnet_type="ResNet50",
+        weights=None,
+        is_training=True,
+        do_finetune=False,
+        model_path=None,
+        regularize=(True, "L2", 0.00001),
+        **kwargs,
+    ):
+        super().__init__(
+            loss_name,
+            tasks,
+            is_training,
+            do_finetune,
+            model_path,
+            regularize,
+            resnet_type=resnet_type,
+            weights=weights,
+            **kwargs,
+        )
+
+        self.divisible_by = 16
+
+    @staticmethod
+    def get_name():
+        return "ResNet"
+
+    def _build_model(self) -> Model:
+        """Builds Model"""
+
+        inputs = self.inputs["x"]
+
+        resnet_params = dict(
+            include_top=False,
+            weights=self.options["weights"],
+            input_tensor=inputs,
+            pooling="avg",
+        )
+
+        if self.options["resnet_type"] == "ResNet50":
+            base_network = tf.keras.applications.resnet50.ResNet50(**resnet_params)
+        elif self.options["resnet_type"] == "ResNet101":
+            base_network = tf.keras.applications.resnet.ResNet101(**resnet_params)
+        elif self.options["resnet_type"] == "ResNet152":
+            base_network = tf.keras.applications.resnet.ResNet152(**resnet_params)
+
+        features = base_network(inputs)
+
+        tf.debugging.assert_all_finite(features, "NaN in features")
+
+        # add final classification
+        outputs = []
+        for task_type, (name, n_label) in zip(
+            self.tasks, self.options["label_shapes"].items()
+        ):
+            out = tf.keras.layers.Dense(
+                units=n_label,
+                activation="relu" if task_type == "classification" else None,
+                kernel_regularizer=self.options["regularizer"],
+                name=f"{name}-Dense" if task_type == "classification" else name,
+            )(features)
+            tf.debugging.assert_all_finite(out, f"NaN in {name} output 1")  # TODO: remove
+            if task_type == "classification":
+                out = tf.keras.layers.Softmax(name=f"{name}")(out)
+            tf.debugging.assert_all_finite(out, f"NaN in {name} output 2")  # TODO: remove
+            outputs.append(out)
+
+        model = MaskedModel(inputs=inputs, outputs=outputs)
+        return model
+
+
+class MaskedModel(tf.keras.Model):
+    """Do the training of the model with missing labels. Nans will be converted
+    into zeros and assigned zero sample weight"""
+
+    # pylint: disable=too-few-public-methods
+
+    def _convert_data(self, data):
+        if len(data) == 2:
+            (x, y), sample_weights = data, None
+        else:
+            x, y, sample_weights = data
+        if sample_weights is None:
+            sample_weights = tuple(
+                tf.cast(
+                    tf.math.logical_not(
+                        tf.math.reduce_any(
+                            tf.math.is_nan(arr), axis=tuple(range(1, len(arr.shape)))
+                        )
+                    ),
+                    tf.int32,
+                )
+                for arr in y
+            )
+        if isinstance(y, tuple):
+            y = tuple(
+                tf.where(tf.math.is_nan(arr), tf.cast(0, arr.dtype), arr) for arr in y
+            )
+        for num, y_t in enumerate(y):
+            tf.debugging.assert_all_finite(y_t, f"NaNs found in y_true Nr. {num}")
+        for num, x_t in enumerate(self(x)):
+            tf.debugging.assert_all_finite(x_t, f"NaNs found in y_pred Nr. {num}")
+        return x, y, sample_weights
+
+    def train_step(self, data):
+        """Do the training, see tf documentation"""
+        x, y, sample_weights = self._convert_data(data)
+        return super().train_step((x, y, sample_weights))
+
+    def test_step(self, data):
+        """Do the testing, see tf documentation"""
+        x, y, sample_weights = self._convert_data(data)
+        return super().test_step((x, y, sample_weights))
+
+    def predict_step(self, data):
+        """Do the prediction, see tf documentation"""
+        x, y, sample_weights = self._convert_data(data)
+        return super().predict_step((x, y, sample_weights))

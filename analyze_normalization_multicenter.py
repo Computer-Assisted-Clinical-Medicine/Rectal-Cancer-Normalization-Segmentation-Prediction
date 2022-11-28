@@ -26,155 +26,67 @@ from tqdm.auto import tqdm
 
 from plot_utils import create_axes, display_dataframe, display_markdown, save_pub
 from SegClassRegBasis import normalization
-from SegClassRegBasis.utils import gather_results
+from utils import gather_all_results
 
 experiment_dir = Path(os.environ["experiment_dir"]) / "Normalization_Experiment"
 
-location_order = [
-    "Frankfurt",
-    "Regensburg",
-    "Mannheim",
-    "all",
-    "Not-Frankfurt",
-    "Not-Regensburg",
-    "Not-Mannheim",
-]
-
 # load data
 data_dir = Path(os.environ["data_dir"])
-timepoints = pd.read_csv(data_dir / "timepoints.csv", sep=";", index_col=0)
 
 with open(experiment_dir / "dataset.yaml", encoding="utf8") as f:
     orig_dataset = yaml.load(f, Loader=yaml.Loader)
 
-collected_results = []
-for external in [True, False]:
-    for postprocessed in [True, False]:
-        for version in ["best", "final"]:
-            loc_results = gather_results(
-                experiment_dir,
-                task="segmentation",
-                external=external,
-                postprocessed=postprocessed,
-                version=version,
-                combined=False,
-            )
-            if loc_results is not None:
-                loc_results["external"] = external
-                loc_results["postprocessed"] = postprocessed
-                loc_results["version"] = version
-                collected_results.append(loc_results)
 
-results = pd.concat(collected_results)
-# reset index
-results.index = pd.RangeIndex(results.shape[0])
-# set timepoint
-results["timepoint"] = results["File Number"].apply(lambda x: "_".join(x.split("_")[:2]))
-results["network"] = results.name.apply(lambda x: x.split("-")[0])
-results["train_location"] = pd.Categorical(
-    results.exp_group_name.str.partition("_")[2], categories=location_order
-)
-# set treatment status
-mask = results.index[~results.timepoint.str.startswith("99")]
-results.loc[mask, "treatment_status"] = timepoints.loc[
-    results.timepoint[mask]
-].treatment_status.values
-mask = results["File Number"].str.contains("_1_l") & results.timepoint.str.startswith("99")
-results.loc[mask, "treatment_status"] = "before therapy"
-mask = results["File Number"].str.contains("_2_l") & results.timepoint.str.startswith("99")
-results.loc[mask, "treatment_status"] = "before OP"
-# set marker for before therapy
-results["before_therapy"] = results.treatment_status == "before therapy"
+results, acquisition_params = gather_all_results()
 
+results_seg = results[results.task == "segmentation"].copy()
+results_seg["do_batch_normalization"] = results_seg["do_batch_normalization"].astype(bool)
 
-def get_norm(model_name):
-    if model_name == "combined_models":
-        return "combined"
-    else:
-        return model_name.partition("DO-")[-1].partition("-obj_")[0]
+results_class = results[results.task == "classification"].copy()
 
-
-results["normalization"] = results.name.apply(get_norm)
-results.normalization = pd.Categorical(results.normalization)
-results["from_study"] = ~results["File Number"].str.startswith("99")
-
-root = data_dir / "Images registered and N4 corrected"
-new_root = data_dir / "Images"
-# get image metadata
-param_list = []
-for number in results["File Number"].unique():
-    images = [Path(img) for img in orig_dataset[number]["images"]]
-    param_file = data_dir / images[0].parent / "acquisition_parameters.csv"
-    param_file = new_root / param_file.relative_to(root)
-    parameters = pd.read_csv(param_file, sep=";", index_col=0)
-    assert isinstance(parameters, pd.DataFrame)
-    t2_params = parameters.loc[parameters.filename == images[0].name].copy()
-    t2_params["File Number"] = number
-    t2_params["name"] = t2_params.index
-    t2_params.set_index("File Number", inplace=True)
-    param_list.append(t2_params)
-acquisition_params = pd.concat(param_list)
-# drop columns that are mostly empty or always the same
-for col in acquisition_params:
-    num_na = acquisition_params[col].isna().sum()
-    if num_na > acquisition_params.shape[0] // 2:
-        acquisition_params.drop(columns=[col], inplace=True)
-        continue
-    same = (acquisition_params[col] == acquisition_params[col].iloc[0]).sum()
-    if same > acquisition_params.shape[0] * 0.9:
-        acquisition_params.drop(columns=[col], inplace=True)
-        continue
-# correct pixel spacing
-def func(x):
-    if "\\" in x:
-        return float(x.split("\\")[0])
-    else:
-        return float(x[1:].split(",")[0])
-
-
-acquisition_params.pixel_spacing = acquisition_params["0028|0030"].apply(func)
-# correct location
-acquisition_params.loc[
-    acquisition_params.index.str.startswith("99"), "location"
-] = "Mannheim-not-from-study"
-
-# filter important parameters
-column_names = {
-    "0008|1090": "model_name",
-    "0018|0050": "slice_thickness",
-    "0018|0080": "repetition_time",
-    "0018|0095": "pixel_bandwidth",
-    "0018|1314": "flip_angle",
-    "0018|0081": "echo_time",
-    "0018|0087": "field_strength",
-    "pixel_spacing": "pixel_spacing",
-    "location": "location",
-}
-acquisition_params = acquisition_params[column_names.keys()]
-acquisition_params.rename(columns=column_names, inplace=True)
-
-# set location
-results = results.merge(right=acquisition_params.location, on="File Number")
+results_reg = results[results.task == "regression"].copy()
 
 # %%
 
 # See which locations are finished
 
-n_finished = pd.DataFrame(
-    index=results.normalization.cat.categories, columns=["BN", "nBN", "total"]
+print("Finished Segmentation")
+n_finished_seg = pd.DataFrame(
+    index=results_seg.normalization.cat.categories, columns=["BN", "nBN", "total"]
 )
-n_finished.BN = (
-    results.query("do_batch_normalization")
+n_finished_seg.BN = (
+    results_seg.query("do_batch_normalization")
     .groupby("normalization")
-    .train_location.nunique()
+    .train_location.unique()
+    .apply(len)
 )
-n_finished.nBN = (
-    results.query("not do_batch_normalization")
+n_finished_seg.nBN = (
+    results_seg.query("not do_batch_normalization")
     .groupby("normalization")
-    .train_location.nunique()
+    .train_location.unique()
+    .apply(len)
 )
-n_finished.total = n_finished.BN + n_finished.nBN
-display(n_finished.sort_values("total", ascending=False))
+n_finished_seg.total = n_finished_seg.BN + n_finished_seg.nBN
+display(n_finished_seg.sort_values("total", ascending=False))
+
+print("Finished Classification")
+n_finished_class = pd.DataFrame(
+    index=results_class.normalization.cat.categories, columns=["2D", "3D", "total"]
+)
+n_finished_class["2D"] = (
+    results_class.query("dimensions == 2")
+    .groupby("normalization")
+    .train_location.unique()
+    .apply(len)
+)
+n_finished_class["3D"] = (
+    results_class.query("dimensions == 3")
+    .groupby("normalization")
+    .train_location.unique()
+    .apply(len)
+)
+n_finished_class.total = n_finished_class["2D"] + n_finished_class["3D"]
+display(n_finished_class.sort_values("total", ascending=False))
 
 # %% [markdown]
 
@@ -192,7 +104,7 @@ display(n_finished.sort_values("total", ascending=False))
 # %%
 
 g = sns.catplot(
-    data=results.query(
+    data=results_seg.query(
         "version == 'best' & before_therapy & postprocessed & name != 'combined_models'"
     ),
     x="Dice",
@@ -212,13 +124,13 @@ plt.show()
 plt.close()
 
 g = sns.catplot(
-    data=results[results.normalization.str.startswith("GAN_")].query(
+    data=results_seg[results_seg.normalization.str.startswith("GAN_")].query(
         "version == 'best' & before_therapy & postprocessed & not do_batch_normalization"
     ),
     x="Dice",
     y="train_location",
     hue="normalization",
-    hue_order=[n for n in results.normalization.cat.categories if n.startswith("GAN_")],
+    hue_order=[n for n in results_seg.normalization.cat.categories if n.startswith("GAN_")],
     col="external",
     row="do_batch_normalization",
     kind="box",
@@ -234,7 +146,7 @@ plt.show()
 plt.close()
 
 g = sns.catplot(
-    data=results.query(
+    data=results_seg.query(
         "version == 'best' & before_therapy & postprocessed & not do_batch_normalization"
     ),
     x="Dice",
@@ -254,7 +166,7 @@ g.fig.subplots_adjust(top=0.87)
 plt.show()
 plt.close()
 
-res_not_all = results.query(
+res_not_all = results_seg.query(
     "before_therapy & postprocessed & name != 'combined_models' & train_location != 'all'"
 )
 if res_not_all.size > 0:
@@ -276,7 +188,7 @@ if res_not_all.size > 0:
     plt.show()
     plt.close()
 
-res_all = results.query(
+res_all = results_seg.query(
     "before_therapy & postprocessed & name != 'combined_models' & train_location == 'all'"
 )
 if res_all.size > 0:
@@ -297,7 +209,7 @@ if res_all.size > 0:
     plt.show()
     plt.close()
 
-res_single_center = results.query(
+res_single_center = results_seg.query(
     "before_therapy & postprocessed & name != 'combined_models'"
 )
 res_single_center = res_single_center[
@@ -323,7 +235,9 @@ if res_single_center.size > 0:
     plt.show()
     plt.close()
 
-res_except_one = results.query("before_therapy & postprocessed & name != 'combined_models'")
+res_except_one = results_seg.query(
+    "before_therapy & postprocessed & name != 'combined_models'"
+)
 res_except_one = res_except_one[
     res_except_one.train_location.apply(
         lambda x: x in ["Not-Frankfurt", "Not-Regensburg", "Not-Mannheim"]
@@ -348,7 +262,7 @@ if res_except_one.size > 0:
     plt.close()
 
 display_markdown("Performance when trained on all training locations.")
-res_grouped_all = results.query(
+res_grouped_all = results_seg.query(
     "version == 'best' & before_therapy & postprocessed & network == 'UNet2D'"
     + " & name != 'combined_models' & train_location == 'all'"
 ).groupby(["normalization", "do_batch_normalization"])
@@ -360,7 +274,7 @@ mean_median_df["Dice median"] = res_grouped_all.Dice.median()
 display_dataframe(mean_median_df)
 
 display_markdown("All training locations except all.")
-res_grouped_not_all = results.query(
+res_grouped_not_all = results_seg.query(
     "version == 'best' & before_therapy & postprocessed & network == 'UNet2D'"
     + " & name != 'combined_models' & train_location != 'all'"
 ).groupby(["normalization", "do_batch_normalization", "external"])
@@ -388,12 +302,11 @@ display_dataframe(
 
 # %%
 
-for train_location in location_order:
+for train_location, results_loc in results_seg.groupby("train_location"):
+    if not results_loc.size:
+        continue
     g = sns.catplot(
-        data=results.query(
-            f"version == 'best' & train_location == '{train_location}'"
-            + " & before_therapy & name != 'combined_models'"
-        ),
+        data=results_loc.query("version == 'best' & before_therapy"),
         x="Dice",
         y="normalization",
         col="postprocessed",
@@ -408,10 +321,7 @@ for train_location in location_order:
     plt.close()
 
     g = sns.catplot(
-        data=results.query(
-            f"version == 'best' & train_location == '{train_location}'"
-            + " & name != 'combined_models' & external"
-        ),
+        data=results_loc.query("version == 'best' & external"),
         x="Dice",
         y="normalization",
         col="postprocessed",
@@ -427,10 +337,7 @@ for train_location in location_order:
 
     if train_location != "all":
         g = sns.catplot(
-            data=results.query(
-                f"version == 'best' & train_location == '{train_location}'"
-                + " & name != 'combined_models' & external & postprocessed"
-            ),
+            data=results_loc.query("version == 'best' & external & postprocessed"),
             x="Dice",
             y="normalization",
             col="before_therapy",
@@ -446,10 +353,7 @@ for train_location in location_order:
         plt.show()
         plt.close()
 
-    data_not_ext = results.query(
-        f"train_location == '{train_location}'"
-        + " & name != 'combined_models' & not external & postprocessed"
-    )
+    data_not_ext = results_loc.query("version == 'best' & not external & postprocessed")
 
     if (
         data_not_ext.from_study.unique().size > 1
@@ -474,10 +378,7 @@ for train_location in location_order:
 
     if train_location != "all":
         g = sns.catplot(
-            data=results.query(
-                f"version == 'best' & train_location == '{train_location}'"
-                + " & name != 'combined_models' & postprocessed & before_therapy"
-            ),
+            data=results_loc.query("version == 'best' & postprocessed & before_therapy"),
             x="Dice",
             y="normalization",
             col="external",
@@ -492,10 +393,7 @@ for train_location in location_order:
         plt.close()
 
         g = sns.catplot(
-            data=results.query(
-                f"version == 'best' & train_location == '{train_location}'"
-                + " & name != 'combined_models' & postprocessed & before_therapy"
-            ),
+            data=results_loc.query("version == 'best' & postprocessed & before_therapy"),
             x="Dice",
             y="fold",
             col="external",
@@ -511,11 +409,11 @@ for train_location in location_order:
 
 # %%
 
-images_dice = pd.DataFrame(index=results["File Number"].unique())
-images_dice["minimum"] = results.groupby("File Number").Dice.min()
-images_dice["mean"] = results.groupby("File Number").Dice.mean()
-images_dice["median"] = results.groupby("File Number").Dice.median()
-images_dice["maximum"] = results.groupby("File Number").Dice.max()
+images_dice = pd.DataFrame(index=results_seg["File Number"].unique())
+images_dice["minimum"] = results_seg.groupby("File Number").Dice.min()
+images_dice["mean"] = results_seg.groupby("File Number").Dice.mean()
+images_dice["median"] = results_seg.groupby("File Number").Dice.median()
+images_dice["maximum"] = results_seg.groupby("File Number").Dice.max()
 
 display_markdown("## Bad images\n### Mean")
 display_dataframe(images_dice.sort_values("mean").iloc[:20])
@@ -627,11 +525,11 @@ plt.close()
 
 display_markdown("## Look for correlation\n### Group by training location")
 
-results_merged = results.merge(
+results_merged = results_seg.merge(
     acquisition_params.drop(columns="location"), on="File Number"
 )
 
-for loc in results.train_location.unique():
+for loc in results_seg.train_location.unique():
     g = sns.histplot(
         data=results_merged.query(
             f"train_location == '{loc}' & normalization == 'QUANTILE'"
@@ -653,7 +551,7 @@ for loc in results.train_location.unique():
 
 display_markdown("### Group by location")
 
-for loc in results.location.unique():
+for loc in results_seg.location.unique():
     if loc == "Regensburg-UK":
         continue
     g = sns.histplot(
@@ -676,7 +574,7 @@ for loc in results.location.unique():
 
 display_markdown("### Try to find correlations")
 # %%
-for loc in results.train_location.unique():
+for loc in results_seg.train_location.unique():
     for col in acquisition_params.columns:
         data = results_merged.query(
             f"train_location == '{loc}' & normalization == 'QUANTILE'"
@@ -707,7 +605,7 @@ for col in acquisition_params.columns:
         data=data,
         y="Dice",
         x=col,
-        markers=["."] * data.train_location.nunique(),
+        markers=["."] * len(data.train_location.cat.categories),
         hue="train_location",
         truncate=True,
         col="external",
@@ -852,9 +750,9 @@ norm_order = ["GAN", "GAN_tog", "Perc", "Perc-HM", "HM", "M-Std"]
 
 TITLE = "Performance when training on a single center"
 display_markdown(TITLE)
-data = results.query("before_therapy & postprocessed & name != 'combined_models'").replace(
-    new_names
-)
+data = results_seg.query(
+    "before_therapy & postprocessed & name != 'combined_models'"
+).replace(new_names)
 data.loc[data.train_location == "all", "external"] = "test"
 
 g = sns.catplot(
@@ -961,7 +859,7 @@ for ax, tlt in zip(axes, titles):
 save_pub("params", bbox_inches="tight")
 
 grouped_data = (
-    results.query(
+    results_seg.query(
         "version == 'best' & before_therapy & postprocessed"
         + " & name != 'combined_models'"
     )
@@ -1377,7 +1275,7 @@ save_pub("mean-std-stat")
 display_markdown("## Compare networks")
 
 grouped_data = (
-    results.query(
+    results_seg.query(
         "version == 'best' & before_therapy & postprocessed"
         + " & name != 'combined_models' & train_location == 'all'"
     )
@@ -1403,7 +1301,7 @@ display_markdown("## Compare Normalization")
 
 display_markdown("### all")
 grouped_data = (
-    results.query(
+    results_seg.query(
         "version == 'best' & before_therapy & postprocessed"
         + " & name != 'combined_models' & train_location == 'all' & not external"
     )
@@ -1424,7 +1322,7 @@ display_dataframe(differences < 0.05)
 
 display_markdown("### internal")
 grouped_data = (
-    results.query(
+    results_seg.query(
         "version == 'best' & before_therapy & postprocessed"
         + " & name != 'combined_models' & train_location != 'all' & not external"
     )
@@ -1445,7 +1343,7 @@ display_dataframe(differences < 0.05)
 
 display_markdown("### external")
 grouped_data = (
-    results.query(
+    results_seg.query(
         "version == 'best' & before_therapy & postprocessed"
         + " & name != 'combined_models' & train_location != 'all' & external"
     )

@@ -69,7 +69,9 @@ while True:
         print(f"Starting with {exp_pd.path}")
         # load experiment
         param_file = experiment_dir / exp_pd.path / "parameters.yaml"
-        assert param_file.exists(), f"Parameter file {param_file} does not exist."
+        if not param_file.exists():
+            print("Parameter file not found, experiment will be skipped")
+            continue
         try:
             exp = Experiment.from_file(param_file)
         except FileNotFoundError:
