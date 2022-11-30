@@ -45,7 +45,7 @@ def get_experiments():
     return exp_df
 
 
-gpu = tf.device(get_gpu(memory_limit=2000))
+gpu = tf.device(get_gpu(memory_limit=8000))
 
 bot = TelegramBot()
 bot.send_message("Starting with training")

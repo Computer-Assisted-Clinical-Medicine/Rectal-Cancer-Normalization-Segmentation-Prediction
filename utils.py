@@ -803,8 +803,13 @@ def plot_with_ma(
             )
 
 
-def gather_all_results() -> pd.DataFrame:
+def gather_all_results(task="segmentation") -> pd.DataFrame:
     """Gather all results from the normalization experiment
+
+    Parameters
+    ----------
+    tasks : str, optional
+        Which tasks to analyze, by default "segmentation"
 
     Returns
     -------
@@ -823,22 +828,21 @@ def gather_all_results() -> pd.DataFrame:
     for external in [True, False]:
         for postprocessed in [True, False]:
             for version in ["best", "final"]:
-                for task in ["segmentation", "classification", "regression"]:
-                    if postprocessed and task != "segmentation":
-                        continue
-                    loc_results = gather_results(
-                        experiment_dir,
-                        task=task,
-                        external=external,
-                        postprocessed=postprocessed,
-                        version=version,
-                        combined=False,
-                    )
-                    if loc_results is not None:
-                        loc_results["external"] = external
-                        loc_results["postprocessed"] = postprocessed
-                        loc_results["version"] = version
-                        collected_results.append(loc_results)
+                if postprocessed and task != "segmentation":
+                    continue
+                loc_results = gather_results(
+                    experiment_dir,
+                    task=task,
+                    external=external,
+                    postprocessed=postprocessed,
+                    version=version,
+                    combined=False,
+                )
+                if loc_results is not None:
+                    loc_results["external"] = external
+                    loc_results["postprocessed"] = postprocessed
+                    loc_results["version"] = version
+                    collected_results.append(loc_results)
 
     results = pd.concat(collected_results)
     # defragment the frame
