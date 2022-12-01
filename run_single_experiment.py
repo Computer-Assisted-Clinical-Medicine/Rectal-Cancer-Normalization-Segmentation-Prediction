@@ -87,16 +87,33 @@ def eval_fold(experiment: Experiment, fold: int):
     fold : int
         The Number of the fold
     """
-    # evaluate the experiment without blocking the process
-    experiment.evaluate_fold(fold)
+    exp_log_dir = experiment.output_path / experiment.fold_dir_names[fold]
+    if not exp_log_dir.exists():
+        raise FileNotFoundError("Fold dir does not exist.")
+    # only have one process running for each fold
+    lock_file = exp_log_dir / "lock_fold_eval.txt.lock"
+    file_lock = filelock.FileLock(lock_file, timeout=1)
 
     try:
-        experiment.evaluate()
-        if experiment.external_test_set is not None:
-            experiment.evaluate_external_testset()
-    except FileNotFoundError:
-        # this happens when not all folds are complete, it will work on the last one
-        pass
+        file_lock.acquire()
+    except filelock.Timeout:
+        print("Another process is using already working on this.")
+        return
+    try:
+        # evaluate the experiment without blocking the process
+        experiment.evaluate_fold(fold)
+
+        try:
+            experiment.evaluate()
+            if experiment.external_test_set is not None:
+                experiment.evaluate_external_testset()
+        except FileNotFoundError:
+            # this happens when not all folds are complete, it will work on the last one
+            pass
+    finally:
+        file_lock.release()
+    if lock_file.exists():
+        lock_file.unlink()
 
 
 def run_experiment_fold(experiment: Experiment, fold: int):
@@ -128,6 +145,7 @@ def run_experiment_fold(experiment: Experiment, fold: int):
     try:
         file_lock.acquire()
     except filelock.Timeout:
+        print("Another process is using already working on this.")
         return None
     try:
         policy = mixed_precision.Policy("mixed_float16")

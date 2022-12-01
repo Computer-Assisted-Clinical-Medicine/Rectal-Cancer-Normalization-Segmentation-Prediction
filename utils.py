@@ -839,6 +839,7 @@ def gather_all_results(task="segmentation") -> pd.DataFrame:
                     combined=False,
                 )
                 if loc_results is not None:
+                    loc_results = loc_results.copy()
                     loc_results["external"] = external
                     loc_results["postprocessed"] = postprocessed
                     loc_results["version"] = version
