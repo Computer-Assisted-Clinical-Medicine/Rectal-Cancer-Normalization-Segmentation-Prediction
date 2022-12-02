@@ -26,7 +26,7 @@ def get_experiments():
     for exp_id, exp_row in exp_df.iterrows():
         exp_path = experiment_dir / exp_row.path
         if exp_path.exists():
-            result_dirs_exist = []
+            result_files_exist = []
             for task in exp_row.tasks.values():
                 versions = exp_row.versions
                 if task == "segmentation":
@@ -36,10 +36,13 @@ def get_experiments():
                     if exp_row.external:
                         names.append("external_testset")
                     for exp_name in names:
-                        result_dirs_exist.append(
-                            (exp_path / f"results_{exp_name}_{ver}_{task}").exists()
+                        res_file = (
+                            exp_path
+                            / f"results_{exp_name}_{ver}_{task}"
+                            / "evaluation-all-files.h5"
                         )
-            if np.all(result_dirs_exist):
+                        result_files_exist.append(res_file.exists())
+            if np.all(result_files_exist):
                 print(f"{exp_row.path} already finished with training and evaluated.")
                 exp_df.loc[exp_id, "completed"] = True
     return exp_df

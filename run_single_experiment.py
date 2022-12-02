@@ -97,19 +97,17 @@ def eval_fold(experiment: Experiment, fold: int):
     try:
         file_lock.acquire()
     except filelock.Timeout:
-        print("Another process is using already working on this.")
+        print("Another process is already working on this.")
         return
+
     try:
         # evaluate the experiment without blocking the process
         experiment.evaluate_fold(fold)
-
-        try:
-            experiment.evaluate()
-            if experiment.external_test_set is not None:
-                experiment.evaluate_external_testset()
-        except FileNotFoundError:
-            # this happens when not all folds are complete, it will work on the last one
-            pass
+        experiment.evaluate()
+        if experiment.external_test_set is not None:
+            experiment.evaluate_external_testset()
+    except FileNotFoundError as exc:
+        print(exc)
     finally:
         file_lock.release()
     if lock_file.exists():
@@ -145,7 +143,7 @@ def run_experiment_fold(experiment: Experiment, fold: int):
     try:
         file_lock.acquire()
     except filelock.Timeout:
-        print("Another process is using already working on this.")
+        print("Another process is already working on this.")
         return None
     try:
         policy = mixed_precision.Policy("mixed_float16")
