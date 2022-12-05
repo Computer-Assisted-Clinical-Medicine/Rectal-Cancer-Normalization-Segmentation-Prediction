@@ -195,6 +195,17 @@ if __name__ == "__main__":
             hyper_parameters_new.append(hyp_new)
     hyper_parameters = hyper_parameters_new
 
+    hyp_new = {
+        **constant_parameters,
+    }
+    hyp_new["architecture"] = ResNet
+    hyp_new["network_parameters"] = np_ResNet.copy()
+    hyp_new["network_parameters"]["resnet_type"] = "ResNet152"
+    hyp_new["train_parameters"]["percent_of_object_samples"] = 0
+    hyp_new["train_parameters"]["batch_size"] = 8
+    hyp_new["dimensions"] = 3
+    hyper_parameters_new.append(hyp_new)
+
     ### normalization method ###
     normalization_methods = [
         (

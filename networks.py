@@ -1,7 +1,7 @@
 """Models for the classification of the acquisition parameters
 """
 from collections import OrderedDict
-from typing import Callable, Optional
+from typing import Callable, Dict, Optional
 
 import numpy as np
 import tensorflow as tf
@@ -443,8 +443,8 @@ class ResNet(SegBasisNet):
 
     Parameters
     ----------
-    loss_name : str
-        Which loss is being used, this will be used to train the autoencoder
+    loss_name : Dict[str, str]
+        Which loss is being used, this will be used to train the resnet
     tasks : OrderedDict[str, str], optional
         The tasks that should be performed, loss and metrics will be selected accordingly
     resnet_type : str, optional
@@ -463,7 +463,7 @@ class ResNet(SegBasisNet):
 
     def __init__(
         self,
-        loss_name: str,
+        loss_name: Dict[str, str],
         tasks: OrderedDict,
         resnet_type="ResNet50",
         weights=None,
@@ -491,15 +491,35 @@ class ResNet(SegBasisNet):
     def get_name():
         return "ResNet"
 
+    def set_up_inputs(self):
+        ndim = len(cfg.train_input_shape) - 1
+        if ndim == 2:
+            super().set_up_inputs()
+        input_shape = cfg.train_input_shape
+        self.inputs["x"] = tf.keras.Input(
+            shape=input_shape,
+            batch_size=cfg.batch_size_train,
+            dtype=cfg.dtype,
+            name="input",
+        )
+        self.options["out_channels"] = cfg.num_classes_seg
+
     def _build_model(self) -> Model:
         """Builds Model"""
 
         inputs = self.inputs["x"]
 
+        dim = len(inputs.get_shape()) - 2
+        # remove batch
+        if dim == 2:
+            input_base = inputs[0].shape
+        else:
+            input_base = inputs[0, 0].shape
+
         resnet_params = dict(
             include_top=False,
             weights=self.options["weights"],
-            input_tensor=inputs,
+            input_shape=tuple(input_base),
             pooling="avg",
         )
 
@@ -510,7 +530,42 @@ class ResNet(SegBasisNet):
         elif self.options["resnet_type"] == "ResNet152":
             base_network = tf.keras.applications.resnet.ResNet152(**resnet_params)
 
-        features = base_network(inputs)
+        if dim == 2:
+            features = base_network(inputs)
+        else:
+            input_unstacked = tf.unstack(inputs, axis=1)
+            output_unstacked = [base_network(t) for t in input_unstacked]
+            output = tf.stack(output_unstacked, axis=1)
+            output = tf.keras.layers.Conv1D(
+                filters=output.shape[2],
+                kernel_size=1,
+                strides=1,
+                activation="relu",
+                name="stack_1d_conv_1",
+                use_bias=True,
+                kernel_regularizer=self.options["regularizer"],
+            )(output)
+            output = tf.keras.layers.Conv1D(
+                filters=output.shape[2],
+                kernel_size=1,
+                strides=1,
+                activation="relu",
+                name="stack_1d_conv_2",
+                use_bias=True,
+                kernel_regularizer=self.options["regularizer"],
+            )(output)
+            output = tf.keras.layers.Conv1D(
+                filters=output.shape[2] // output.shape[1],
+                kernel_size=1,
+                strides=1,
+                activation="relu",
+                name="stack_1d_conv_reduce",
+                use_bias=True,
+                kernel_regularizer=self.options["regularizer"],
+            )(output)
+            features = tf.reshape(
+                output, (output.shape[0], output.shape[1] * output.shape[2])
+            )
 
         tf.debugging.assert_all_finite(features, "NaN in features")
 
