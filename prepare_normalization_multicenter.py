@@ -584,6 +584,21 @@ if __name__ == "__main__":
                 tasks = ("segmentation",)
                 fold_dir = group_dir_rel / "folds"
 
+            # make sure that there are samples for all labels
+            for tsk in ["classification", "regression"]:
+                if tsk not in tasks:
+                    continue
+                tsk_df = pd.DataFrame([exp_dataset[t][tsk] for t in train_list])
+                n_none = tsk_df.isna().mean()
+                for to_delete in n_none[n_none > 0.9].index:
+                    print(
+                        f"Only missing values found in {to_delete}."
+                        + " It will not be used for training."
+                    )
+                    for val in exp_dataset.values():
+                        if to_delete in val[tsk]:
+                            del val[tsk][to_delete]
+
             exp = Experiment(
                 hyper_parameters=hyp,
                 name=experiment_name,
