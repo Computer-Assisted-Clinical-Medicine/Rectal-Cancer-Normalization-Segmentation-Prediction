@@ -230,6 +230,12 @@ if results is not None:
         ]
     )
 
+    print("Look for NaNs")
+    results_na = results.copy()
+    results_na["is_NA"] = results_na.structured_similarity_index.isna()
+    num_na = results_na.groupby(["location", "normalization_name", "modality"]).is_NA.sum()
+    display(num_na[num_na > 0])
+
 # %%
 # plot the generator
 

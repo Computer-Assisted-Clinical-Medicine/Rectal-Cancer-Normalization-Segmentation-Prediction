@@ -156,7 +156,7 @@ def run_experiment_fold(experiment: Experiment, fold: int):
         lock_file.unlink()
 
     exp_logger.handlers.clear()
-    configure_loggers(exp_logger, exp_log_dir, "eval_")
+    configure_loggers(exp_logger, exp_log_dir, "_eval")
 
     # evaluate the experiment without blocking the process
     thread = Thread(target=eval_fold, args=(experiment, fold))
