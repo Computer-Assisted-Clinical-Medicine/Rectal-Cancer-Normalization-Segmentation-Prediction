@@ -184,6 +184,8 @@ for class_task in classification_tasks:
     )
     g.fig.suptitle(f"{class_task} overall AuC (version = best)")
     g.fig.subplots_adjust(top=0.87)
+    for ax in g.axes.flat:
+        ax.set_xlim(0, 1)
     plt.show()
     plt.close()
 
@@ -200,6 +202,8 @@ for class_task in classification_tasks:
     )
     g.fig.suptitle(f"{class_task} overall Accuracy (version = best)")
     g.fig.subplots_adjust(top=0.87)
+    for ax in g.axes.flat:
+        ax.set_xlim(0, 1)
     plt.show()
     plt.close()
 
@@ -209,7 +213,7 @@ for class_task in classification_tasks:
 def read_auc_from_files(exp_dir, res_cls, cls_tsks):
     """Calculate the metrics from the individual predictions per slice"""
     levels = {
-        "location": res_cls.train_location.cat.categories,
+        "train_location": res_cls.train_location.cat.categories,
         "normalization": res_cls.normalization.unique(),
         "dimensions": res_cls.dimensions.unique(),
         "fold": list(range(5)),
@@ -308,9 +312,33 @@ def read_auc_from_files(exp_dir, res_cls, cls_tsks):
         res.loc[idx] = results
 
         last_idx = idx
-    return res
+    return res.astype(pd.Float32Dtype())
 
 
 results_single_files = read_auc_from_files(
     experiment_dir, results_class, classification_tasks
 )
+
+# %%
+
+for class_task in classification_tasks:
+    res_tsk = results_single_files.reset_index().query(
+        f"classification_task == '{class_task}'"
+    )
+    g = sns.catplot(
+        data=res_tsk.query("version == 'best'"),
+        x="auc_ovo",
+        y="train_location",
+        hue="normalization",
+        col="external",
+        row="dimensions",
+        kind="bar",
+        legend=True,
+        legend_out=True,
+    )
+    g.fig.suptitle(f"{class_task} overall AuC (version = best)")
+    g.fig.subplots_adjust(top=0.87)
+    for ax in g.axes.flat:
+        ax.set_xlim(0, 1)
+    plt.show()
+    plt.close()
