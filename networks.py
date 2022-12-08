@@ -567,8 +567,6 @@ class ResNet(SegBasisNet):
                 output, (output.shape[0], output.shape[1] * output.shape[2])
             )
 
-        tf.debugging.assert_all_finite(features, "NaN in features")
-
         # add final classification
         outputs = []
         for task_type, (name, n_label) in zip(
@@ -580,10 +578,8 @@ class ResNet(SegBasisNet):
                 kernel_regularizer=self.options["regularizer"],
                 name=f"{name}-Dense" if task_type == "classification" else name,
             )(features)
-            tf.debugging.assert_all_finite(out, f"NaN in {name} output 1")  # TODO: remove
             if task_type == "classification":
                 out = tf.keras.layers.Softmax(name=f"{name}")(out)
-            tf.debugging.assert_all_finite(out, f"NaN in {name} output 2")  # TODO: remove
             outputs.append(out)
 
         model = MaskedModel(inputs=inputs, outputs=outputs)

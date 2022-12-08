@@ -3,6 +3,8 @@
 
 import os
 from pathlib import Path
+from threading import Thread
+from typing import List
 
 import numpy as np
 import pandas as pd
@@ -48,30 +50,39 @@ def get_experiments():
     return exp_df
 
 
-gpu = tf.device(get_gpu(memory_limit=8000))
+def run_all_experiments(exp_dir: Path, gpu, bot: TelegramBot) -> bool:
+    """Run all experiments in the experiment dir with the gpu and send out messages
+    to the bot.
 
-bot = TelegramBot()
-bot.send_message("Starting with training")
-bot.send_sticker("CAACAgIAAxkBAAO1Y1evsCpQBMjUMVwxuIp-8GND1B8AAk8AA1m7_CVwHhUv2KjsaioE")
+    Parameters
+    ----------
+    exp_dir : Path
+        The experiment directory
+    gpu : Tensorflow Device
+        The device to use (used as context manager)
+    bot : TelegramBot
+        The bot to send out messages with
 
-experiments = get_experiments()
-num_completed = experiments.completed.sum()
-message = f"{num_completed} of {experiments.shape[0]} experiments already finished."
-print(message)
-bot.send_message(message)
+    Returns
+    -------
+    bool
+        The return values signifies if all experiments are completed or not
+    """
 
-# always load all experiments again, because sometimes experiments are prepared
-# during the training
-while True:
+    # always load all experiments again, because sometimes experiments are prepared
+    # during the training
     experiments = get_experiments()
     all_threads = []
     if np.all(experiments.completed):
-        break
-    num_completed = experiments.completed.sum()
-    for num, (_, exp_pd) in enumerate(experiments[~experiments.completed].iterrows()):
+        return True
+    for _, exp_pd in experiments[~experiments.completed].iterrows():
+        if "UNet" in exp_pd.path:
+            continue
+        # if exp_pd.dimensions == 2:
+        #     continue
         print(f"Starting with {exp_pd.path}")
         # load experiment
-        param_file = experiment_dir / exp_pd.path / "parameters.yaml"
+        param_file = exp_dir / exp_pd.path / "parameters.yaml"
         if not param_file.exists():
             print("Parameter file not found, experiment will be skipped")
             continue
@@ -80,19 +91,7 @@ while True:
         except FileNotFoundError:
             print("Files are missing for this experiment")
             continue
-        for f in range(exp.folds):
-            bot.send_message(
-                f"Starting with {exp_pd.path} ({num_completed+num+1}/{experiments.shape[0]}) "
-                f"fold {f} ({f+1}/{exp.folds})"
-            )
-            with gpu:
-                try:
-                    all_threads.append(run_experiment_fold(exp, f))
-                except Exception as exc:  # pylint:disable=broad-except
-                    message = f"{exp_pd.path} failed with {exc}"
-                    print(message)
-                    bot.send_message(message)
-            bot.send_message(f"Finished with fold {f}")
+        all_threads += run_experiment(gpu, bot, experiments, exp)
 
         bot.send_message(f"Finished with {exp_pd.path}")
 
@@ -100,5 +99,69 @@ while True:
         if thread is not None:
             thread.join()
 
-bot.send_message("Finished")
-bot.send_sticker()
+    return False
+
+
+def run_experiment(
+    gpu, bot: TelegramBot, experiments: pd.DataFrame, exp: Experiment
+) -> List[Thread]:
+    """Run a single experiment with all folds
+
+    Parameters
+    ----------
+    gpu : Tensorflow Device
+        The device to use (used as context manager)
+    bot : TelegramBot
+        The bot to send out messages with
+    experiments : pd.DataFrame
+        The dataframe with all experiments. This is used to calculate the number
+        of the current and remaining experiments.
+    exp : Experiment
+        The experiment object
+
+    Returns
+    -------
+    List[Thread]
+        Returns a list of all threads doing evaluation, they should be joined before
+        doing more things.
+    """
+    n_comp = experiments.completed.sum()
+    n_exp = experiments.shape[0]
+    threads = []
+    for f in range(exp.folds):
+        bot.send_message(
+            f"Starting with {exp.output_path_rel} ({n_comp+1}/{n_exp}) "
+            f"fold {f} ({f+1}/{exp.folds})"
+        )
+        with gpu:
+            try:
+                threads.append(run_experiment_fold(exp, f))
+            except Exception as exc:  # pylint:disable=broad-except
+                message = f"{exp.output_path_rel} failed with {type(exc).__name__}: "
+                error_message = str(exc)
+                full_msg = message + error_message
+                if len(error_message) > 400:
+                    error_message = error_message[:200] + "\n...\n" + error_message[-200:]
+                message += error_message
+                print(full_msg)
+                bot.send_message(message)
+        bot.send_message(f"Finished with fold {f}")
+    return threads
+
+
+if __name__ == "__main__":
+
+    tf_device = tf.device(get_gpu(memory_limit=8000))
+
+    telegram_bot = TelegramBot()
+    telegram_bot.send_message("Starting with training")
+    telegram_bot.send_sticker(
+        "CAACAgIAAxkBAAO1Y1evsCpQBMjUMVwxuIp-8GND1B8AAk8AA1m7_CVwHhUv2KjsaioE"
+    )
+
+    FINISHED = False
+    while not FINISHED:
+        FINISHED = run_all_experiments(experiment_dir, tf_device, telegram_bot)
+
+    telegram_bot.send_message("Finished")
+    telegram_bot.send_sticker()

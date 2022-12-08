@@ -65,6 +65,24 @@ n_finished_seg.nBN = (
 n_finished_seg.total = n_finished_seg.BN + n_finished_seg.nBN
 display(n_finished_seg.sort_values("total", ascending=False))
 
+n_finished_seg = pd.DataFrame(
+    index=results.train_location.cat.categories, columns=["BN", "nBN", "total"]
+)
+n_finished_seg.BN = (
+    results.query("do_batch_normalization")
+    .groupby("train_location")
+    .normalization.unique()
+    .apply(len)
+)
+n_finished_seg.nBN = (
+    results.query("not do_batch_normalization")
+    .groupby("train_location")
+    .normalization.unique()
+    .apply(len)
+)
+n_finished_seg.total = n_finished_seg.BN + n_finished_seg.nBN
+display_dataframe(n_finished_seg.sort_values("total", ascending=False))
+
 # %% [markdown]
 
 # ## Analyze the data

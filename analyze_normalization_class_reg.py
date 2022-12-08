@@ -62,6 +62,24 @@ n_finished_class["3D"] = (
 n_finished_class.total = n_finished_class["2D"] + n_finished_class["3D"]
 display_dataframe(n_finished_class.sort_values("total", ascending=False))
 
+n_finished_class = pd.DataFrame(
+    index=results_class.train_location.cat.categories, columns=["2D", "3D", "total"]
+)
+n_finished_class["2D"] = (
+    results_class.query("dimensions == 2")
+    .groupby("train_location")
+    .normalization.unique()
+    .apply(len)
+)
+n_finished_class["3D"] = (
+    results_class.query("dimensions == 3")
+    .groupby("train_location")
+    .normalization.unique()
+    .apply(len)
+)
+n_finished_class.total = n_finished_class["2D"] + n_finished_class["3D"]
+display_dataframe(n_finished_class.sort_values("total", ascending=False))
+
 # %% [markdown]
 
 # ## Analyze the data
@@ -163,9 +181,6 @@ metrics = [
     "accuracy",
     "precision_mean",
 ]
-groupby = ["task", "train_location", "normalization"]
-display_dataframe(results_class_task.groupby(groupby).mean()[metrics])
-display_dataframe(results_class_task.groupby(groupby).median()[metrics])
 
 # %%
 
