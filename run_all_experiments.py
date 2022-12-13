@@ -75,11 +75,7 @@ def run_all_experiments(exp_dir: Path, gpu, bot: TelegramBot) -> bool:
     all_threads = []
     if np.all(experiments.completed):
         return True
-    for _, exp_pd in experiments[~experiments.completed].iterrows():
-        if "UNet" in exp_pd.path:
-            continue
-        # if exp_pd.dimensions == 2:
-        #     continue
+    for exp_id, exp_pd in experiments[~experiments.completed].iterrows():
         print(f"Starting with {exp_pd.path}")
         # load experiment
         param_file = exp_dir / exp_pd.path / "parameters.yaml"
@@ -94,6 +90,8 @@ def run_all_experiments(exp_dir: Path, gpu, bot: TelegramBot) -> bool:
         all_threads += run_experiment(gpu, bot, experiments, exp)
 
         bot.send_message(f"Finished with {exp_pd.path}")
+
+        experiments.loc[exp_id, "completed"] = True
 
     for thread in all_threads:
         if thread is not None:
@@ -158,6 +156,7 @@ if __name__ == "__main__":
     telegram_bot.send_sticker(
         "CAACAgIAAxkBAAO1Y1evsCpQBMjUMVwxuIp-8GND1B8AAk8AA1m7_CVwHhUv2KjsaioE"
     )
+    print("Start with training")
 
     FINISHED = False
     while not FINISHED:

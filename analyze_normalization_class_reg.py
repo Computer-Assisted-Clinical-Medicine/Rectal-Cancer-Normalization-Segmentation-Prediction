@@ -80,6 +80,27 @@ n_finished_class["3D"] = (
 n_finished_class.total = n_finished_class["2D"] + n_finished_class["3D"]
 display_dataframe(n_finished_class.sort_values("total", ascending=False))
 
+n_finished_class = pd.DataFrame(
+    index=results_class.train_location.cat.categories,
+    columns=results_class.normalization.cat.categories,
+)
+for loc in results_class.train_location.cat.categories:
+    for norm in results_class.normalization.cat.categories:
+        n_finished_class.loc[loc, norm] = results_class.query(
+            "dimensions == 2" + f"& train_location == '{loc}' & normalization == '{norm}'"
+        ).dimensions.nunique()
+n_finished_class.columns = [
+    c.replace("_", " ").replace("DISCRIMINATORS", "DISC") for c in n_finished_class
+]
+display_dataframe(n_finished_class)
+display_dataframe(
+    n_finished_class[
+        n_finished_class.columns[
+            [not np.all(n_finished_class[c] == 1) for c in n_finished_class]
+        ]
+    ]
+)
+
 # %% [markdown]
 
 # ## Analyze the data
@@ -243,9 +264,9 @@ def read_auc_from_files(exp_dir, res_cls, cls_tsks):
 
     last_idx = (None,) * len(levels)
     for idx, _ in tqdm(res.iterrows(), total=res.shape[0]):
-        (location, norm, dim, fold, external, version, tsk) = idx
+        (location, norm_name, dim, fold, external, version, tsk) = idx
 
-        exp_name = f"ResNet{dim}D-ResNet50-{norm}-obj_000%-100"
+        exp_name = f"ResNet{dim}D-ResNet50-{norm_name}-obj_000%-100"
 
         fold_dir = exp_dir / f"Normalization_{location}" / exp_name / f"fold-{fold}"
         if external:

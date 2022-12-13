@@ -676,6 +676,8 @@ class GanDiscriminators(Normalization):
                 axis=num,
             )
 
+        self.check_image(image_np_norm)
+
         # and turn it back into an image
         image_normalized = sitk.GetImageFromArray(image_np_norm)
         image_normalized.CopyInformation(image)

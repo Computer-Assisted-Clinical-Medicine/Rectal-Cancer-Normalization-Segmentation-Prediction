@@ -613,10 +613,6 @@ class MaskedModel(tf.keras.Model):
             y = tuple(
                 tf.where(tf.math.is_nan(arr), tf.cast(0, arr.dtype), arr) for arr in y
             )
-        for num, y_t in enumerate(y):
-            tf.debugging.assert_all_finite(y_t, f"NaNs found in y_true Nr. {num}")
-        for num, x_t in enumerate(self(x)):
-            tf.debugging.assert_all_finite(x_t, f"NaNs found in y_pred Nr. {num}")
         return x, y, sample_weights
 
     def train_step(self, data):

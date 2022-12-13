@@ -91,7 +91,9 @@ def read_norm_exp(norm_suffix: str, silent=False) -> pd.DataFrame:
 
             if not silent:
                 print("Start evaluating the generated images.")
-            for pat_name, data in tqdm(dataset.items(), desc=loc, unit="image"):
+            for pat_name, data in tqdm(
+                dataset.items(), desc=f"GAN{norm_suffix} - {loc}", unit="image"
+            ):
                 image_gan = experiment_dir / data["image"]
                 image_inp = experiment_dir / input_dataset[pat_name]["image"]
 
@@ -195,7 +197,7 @@ if results is not None:
     nmi = sns.catplot(
         data=results,
         x="experiment_name",
-        y="norm_mutual_inf",
+        y="pred_max",
         kind="box",
         row="location",
         row_order=train_locations,
@@ -228,6 +230,19 @@ if results is not None:
         mean_results.sort_values("structured_similarity_index")[
             ["rmse", "norm_mutual_inf", "structured_similarity_index"]
         ]
+    )
+
+    print("Max prediction for each image")
+    display(
+        results.sort_values("pred_max", ascending=False)[
+            [
+                "pred_max",
+                "normalization_name",
+                "location",
+                "modality",
+                "rmse",
+            ]
+        ].iloc[:15]
     )
 
     print("Look for NaNs")
