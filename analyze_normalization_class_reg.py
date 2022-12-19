@@ -80,27 +80,6 @@ n_finished_class["3D"] = (
 n_finished_class.total = n_finished_class["2D"] + n_finished_class["3D"]
 display_dataframe(n_finished_class.sort_values("total", ascending=False))
 
-n_finished_class = pd.DataFrame(
-    index=results_class.train_location.cat.categories,
-    columns=results_class.normalization.cat.categories,
-)
-for loc in results_class.train_location.cat.categories:
-    for norm in results_class.normalization.cat.categories:
-        n_finished_class.loc[loc, norm] = results_class.query(
-            "dimensions == 2" + f"& train_location == '{loc}' & normalization == '{norm}'"
-        ).dimensions.nunique()
-n_finished_class.columns = [
-    c.replace("_", " ").replace("DISCRIMINATORS", "DISC") for c in n_finished_class
-]
-display_dataframe(n_finished_class)
-display_dataframe(
-    n_finished_class[
-        n_finished_class.columns[
-            [not np.all(n_finished_class[c] == 2) for c in n_finished_class]
-        ]
-    ]
-)
-
 # %% [markdown]
 
 # ## Analyze the data
