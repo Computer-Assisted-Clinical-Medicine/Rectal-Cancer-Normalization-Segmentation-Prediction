@@ -96,7 +96,7 @@ display_dataframe(n_finished_class)
 display_dataframe(
     n_finished_class[
         n_finished_class.columns[
-            [not np.all(n_finished_class[c] == 1) for c in n_finished_class]
+            [not np.all(n_finished_class[c] == 2) for c in n_finished_class]
         ]
     ]
 )
@@ -205,7 +205,28 @@ metrics = [
 
 # %%
 
-for class_task in classification_tasks:
+print("Classification results for all data using HM-Quantile and a 2D ResNet")
+res_class_all_hm_quant = (
+    results_class_task.query(
+        "not external & version == 'best' & train_location == 'all' & dimensions == 2"
+        + " & normalization == 'HM_QUANTILE'"
+    )
+    .groupby("task")
+    .mean()[
+        ["auc_ovo", "auc_ovr", "accuracy", "precision", "recall", "top_2_accuracy", "std"]
+    ]
+    .sort_values("auc_ovo", ascending=False)
+)
+
+
+display_dataframe(res_class_all_hm_quant)
+good_classification_tasks = list(
+    res_class_all_hm_quant[res_class_all_hm_quant.auc_ovo > 0.5].index
+)
+
+# %%
+
+for class_task in good_classification_tasks:
     res_tsk = results_class_task.query(f"task == '{class_task}'")
     g = sns.catplot(
         data=res_tsk.query("version == 'best'"),
@@ -240,6 +261,57 @@ for class_task in classification_tasks:
     g.fig.subplots_adjust(top=0.87)
     for ax in g.axes.flat:
         ax.set_xlim(0, 1)
+    plt.show()
+    plt.close()
+
+    g = sns.catplot(
+        data=results_class.query("version == 'best'"),
+        x=f"{class_task}_std",
+        y="train_location",
+        hue="normalization",
+        col="external",
+        row="dimensions",
+        kind="box",
+        legend=True,
+        legend_out=True,
+    )
+    g.fig.suptitle(f"{class_task} overall Std (version = best)")
+    g.fig.subplots_adjust(top=0.87)
+    plt.show()
+    plt.close()
+
+# %%
+
+for reg_task in regression_tasks:
+    g = sns.catplot(
+        data=results_reg.query("version == 'best'"),
+        x=f"{reg_task}_rmse",
+        y="train_location",
+        hue="normalization",
+        col="external",
+        row="dimensions",
+        kind="box",
+        legend=True,
+        legend_out=True,
+    )
+    g.fig.suptitle(f"{class_task} overall RMSE (version = best)")
+    g.fig.subplots_adjust(top=0.87)
+    plt.show()
+    plt.close()
+
+    g = sns.catplot(
+        data=results_reg.query("version == 'best'"),
+        x=f"{reg_task}_std",
+        y="train_location",
+        hue="normalization",
+        col="external",
+        row="dimensions",
+        kind="box",
+        legend=True,
+        legend_out=True,
+    )
+    g.fig.suptitle(f"{class_task} overall STD (version = best)")
+    g.fig.subplots_adjust(top=0.87)
     plt.show()
     plt.close()
 

@@ -264,7 +264,7 @@ mean_median_df = pd.DataFrame(res_grouped_all.Dice.mean()).rename(
     columns={"Dice": "Dice mean"}
 )
 mean_median_df["Dice median"] = res_grouped_all.Dice.median()
-display_dataframe(mean_median_df)
+display_dataframe(mean_median_df.round(2))
 
 display_markdown("All training locations except all.")
 res_grouped_not_all = results.query(
@@ -416,306 +416,6 @@ display_dataframe(images_dice.sort_values("median").iloc[:20])
 
 display_markdown("### Maximum")
 display_dataframe(images_dice.sort_values("maximum").iloc[:20])
-
-# %%
-
-display_markdown("## Analyze the different centers")
-
-# remove Regensburg UK, there is just one value
-to_drop = acquisition_params.index[acquisition_params.location == "Regensburg-UK"]
-
-g = sns.displot(
-    data=acquisition_params.drop(to_drop),
-    hue="model_name",
-    y="location",
-    multiple="stack",
-    edgecolor="grey",
-    linewidth=1.5,
-)
-plt.show()
-plt.close()
-
-g = sns.displot(
-    data=acquisition_params.drop(to_drop),
-    hue="location",
-    x="slice_thickness",
-    binrange=(0.5, 6.5),
-    binwidth=1,
-    multiple="stack",
-)
-plt.show()
-plt.close()
-
-g = sns.displot(
-    data=acquisition_params.drop(to_drop),
-    hue="location",
-    x="repetition_time",
-    multiple="layer",
-    element="step",
-    kde=True,
-)
-plt.show()
-plt.close()
-
-g = sns.displot(
-    data=acquisition_params.drop(to_drop),
-    hue="location",
-    x="echo_time",
-    multiple="stack",
-    binwidth=10,
-    binrange=(75, 135),
-)
-plt.show()
-plt.close()
-
-g = sns.displot(
-    data=acquisition_params.drop(to_drop),
-    hue="location",
-    x="pixel_bandwidth",
-    multiple="stack",
-    binwidth=50,
-)
-plt.show()
-plt.close()
-
-g = sns.displot(
-    data=acquisition_params.drop(to_drop),
-    hue="location",
-    x="flip_angle",
-    multiple="stack",
-    binwidth=10,
-    binrange=(85, 165),
-)
-plt.show()
-plt.close()
-
-g = sns.displot(
-    data=acquisition_params.drop(to_drop),
-    hue="location",
-    x="field_strength",
-    multiple="dodge",
-    binwidth=1.5,
-    binrange=(0.75, 3.75),
-)
-g.facet_axis(0, 0).set_xticks([1.5, 3])
-plt.show()
-plt.close()
-
-g = sns.displot(
-    data=acquisition_params.drop(to_drop),
-    hue="location",
-    x="pixel_spacing",
-    multiple="layer",
-    binwidth=0.2,
-    binrange=(0.1, 1.7),
-    element="step",
-    kde=True,
-)
-plt.show()
-plt.close()
-
-# %%
-
-display_markdown("## Look for correlation\n### Group by training location")
-
-results_merged = results.merge(
-    acquisition_params.drop(columns="location"), on="File Number"
-)
-
-for loc in results.train_location.unique():
-    g = sns.histplot(
-        data=results_merged.query(
-            f"train_location == '{loc}' & normalization == 'QUANTILE'"
-            + " & before_therapy & location != 'Regensburg-UK'"
-        ),
-        x="Dice",
-        hue="location",
-        kde=True,
-        multiple="layer",
-        element="step",
-        stat="percent",
-        common_norm=False,
-        binwidth=0.05,
-    )
-    g.set_title(f"Training location = {loc}")
-
-    plt.show()
-    plt.close()
-
-display_markdown("### Group by location")
-
-for loc in results.location.unique():
-    if loc == "Regensburg-UK":
-        continue
-    g = sns.histplot(
-        data=results_merged.query(
-            "normalization == 'QUANTILE'" + f" & before_therapy & location == '{loc}'"
-        ),
-        x="Dice",
-        hue="train_location",
-        kde=True,
-        multiple="layer",
-        element="step",
-        stat="percent",
-        common_norm=False,
-        binwidth=0.05,
-    )
-    g.set_title(f"location = {loc}")
-
-    plt.show()
-    plt.close()
-
-display_markdown("### Try to find correlations")
-# %%
-for loc in results.train_location.unique():
-    for col in acquisition_params.columns:
-        data = results_merged.query(
-            f"train_location == '{loc}' & normalization == 'QUANTILE'"
-            + " & before_therapy & location != 'Regensburg-UK'"
-        )
-        if not pd.api.types.is_numeric_dtype(results_merged[col].dtype):
-            g = sns.histplot(
-                data=data,
-                x="Dice",
-                hue=col,
-                kde=True,
-                common_norm=False,
-                stat="percent",
-                multiple="layer",
-            )
-            g.set_title(f"train_location = {loc} : {col}")
-        plt.show()
-        plt.close()
-# %%
-for col in acquisition_params.columns:
-    if not pd.api.types.is_numeric_dtype(results_merged[col].dtype):
-        continue
-    data = results_merged.query("normalization == 'QUANTILE' & before_therapy").copy()
-
-    N_BINS = 10
-
-    g = sns.lmplot(
-        data=data,
-        y="Dice",
-        x=col,
-        markers=["."] * len(data.train_location.cat.categories),
-        hue="train_location",
-        truncate=True,
-        col="external",
-    )
-    g.facet_axis(0, 0).set_title(f"{col}")
-    plt.show()
-    plt.close()
-
-    fig, axes = plt.subplots(nrows=1, ncols=2, sharex=True, sharey=True, figsize=(8, 4))
-    for external, ax in zip([False, True], axes):
-        plot_data = data[data.external == external].copy()
-        bins = np.linspace(
-            start=plot_data[col].min() - 0.01,
-            stop=plot_data[col].max() + 0.01,
-            num=N_BINS + 1,
-        )
-        bin_num = pd.Series(
-            np.digitize(plot_data[col], bins),
-            index=plot_data.index,
-            name="bin_num",
-        )
-        plot_data[col + "_bin"] = bin_num
-        bin_centers = bins[:-1] + (bins[1] - bins[0]) / 2
-        plot_data[col + "_bin_center"] = bin_centers[plot_data[col + "_bin"] - 1]
-
-        groups = plot_data.Dice.groupby([plot_data.train_location, bin_num])
-        means = groups.mean()
-        stds = groups.std()
-
-        for loc in plot_data.train_location.unique():
-            ax.errorbar(
-                x=bin_centers[means.loc[loc].index - 1],
-                y=means.loc[loc],
-                yerr=stds.loc[loc],
-                label=loc,
-                capsize=5,
-                capthick=2,
-            )
-        ax.set_title(f"external = {external}")
-        ax.set_xlabel(f"{col}")
-
-    axes[1].legend()
-    axes[0].set_ylabel("Dice")
-    fig.tight_layout()
-
-    plt.show()
-    plt.close()
-
-# %%
-for col in acquisition_params.columns:
-    if not pd.api.types.is_numeric_dtype(results_merged[col].dtype):
-        continue
-    data = results_merged.query("before_therapy & normalization != 'combined'").copy()
-
-    g = sns.lmplot(
-        data=data,
-        y="Dice",
-        x=col,
-        markers=["."] * data.normalization.nunique(),
-        hue="normalization",
-        truncate=True,
-        col="external",
-    )
-    plt.show()
-    plt.close()
-
-    bins = np.linspace(
-        start=data[col].min() - 0.01,
-        stop=data[col].max() + 0.01,
-        num=21,
-    )
-    bin_num = pd.Series(
-        np.digitize(data[col], bins),
-        index=data.index,
-        name="bin_num",
-    )
-    data[col + "_bin"] = bin_num
-    bin_centers = bins[:-1] + (bins[1] - bins[0]) / 2
-    data[col + "_bin_center"] = bin_centers[data[col + "_bin"] - 1]
-
-    groups = data.Dice.groupby([data.normalization, bin_num])
-    means = groups.mean()
-    stds = groups.std()
-
-    plt.figure(figsize=(8, 6))
-    for loc in np.sort(data.normalization.unique()):
-        plt.errorbar(
-            x=bin_centers[means.loc[loc].index - 1],
-            y=means.loc[loc],
-            yerr=stds.loc[loc],
-            label=loc,
-            capsize=5,
-            capthick=2,
-        )
-    plt.legend()
-    plt.show()
-    plt.close()
-
-    for df in [means, stds]:
-        df = df.reset_index()
-        df[col] = bin_centers[df.bin_num - 1]
-
-    g = sns.lineplot(
-        data=data,
-        x=col + "_bin_center",
-        y="Dice",
-        hue="normalization",
-        markers=True,
-        err_style="bars",
-    )
-    g.set_xlabel(col)
-    for line in g.lines:
-        line.set_alpha(0)
-        line.set_marker("o")
-    plt.show()
-    plt.close()
-
 # %%
 
 display_markdown("## Publication figures")
@@ -1191,6 +891,306 @@ for i, (n, lbl, img, img_norm, ax_line) in enumerate(
         ax_line[3].set_title("Normalized Image")
 
 save_pub("perc-hm", bbox_inches=Bbox.from_extents(-0.8, 1.9, 10.5, 8.3))
+
+# %%
+
+display_markdown("## Analyze the different centers")
+
+# remove Regensburg UK, there is just one value
+to_drop = acquisition_params.index[acquisition_params.location == "Regensburg-UK"]
+
+g = sns.displot(
+    data=acquisition_params.drop(to_drop),
+    hue="model_name",
+    y="location",
+    multiple="stack",
+    edgecolor="grey",
+    linewidth=1.5,
+)
+plt.show()
+plt.close()
+
+g = sns.displot(
+    data=acquisition_params.drop(to_drop),
+    hue="location",
+    x="slice_thickness",
+    binrange=(0.5, 6.5),
+    binwidth=1,
+    multiple="stack",
+)
+plt.show()
+plt.close()
+
+g = sns.displot(
+    data=acquisition_params.drop(to_drop),
+    hue="location",
+    x="repetition_time",
+    multiple="layer",
+    element="step",
+    kde=True,
+)
+plt.show()
+plt.close()
+
+g = sns.displot(
+    data=acquisition_params.drop(to_drop),
+    hue="location",
+    x="echo_time",
+    multiple="stack",
+    binwidth=10,
+    binrange=(75, 135),
+)
+plt.show()
+plt.close()
+
+g = sns.displot(
+    data=acquisition_params.drop(to_drop),
+    hue="location",
+    x="pixel_bandwidth",
+    multiple="stack",
+    binwidth=50,
+)
+plt.show()
+plt.close()
+
+g = sns.displot(
+    data=acquisition_params.drop(to_drop),
+    hue="location",
+    x="flip_angle",
+    multiple="stack",
+    binwidth=10,
+    binrange=(85, 165),
+)
+plt.show()
+plt.close()
+
+g = sns.displot(
+    data=acquisition_params.drop(to_drop),
+    hue="location",
+    x="field_strength",
+    multiple="dodge",
+    binwidth=1.5,
+    binrange=(0.75, 3.75),
+)
+g.facet_axis(0, 0).set_xticks([1.5, 3])
+plt.show()
+plt.close()
+
+g = sns.displot(
+    data=acquisition_params.drop(to_drop),
+    hue="location",
+    x="pixel_spacing",
+    multiple="layer",
+    binwidth=0.2,
+    binrange=(0.1, 1.7),
+    element="step",
+    kde=True,
+)
+plt.show()
+plt.close()
+
+# %%
+
+display_markdown("## Look for correlation\n### Group by training location")
+
+results_merged = results.merge(
+    acquisition_params.drop(columns="location"), on="File Number"
+)
+
+for loc in results.train_location.unique():
+    g = sns.histplot(
+        data=results_merged.query(
+            f"train_location == '{loc}' & normalization == 'QUANTILE'"
+            + " & before_therapy & location != 'Regensburg-UK'"
+        ),
+        x="Dice",
+        hue="location",
+        kde=True,
+        multiple="layer",
+        element="step",
+        stat="percent",
+        common_norm=False,
+        binwidth=0.05,
+    )
+    g.set_title(f"Training location = {loc}")
+
+    plt.show()
+    plt.close()
+
+display_markdown("### Group by location")
+
+for loc in results.location.unique():
+    if loc == "Regensburg-UK":
+        continue
+    g = sns.histplot(
+        data=results_merged.query(
+            "normalization == 'QUANTILE'" + f" & before_therapy & location == '{loc}'"
+        ),
+        x="Dice",
+        hue="train_location",
+        kde=True,
+        multiple="layer",
+        element="step",
+        stat="percent",
+        common_norm=False,
+        binwidth=0.05,
+    )
+    g.set_title(f"location = {loc}")
+
+    plt.show()
+    plt.close()
+
+display_markdown("### Try to find correlations")
+# %%
+for loc in results.train_location.unique():
+    for col in acquisition_params.columns:
+        data = results_merged.query(
+            f"train_location == '{loc}' & normalization == 'QUANTILE'"
+            + " & before_therapy & location != 'Regensburg-UK'"
+        )
+        if not pd.api.types.is_numeric_dtype(results_merged[col].dtype):
+            g = sns.histplot(
+                data=data,
+                x="Dice",
+                hue=col,
+                kde=True,
+                common_norm=False,
+                stat="percent",
+                multiple="layer",
+            )
+            g.set_title(f"train_location = {loc} : {col}")
+        plt.show()
+        plt.close()
+# %%
+for col in acquisition_params.columns:
+    if not pd.api.types.is_numeric_dtype(results_merged[col].dtype):
+        continue
+    data = results_merged.query("normalization == 'QUANTILE' & before_therapy").copy()
+
+    N_BINS = 10
+
+    g = sns.lmplot(
+        data=data,
+        y="Dice",
+        x=col,
+        markers=["."] * len(data.train_location.cat.categories),
+        hue="train_location",
+        truncate=True,
+        col="external",
+    )
+    g.facet_axis(0, 0).set_title(f"{col}")
+    plt.show()
+    plt.close()
+
+    fig, axes = plt.subplots(nrows=1, ncols=2, sharex=True, sharey=True, figsize=(8, 4))
+    for external, ax in zip([False, True], axes):
+        plot_data = data[data.external == external].copy()
+        bins = np.linspace(
+            start=plot_data[col].min() - 0.01,
+            stop=plot_data[col].max() + 0.01,
+            num=N_BINS + 1,
+        )
+        bin_num = pd.Series(
+            np.digitize(plot_data[col], bins),
+            index=plot_data.index,
+            name="bin_num",
+        )
+        plot_data[col + "_bin"] = bin_num
+        bin_centers = bins[:-1] + (bins[1] - bins[0]) / 2
+        plot_data[col + "_bin_center"] = bin_centers[plot_data[col + "_bin"] - 1]
+
+        groups = plot_data.Dice.groupby([plot_data.train_location, bin_num])
+        means = groups.mean()
+        stds = groups.std()
+
+        for loc in plot_data.train_location.unique():
+            ax.errorbar(
+                x=bin_centers[means.loc[loc].index - 1],
+                y=means.loc[loc],
+                yerr=stds.loc[loc],
+                label=loc,
+                capsize=5,
+                capthick=2,
+            )
+        ax.set_title(f"external = {external}")
+        ax.set_xlabel(f"{col}")
+
+    axes[1].legend()
+    axes[0].set_ylabel("Dice")
+    fig.tight_layout()
+
+    plt.show()
+    plt.close()
+
+# %%
+for col in acquisition_params.columns:
+    if not pd.api.types.is_numeric_dtype(results_merged[col].dtype):
+        continue
+    data = results_merged.query("before_therapy & normalization != 'combined'").copy()
+
+    g = sns.lmplot(
+        data=data,
+        y="Dice",
+        x=col,
+        markers=["."] * data.normalization.nunique(),
+        hue="normalization",
+        truncate=True,
+        col="external",
+    )
+    plt.show()
+    plt.close()
+
+    bins = np.linspace(
+        start=data[col].min() - 0.01,
+        stop=data[col].max() + 0.01,
+        num=21,
+    )
+    bin_num = pd.Series(
+        np.digitize(data[col], bins),
+        index=data.index,
+        name="bin_num",
+    )
+    data[col + "_bin"] = bin_num
+    bin_centers = bins[:-1] + (bins[1] - bins[0]) / 2
+    data[col + "_bin_center"] = bin_centers[data[col + "_bin"] - 1]
+
+    groups = data.Dice.groupby([data.normalization, bin_num])
+    means = groups.mean()
+    stds = groups.std()
+
+    plt.figure(figsize=(8, 6))
+    for loc in np.sort(data.normalization.unique()):
+        plt.errorbar(
+            x=bin_centers[means.loc[loc].index - 1],
+            y=means.loc[loc],
+            yerr=stds.loc[loc],
+            label=loc,
+            capsize=5,
+            capthick=2,
+        )
+    plt.legend()
+    plt.show()
+    plt.close()
+
+    for df in [means, stds]:
+        df = df.reset_index()
+        df[col] = bin_centers[df.bin_num - 1]
+
+    g = sns.lineplot(
+        data=data,
+        x=col + "_bin_center",
+        y="Dice",
+        hue="normalization",
+        markers=True,
+        err_style="bars",
+    )
+    g.set_xlabel(col)
+    for line in g.lines:
+        line.set_alpha(0)
+        line.set_marker("o")
+    plt.show()
+    plt.close()
+
 
 # %%
 # plot means and std

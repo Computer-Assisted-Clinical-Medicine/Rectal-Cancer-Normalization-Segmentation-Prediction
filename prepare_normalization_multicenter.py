@@ -40,8 +40,6 @@ def priority(hp_params, train_loc):
     prio = 0
     arch_priority = {UNet: 2000, DeepLabv3plus: 1000, ResNet: 0}
     architecture = hp_params["architecture"]
-    if hp_params["dimensions"] == 2:
-        prio += 1000
     prio += arch_priority.get(architecture, 0)
 
     norm = hp_params["preprocessing_parameters"]["normalizing_method"]
@@ -198,21 +196,6 @@ if __name__ == "__main__":
                 hyp_new["train_parameters"]["percent_of_object_samples"] = 0
             hyper_parameters_new.append(hyp_new)
     hyper_parameters = hyper_parameters_new
-
-    # hyp_new = {
-    #     **constant_parameters,
-    # }
-    # hyp_new["architecture"] = ResNet
-    # hyp_new["network_parameters"] = np_ResNet.copy()
-    # hyp_new["network_parameters"]["eval_center"] = True
-    # hyp_new["train_parameters"]["percent_of_object_samples"] = 0
-    # hyp_new["train_parameters"]["batch_size"] = 16
-    # hyp_new["train_parameters"]["in_plane_dimension"] = 64
-    # hyp_new["train_parameters"]["samples_per_volume"] = 1
-    # hyp_new["train_parameters"]["number_slices"] = 16
-    # hyp_new["train_parameters"]["l_r"] = ("exponential", 1e-4, 1e-6)
-    # hyp_new["dimensions"] = 3
-    # hyper_parameters.append(hyp_new)
 
     ### normalization method ###
     normalization_methods = [
