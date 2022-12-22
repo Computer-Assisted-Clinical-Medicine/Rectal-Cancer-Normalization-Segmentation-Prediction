@@ -16,12 +16,12 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import seaborn as sns
-from tqdm import tqdm
 import yaml
-from SegClassRegBasis.evaluation import calculate_classification_metrics
+from tqdm import tqdm
 
 from plot_utils import display_dataframe
-from utils import gather_all_results
+from SegClassRegBasis.evaluation import calculate_classification_metrics
+from utils import calculate_auc, gather_all_results
 
 experiment_dir = Path(os.environ["experiment_dir"]) / "Normalization_Experiment"
 
@@ -45,39 +45,21 @@ regression_tasks = [c.partition("_rmse")[0] for c in results_reg if c.endswith("
 
 print("Finished Classification")
 n_finished_class = pd.DataFrame(
-    index=results_class.normalization.cat.categories, columns=["2D", "3D", "total"]
+    index=results_class.normalization.cat.categories, columns=["2D", "total"]
 )
 n_finished_class["2D"] = (
-    results_class.query("dimensions == 2")
-    .groupby("normalization")
-    .train_location.unique()
-    .apply(len)
+    results_class.groupby("normalization").train_location.unique().apply(len)
 )
-n_finished_class["3D"] = (
-    results_class.query("dimensions == 3")
-    .groupby("normalization")
-    .train_location.unique()
-    .apply(len)
-)
-n_finished_class.total = n_finished_class["2D"] + n_finished_class["3D"]
+n_finished_class.total = n_finished_class["2D"]
 display_dataframe(n_finished_class.sort_values("total", ascending=False))
 
 n_finished_class = pd.DataFrame(
-    index=results_class.train_location.cat.categories, columns=["2D", "3D", "total"]
+    index=results_class.train_location.cat.categories, columns=["2D", "total"]
 )
 n_finished_class["2D"] = (
-    results_class.query("dimensions == 2")
-    .groupby("train_location")
-    .normalization.unique()
-    .apply(len)
+    results_class.groupby("train_location").normalization.unique().apply(len)
 )
-n_finished_class["3D"] = (
-    results_class.query("dimensions == 3")
-    .groupby("train_location")
-    .normalization.unique()
-    .apply(len)
-)
-n_finished_class.total = n_finished_class["2D"] + n_finished_class["3D"]
+n_finished_class.total = n_finished_class["2D"]
 display_dataframe(n_finished_class.sort_values("total", ascending=False))
 
 # %% [markdown]
@@ -95,65 +77,6 @@ display_dataframe(n_finished_class.sort_values("total", ascending=False))
 
 # %%
 
-
-def calculate_auc(df: pd.DataFrame, task: str) -> pd.DataFrame:
-    """Calculate the AUC and other statistics for one task in the dataframe
-
-    Parameters
-    ----------
-    df : pd.DataFrame
-        The dataframe with the columns {task}_probability_{lbl},
-        {task}_ground_truth and {task}_top_prediction
-    task : str
-        The task name
-
-    Returns
-    -------
-    pd.DataFrame
-        The resulting metrics with the names as columns and the individual labels as rows
-    """
-    prob_prefix = f"{task}_probability_"
-    prob_col_names = [c for c in df if prob_prefix in c]
-
-    # remove missing values
-    ground_truth = df[f"{task}_ground_truth"]
-    probabilities = df[prob_col_names].values
-    not_na = np.all(np.isfinite(probabilities), axis=-1)
-    # if np.sum(~not_na):
-    #     print(f"Nans found in {task}")
-    mask = (ground_truth != -1) & not_na
-
-    top_pred = df[f"{task}_top_prediction"][mask]
-    probabilities = probabilities[mask]
-    ground_truth = ground_truth[mask]
-    if pd.api.types.is_numeric_dtype(ground_truth.dtype):
-        ground_truth = ground_truth.astype(int)
-    labels = np.array([val.partition(prob_prefix)[-1] for val in prob_col_names])
-
-    if np.all(~mask):
-        results = {}
-    else:
-        results = calculate_classification_metrics(
-            prediction=top_pred,
-            probabilities=probabilities,
-            ground_truth=ground_truth,
-            labels=labels,
-        )
-        del results["confusion_matrix"]
-
-    results_per_label = {lbl: {} for lbl in labels}
-    for key, vals in results.items():
-        if isinstance(vals, float):
-            vals = [vals] * len(labels)
-        for single_val, lbl in zip(vals, labels):
-            results_per_label[lbl][key] = single_val
-
-    res_df = pd.DataFrame(results, dtype=pd.Float64Dtype())
-    res_df["task"] = task
-    res_df.index.name = "label"
-    return res_df
-
-
 res_list = []
 for class_task in classification_tasks:
     # calculate AUC values
@@ -162,7 +85,6 @@ for class_task in classification_tasks:
             [
                 "train_location",
                 "normalization",
-                "dimensions",
                 "name",
                 "version",
                 "external",
@@ -184,11 +106,10 @@ metrics = [
 
 # %%
 
-print("Classification results for all data using HM-Quantile and a 2D ResNet")
+print("Classification results for using HM-Quantile and a 2D ResNet")
 res_class_all_hm_quant = (
     results_class_task.query(
-        "not external & version == 'best' & train_location == 'all' & dimensions == 2"
-        + " & normalization == 'HM_QUANTILE'"
+        "not external & version == 'best' & normalization == 'HM_QUANTILE'"
     )
     .groupby("task")
     .mean()[
@@ -198,9 +119,43 @@ res_class_all_hm_quant = (
 )
 
 
-display_dataframe(res_class_all_hm_quant)
+display_dataframe(res_class_all_hm_quant.round(2))
 good_classification_tasks = list(
-    res_class_all_hm_quant[res_class_all_hm_quant.auc_ovo > 0.5].index
+    res_class_all_hm_quant[res_class_all_hm_quant.auc_ovo > 0.55].index
+)
+
+print("Classification results for internal examples")
+res_class_no_ext = (
+    results_class_task.query("not external & version == 'best'")
+    .groupby(["task", "normalization"])
+    .mean()[
+        ["auc_ovo", "auc_ovr", "accuracy", "precision", "recall", "top_2_accuracy", "std"]
+    ]
+)
+display_dataframe(res_class_no_ext.loc[good_classification_tasks].round(2))
+
+print("Classification results for external examples")
+res_class_ext = (
+    results_class_task.query("external & version == 'best'")
+    .groupby(["task", "normalization"])
+    .mean()[
+        ["auc_ovo", "auc_ovr", "accuracy", "precision", "recall", "top_2_accuracy", "std"]
+    ]
+)
+display_dataframe(res_class_ext.loc[good_classification_tasks].round(2))
+
+print("Average AUC_OvO for all good tasks for external data")
+results_class_task_good = results_class_task[
+    results_class_task.task.apply(lambda t: t in good_classification_tasks)
+].query("version == 'best' & external")
+display_dataframe(
+    results_class_task_good.groupby(["normalization", "train_location", "task"])
+    .auc_ovo.mean()
+    .reset_index()
+    .groupby("normalization")
+    .mean()
+    .sort_values("auc_ovo", ascending=False)
+    .round(2)
 )
 
 # %%
@@ -213,7 +168,6 @@ for class_task in good_classification_tasks:
         y="train_location",
         hue="normalization",
         col="external",
-        row="dimensions",
         kind="bar",
         legend=True,
         legend_out=True,
@@ -231,7 +185,6 @@ for class_task in good_classification_tasks:
         y="train_location",
         hue="normalization",
         col="external",
-        row="dimensions",
         kind="bar",
         legend=True,
         legend_out=True,
@@ -249,7 +202,6 @@ for class_task in good_classification_tasks:
         y="train_location",
         hue="normalization",
         col="external",
-        row="dimensions",
         kind="box",
         legend=True,
         legend_out=True,
@@ -268,7 +220,6 @@ for reg_task in regression_tasks:
         y="train_location",
         hue="normalization",
         col="external",
-        row="dimensions",
         kind="box",
         legend=True,
         legend_out=True,
@@ -284,7 +235,6 @@ for reg_task in regression_tasks:
         y="train_location",
         hue="normalization",
         col="external",
-        row="dimensions",
         kind="box",
         legend=True,
         legend_out=True,
@@ -299,10 +249,10 @@ for reg_task in regression_tasks:
 
 def read_auc_from_files(exp_dir, res_cls, cls_tsks):
     """Calculate the metrics from the individual predictions per slice"""
+
     levels = {
         "train_location": res_cls.train_location.cat.categories,
         "normalization": res_cls.normalization.unique(),
-        "dimensions": res_cls.dimensions.unique(),
         "fold": list(range(5)),
         "external": [True, False],
         "version": ["best", "final"],
@@ -315,9 +265,9 @@ def read_auc_from_files(exp_dir, res_cls, cls_tsks):
 
     last_idx = (None,) * len(levels)
     for idx, _ in tqdm(res.iterrows(), total=res.shape[0]):
-        (location, norm_name, dim, fold, external, version, tsk) = idx
+        (location, norm_name, fold, external, version, tsk) = idx
 
-        exp_name = f"ResNet{dim}D-ResNet50-{norm_name}-obj_000%-100"
+        exp_name = f"ResNet2D-ResNet50-{norm_name}-obj_000%-100"
 
         fold_dir = exp_dir / f"Normalization_{location}" / exp_name / f"fold-{fold}"
         if external:
@@ -399,16 +349,30 @@ def read_auc_from_files(exp_dir, res_cls, cls_tsks):
         res.loc[idx] = results
 
         last_idx = idx
-    return res.astype(pd.Float32Dtype())
+    return res.astype(float)
 
 
-results_single_files = read_auc_from_files(
-    experiment_dir, results_class, classification_tasks
-)
+auc_file = experiment_dir / "pub" / "auc_single_files.h5"
+if auc_file.exists():
+    results_single_files = pd.read_hdf(auc_file).set_index(
+        [
+            "train_location",
+            "normalization",
+            "fold",
+            "external",
+            "version",
+            "classification_task",
+        ]
+    )
+else:
+    results_single_files = read_auc_from_files(
+        experiment_dir, results_class, classification_tasks
+    )
+    results_single_files.reset_index().to_hdf(auc_file, key="results", format="table")
 
 # %%
 
-for class_task in classification_tasks:
+for class_task in good_classification_tasks:
     res_tsk = results_single_files.reset_index().query(
         f"classification_task == '{class_task}'"
     )
@@ -418,7 +382,6 @@ for class_task in classification_tasks:
         y="train_location",
         hue="normalization",
         col="external",
-        row="dimensions",
         kind="bar",
         legend=True,
         legend_out=True,

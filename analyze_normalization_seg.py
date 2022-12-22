@@ -16,16 +16,12 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import seaborn as sns
-import SimpleITK as sitk
 import yaml
 from IPython.display import display
-from matplotlib.transforms import Bbox
 from scipy.stats import ttest_ind
 from sklearn.cluster import DBSCAN, KMeans
-from tqdm.auto import tqdm
 
-from plot_utils import create_axes, display_dataframe, display_markdown, save_pub
-from SegClassRegBasis import normalization
+from plot_utils import display_dataframe, display_markdown
 from utils import gather_all_results
 
 experiment_dir = Path(os.environ["experiment_dir"]) / "Normalization_Experiment"
@@ -418,482 +414,6 @@ display_markdown("### Maximum")
 display_dataframe(images_dice.sort_values("maximum").iloc[:20])
 # %%
 
-display_markdown("## Publication figures")
-
-new_names = {
-    "GAN_DISCRIMINATORS": "GAN",
-    "GAN_DISCRIMINATORS_3_64_0.50": "GAN_3_64",
-    "GAN_DISCRIMINATORS_3_64_0.50_BetterConv": "GAN_3_64_BC",
-    "GAN_DISCRIMINATORS_3_64_0.50_BetterConv_0.00001": "GAN_3_64_BC_lr",
-    "GAN_DISCRIMINATORS_3_64_0.50_BetterConv_0.00001_all_image": "GAN_3_64_BC_lr_img",
-    "QUANTILE": "Perc",
-    "HM_QUANTILE": "Perc-HM",
-    "MEAN_STD": "M-Std",
-    "HISTOGRAM_MATCHING": "HM",
-    "UNet2D": "UNet",
-    "DeepLabv3plus2D": "DeepLabV3+",
-    "Frankfurt": "Center 1",
-    "Regensburg": "Center 2",
-    "Mannheim-not-from-study": "Center 3",
-    "Mannheim": "Center 4",
-    "Wuerzburg": "Center 5",
-    "Regensburg-UK": "Center 6",
-}
-norm_order = ["GAN", "GAN_tog", "Perc", "Perc-HM", "HM", "M-Std"]
-
-TITLE = "Performance when training on a single center"
-display_markdown(TITLE)
-data = results.query("before_therapy & postprocessed & name != 'combined_models'").replace(
-    new_names
-)
-data.loc[data.train_location == "all", "external"] = "test"
-
-g = sns.catplot(
-    data=data,
-    y="Dice",
-    x="normalization",
-    order=norm_order,
-    col="external",
-    hue="version",
-    kind="box",
-    legend=True,
-    legend_out=True,
-    height=4,
-    aspect=0.7,
-)
-titles = [
-    "A",
-    "B",
-    "C",
-]
-for ax, tlt in zip(g.axes[0], titles):
-    ax.set_title(tlt)
-    ax.tick_params(axis="x", rotation=90)
-save_pub("performance_ABC")
-
-g = sns.catplot(
-    data=data.replace(new_names),
-    y="Dice",
-    x="normalization",
-    order=norm_order,
-    col="external",
-    hue="version",
-    kind="box",
-    legend=True,
-    legend_out=True,
-    height=4,
-    aspect=0.7,
-)
-titles = [
-    "all",
-    "internal",
-    "external",
-]
-for ax, tlt in zip(g.axes[0], titles):
-    ax.set_title(tlt)
-    ax.tick_params(axis="x", rotation=90)
-save_pub("performance_names")
-
-for name_df, name in zip(data.external.unique(), titles):
-    if name_df == "test":
-        query = f"external == '{name_df}'"
-    else:
-        query = f"external == {name_df}"
-    g = sns.catplot(
-        data=data.query(query).replace(new_names),
-        y="Dice",
-        x="normalization",
-        order=norm_order,
-        row="external",
-        hue="version",
-        kind="box",
-        legend=True,
-        legend_out=True,
-        height=5,
-        aspect=0.8,
-    )
-    g.axes[0, 0].set_title(name)
-    save_pub(f"performance_names_{name}")
-
-fig, axes = plt.subplots(nrows=1, ncols=2, sharex=False, sharey=True, figsize=(8, 4))
-
-sns.histplot(
-    data=acquisition_params.replace(new_names),
-    hue="location",
-    x="pixel_spacing",
-    multiple="stack",
-    binwidth=0.2,
-    binrange=(0, 1.8),
-    hue_order=[f"Center {i}" for i in range(1, 7)],
-    ax=axes[0],
-)
-axes[0].set_xlabel("in-plane resolution (mm)")
-
-sns.histplot(
-    data=acquisition_params.replace(new_names),
-    hue="location",
-    x="echo_time",
-    multiple="stack",
-    binwidth=10,
-    binrange=(75, 135),
-    hue_order=[f"Center {i}" for i in range(1, 7)],
-    ax=axes[1],
-    legend=False,
-)
-axes[1].set_xlabel("echo time (ms)")
-
-titles = [
-    "A",
-    "B",
-]
-for ax, tlt in zip(axes, titles):
-    ax.set_title(tlt)
-
-save_pub("params", bbox_inches="tight")
-
-grouped_data = (
-    results.query(
-        "version == 'best' & before_therapy & postprocessed"
-        + " & name != 'combined_models'"
-    )
-    .replace(new_names)
-    .groupby(["normalization"])
-)
-data = pd.DataFrame(grouped_data.Dice.mean()).drop("Dice", axis="columns")
-for group, group_data in grouped_data:
-    mean_all = group_data[group_data.train_location == "all"].Dice.mean()
-    data.loc[group, "all"] = mean_all
-    mean_internal = group_data[
-        (group_data.train_location != "all") & (~group_data.external)
-    ].Dice.mean()
-    data.loc[group, "internal"] = mean_internal
-    mean_external = group_data[
-        (group_data.train_location != "all") & group_data.external
-    ].Dice.mean()
-    data.loc[group, "external"] = mean_external
-display_markdown("Models trained on one center.")
-display_dataframe(data.round(2))
-
-# %%
-# make a nice description of the hm methods
-images = orig_dataset["1001_1_l0_d0"]["images"]
-images_sitk = [sitk.ReadImage(str(data_dir / img)) for img in images]
-norm_dir_hist = (
-    experiment_dir / "Normalization_all" / "data_preprocessed" / "HISTOGRAM_MATCHING"
-)
-norm_files = [norm_dir_hist / f"normalization_mod{i}.yaml" for i in range(3)]
-norms = [normalization.HistogramMatching.from_file(f) for f in norm_files]
-images_normed = [n.normalize(img) for img, n in zip(images_sitk, norms)]
-
-axes = create_axes()
-
-for i, (n, lbl, img, img_norm, ax_line) in enumerate(
-    zip(norms, ["T2w", "b800", "ADC"], images_sitk, images_normed, axes)
-):
-    ax_line[0].plot(n.quantiles * 100, n.standard_scale, label=f"{lbl} - std.")
-    ax_line[0].plot(n.quantiles * 100, n.get_landmarks(img)[0], label=f"{lbl} - img.")
-    ax_line[0].set_ylabel("Intensity")
-    ax_line[0].set_xlim((0, 100))
-    ax_line[0].set_xticks(norms[0].quantiles * 100)
-    ax_line[0].legend()
-    if i == 2:
-        ax_line[0].set_xlabel("Percentile")
-    else:
-        ax_line[0].axes.xaxis.set_ticklabels([])
-        ax_line[0].axes.set_xlabel(None)
-    if i == 0:
-        ax_line[0].set_title("Landmarks")
-
-    img_np = sitk.GetArrayFromImage(img)
-    img_np = 2 * img_np / img_np.max() - 1
-    img_flat = img_np.reshape(-1)
-    img_norm_np = sitk.GetArrayFromImage(img_norm)
-    image_norm_flat = img_norm_np.reshape(-1)
-    dataframe = pd.DataFrame(
-        {
-            "Intensity": np.concatenate((img_flat, image_norm_flat)),
-            "image": ["ori. img."] * len(img_flat) + ["norm. img."] * len(image_norm_flat),
-        },
-    )
-    sns.histplot(
-        data=dataframe,
-        x="Intensity",
-        hue="image",
-        bins=20,
-        stat="proportion",
-        ax=ax_line[1],
-        legend=i == 0,
-    )
-    if i == 0:
-        ax_line[1].set_title("Histogram")
-    if i != 2:
-        ax_line[1].axes.set_xlabel(None)
-    ax_line[1].set_xlim((-1, 1))
-
-    ax_line[2].imshow(
-        img_np[img_np.shape[0] // 2], interpolation="nearest", cmap="gray", vmin=-1, vmax=1
-    )
-    ax_line[2].axis("off")
-    if i == 0:
-        ax_line[2].set_title("Original Image")
-
-    ax_line[3].imshow(
-        img_norm_np[img_norm_np.shape[0] // 2],
-        interpolation="nearest",
-        cmap="gray",
-        vmin=-1,
-        vmax=1,
-    )
-    ax_line[3].axis("off")
-    if i == 0:
-        ax_line[3].set_title("Normalized Image")
-
-# (x_min, y_min, x_max, y_max)
-save_pub("hm", bbox_inches=Bbox.from_extents(-0.8, 1.9, 10.5, 8.3))
-
-# %%
-# make a nice description of the mean-std method
-images = orig_dataset["1001_1_l0_d0"]["images"]
-images_sitk = [sitk.ReadImage(str(data_dir / img)) for img in images]
-norm_dir_hist = experiment_dir / "data_preprocessed" / "MEAN_STD"
-norm_files = [norm_dir_hist / f"normalization_mod{i}.yaml" for i in range(3)]
-norms = [normalization.MeanSTD.from_file(f) for f in norm_files]
-for n in norms:
-    n.clip_outliers = False
-images_normed = [n.normalize(img) for img, n in zip(images_sitk, norms)]
-axes = create_axes()
-for i, (n, lbl, img, img_norm, ax_line) in enumerate(
-    zip(norms, ["T2w", "b800", "ADC"], images_sitk, images_normed, axes)
-):
-    img_np = sitk.GetArrayFromImage(img)
-    img_flat = img_np.reshape(-1)
-    img_norm_np = sitk.GetArrayFromImage(img_norm)
-    image_norm_flat = img_norm_np.reshape(-1)
-    dataframe = pd.DataFrame(
-        {
-            "Intensity": np.concatenate((img_flat, image_norm_flat)),
-            "image": ["original image"] * len(img_flat)
-            + ["normalized image"] * len(image_norm_flat),
-        },
-    )
-
-    sns.histplot(
-        data=dataframe.query("image == 'original image'"),
-        x="Intensity",
-        hue="image",
-        bins=20,
-        stat="proportion",
-        ax=ax_line[0],
-        legend=False,
-    )
-    if i == 0:
-        ax_line[0].set_title("Original Histogram")
-    if i != 2:
-        ax_line[0].axes.set_xlabel(None)
-
-    MIN_B = -1.6
-    MAX_B = 2.5
-    BIN_WIDTH = (MAX_B - MIN_B) / 20
-    MIN_DISP = MIN_B - BIN_WIDTH / 2
-    MAX_DISP = MAX_B + BIN_WIDTH / 2
-    sns.histplot(
-        data=dataframe.query("image == 'normalized image'"),
-        x="Intensity",
-        hue="image",
-        bins=np.linspace(MIN_DISP, MAX_DISP, 21),
-        stat="proportion",
-        ax=ax_line[1],
-        legend=False,
-    )
-    if i == 0:
-        ax_line[1].set_title("Normalized Histogram")
-    ax_line[1].set_xlim((MIN_DISP - BIN_WIDTH, MAX_DISP + BIN_WIDTH))
-    if i != 2:
-        ax_line[1].axes.set_xlabel(None)
-    ax_line[1].set_ylim(ax_line[0].get_ylim())
-
-    ax_line[2].imshow(
-        img_np[img_np.shape[0] // 2],
-        interpolation="nearest",
-        cmap="gray",
-        vmin=img_np.min(),
-        vmax=img_np.max(),
-    )
-    ax_line[2].axis("off")
-    if i == 0:
-        ax_line[2].set_title("Original Image")
-
-    ax_line[3].imshow(
-        img_norm_np[img_norm_np.shape[0] // 2],
-        interpolation="nearest",
-        cmap="gray",
-        vmin=img_norm_np.min(),
-        vmax=img_norm_np.max(),
-    )
-    ax_line[3].axis("off")
-    if i == 0:
-        ax_line[3].set_title("Normalized Image")
-
-save_pub("mean-std", bbox_inches=Bbox.from_extents(-0.8, 1.9, 10.5, 8.3))
-
-# %%
-# make a nice description of the perc method
-images = orig_dataset["1001_1_l0_d0"]["images"]
-images_sitk = [sitk.ReadImage(str(data_dir / img)) for img in images]
-norm_dir_hist = experiment_dir / "data_preprocessed" / "QUANTILE"
-norm_files = [norm_dir_hist / f"normalization_mod{i}.yaml" for i in range(3)]
-norms = [normalization.Quantile.from_file(f) for f in norm_files]
-images_normed = [n.normalize(img) for img, n in zip(images_sitk, norms)]
-axes = create_axes()
-for i, (n, lbl, img, img_norm, ax_line) in enumerate(
-    zip(norms, ["T2w", "b800", "ADC"], images_sitk, images_normed, axes)
-):
-    img_np = sitk.GetArrayFromImage(img)
-    img_flat = img_np.reshape(-1)
-    img_norm_np = sitk.GetArrayFromImage(img_norm)
-    image_norm_flat = img_norm_np.reshape(-1)
-    dataframe = pd.DataFrame(
-        {
-            "Intensity": np.concatenate((img_flat, image_norm_flat)),
-            "image": ["original image"] * len(img_flat)
-            + ["normalized image"] * len(image_norm_flat),
-        },
-    )
-
-    sns.histplot(
-        data=dataframe.query("image == 'original image'"),
-        x="Intensity",
-        hue="image",
-        bins=20,
-        stat="proportion",
-        ax=ax_line[0],
-        legend=False,
-    )
-    if i == 0:
-        ax_line[0].set_title("Original Histogram")
-    if i != 2:
-        ax_line[0].axes.set_xlabel(None)
-
-    sns.histplot(
-        data=dataframe.query("image == 'normalized image'"),
-        x="Intensity",
-        hue="image",
-        bins=np.linspace(-1.05, 1.05, 21),
-        stat="proportion",
-        ax=ax_line[1],
-        legend=False,
-    )
-    if i == 0:
-        ax_line[1].set_title("Normalized Histogram")
-    if i != 2:
-        ax_line[1].axes.xaxis.set_ticklabels([])
-        ax_line[1].axes.set_xlabel(None)
-    ax_line[1].set_xlim((-1.15, 1.15))
-    # remove y-axis
-    ax_line[1].set_ylim(ax_line[0].get_ylim())
-    if i != 2:
-        ax_line[1].axes.set_xlabel(None)
-
-    ax_line[2].imshow(
-        img_np[img_np.shape[0] // 2],
-        interpolation="nearest",
-        cmap="gray",
-        vmin=img_np.min(),
-        vmax=img_np.max(),
-    )
-    ax_line[2].axis("off")
-    if i == 0:
-        ax_line[2].set_title("Original Image")
-
-    ax_line[3].imshow(
-        img_norm_np[img_norm_np.shape[0] // 2],
-        interpolation="nearest",
-        cmap="gray",
-        vmin=img_norm_np.min(),
-        vmax=img_norm_np.max(),
-    )
-    ax_line[3].axis("off")
-    if i == 0:
-        ax_line[3].set_title("Normalized Image")
-
-save_pub("perc", bbox_inches=Bbox.from_extents(-0.8, 1.9, 10.5, 8.3))
-
-# %%
-# make a nice description of the perc-hm methods
-images = orig_dataset["1001_1_l0_d0"]["images"]
-images_sitk = [sitk.ReadImage(str(data_dir / img)) for img in images]
-norm_dir_hist = experiment_dir / "Normalization_all" / "data_preprocessed" / "HM_QUANTILE"
-norm_files = [norm_dir_hist / f"normalization_mod{i}.yaml" for i in range(3)]
-norms = [normalization.HMQuantile.from_file(f) for f in norm_files]
-images_normed = [n.normalize(img) for img, n in zip(images_sitk, norms)]
-axes = create_axes()
-for i, (n, lbl, img, img_norm, ax_line) in enumerate(
-    zip(norms, ["T2w", "b800", "ADC"], images_sitk, images_normed, axes)
-):
-    ax_line[0].plot(n.quantiles * 100, n.standard_scale, label=f"{lbl} - std.")
-    quant = normalization.Quantile(lower_q=n.quantiles[0], upper_q=n.quantiles[-1])
-    landmarks = n.get_landmarks(quant.normalize(img))[0]
-    landmarks = landmarks / landmarks.max()
-    ax_line[0].plot(n.quantiles * 100, landmarks, label=f"{lbl} - img.")
-    ax_line[0].set_ylabel("Intensity")
-    ax_line[0].set_xlim((0, 100))
-    ax_line[0].set_xticks(norms[0].quantiles * 100)
-    if i == 2:
-        ax_line[0].set_xlabel("Percentile")
-    else:
-        ax_line[0].axes.set_xlabel(None)
-    if i == 0:
-        ax_line[0].legend()
-        ax_line[0].set_title("Landmarks")
-
-    img_np = sitk.GetArrayFromImage(img)
-    img_np = 2 * img_np / img_np.max() - 1
-    img_flat = img_np.reshape(-1)
-    img_norm_np = sitk.GetArrayFromImage(img_norm)
-    image_norm_flat = img_norm_np.reshape(-1)
-    dataframe = pd.DataFrame(
-        {
-            "Intensity": np.concatenate((img_flat, image_norm_flat)),
-            "image": ["orig. img."] * len(img_flat) + ["norm. img."] * len(image_norm_flat),
-        },
-    )
-    sns.histplot(
-        data=dataframe,
-        x="Intensity",
-        hue="image",
-        bins=20,
-        stat="proportion",
-        ax=ax_line[1],
-        legend=i == 0,
-    )
-    if i == 0:
-        ax_line[1].set_title("Histogram")
-    ax_line[1].set_xlim((-1, 1))
-    if i != 2:
-        ax_line[1].axes.set_xlabel(None)
-
-    ax_line[2].imshow(
-        img_np[img_np.shape[0] // 2], interpolation="nearest", cmap="gray", vmin=-1, vmax=1
-    )
-    ax_line[2].axis("off")
-    if i == 0:
-        ax_line[2].set_title("Original Image")
-
-    ax_line[3].imshow(
-        img_norm_np[img_norm_np.shape[0] // 2],
-        interpolation="nearest",
-        cmap="gray",
-        vmin=-1,
-        vmax=1,
-    )
-    ax_line[3].axis("off")
-    if i == 0:
-        ax_line[3].set_title("Normalized Image")
-
-save_pub("perc-hm", bbox_inches=Bbox.from_extents(-0.8, 1.9, 10.5, 8.3))
-
-# %%
-
 display_markdown("## Analyze the different centers")
 
 # remove Regensburg UK, there is just one value
@@ -1191,81 +711,48 @@ for col in acquisition_params.columns:
     plt.show()
     plt.close()
 
-
-# %%
-# plot means and std
-mean_stds_list = []
-modalities = ["T2w", "b800", "ADC"]
-for lbl, data in tqdm(orig_dataset.items()):
-    image_paths = [data_dir / p for p in data["images"]]
-    images = [
-        sitk.ReadImage(str(img_path)) for img_path in image_paths if img_path.exists()
-    ]
-    images_np = [sitk.GetArrayFromImage(img) for img in images]
-    mean_stds_list += [
-        {
-            "Mean": np.mean(img[img > np.quantile(img, 0.01)]),
-            "Std": np.std(img[img > np.quantile(img, 0.01)]),
-            "Name": lbl,
-            "Modality": mod,
-        }
-        for img, mod in zip(images_np, modalities)
-    ]
-
-mean_stds = pd.DataFrame(mean_stds_list)
-mean_stds["patientID"] = mean_stds["Name"].str.partition("_")[0]
-mean_stds["Location"] = mean_stds["patientID"].apply(lambda s: s[:-3])
-mean_stds = mean_stds.replace(
-    {
-        "1": "Center 1",
-        "11": "Center 2",
-        "99": "Center 3",
-        "13": "Center 4",
-        "12": "Center 5",
-        "5": "Center 6",
-    }
-)
-
-
-# %%
-fig, axes = plt.subplots(nrows=2, ncols=3, figsize=(10, 6), sharey=True)
-for num, (mod, ax_col) in enumerate(zip(modalities, axes.T)):
-    data = mean_stds.query(f"Modality == '{mod}' & Location != 'Center 6'")
-    std_max = data["Std"].quantile(0.99)
-    data = data.drop(index=data[data.Std > std_max].index)
-    sns.histplot(
-        data=data,
-        x="Mean",
-        hue="Location",
-        stat="proportion",
-        bins=20,
-        common_norm=False,
-        hue_order=[f"Center {i}" for i in range(1, 6)],
-        ax=ax_col[0],
-        legend=num == 0,
-        element="poly",
-    )
-
-    sns.histplot(
-        data=data,
-        x="Std",
-        hue="Location",
-        stat="proportion",
-        bins=20,
-        common_norm=False,
-        hue_order=[f"Center {i}" for i in range(1, 6)],
-        ax=ax_col[1],
-        legend=False,
-        element="poly",
-    )
-
-    ax_col[0].set_title(mod)
-
-plt.tight_layout()
-save_pub("mean-std-stat")
-
 # %%
 display_markdown("## Compare networks")
+
+new_names = {
+    "GAN_DISCRIMINATORS": "GAN",
+    "GAN_DISCRIMINATORS_3_64_0.50": "GAN_3_64",
+    "GAN_DISCRIMINATORS_3_64_0.50_BetterConv": "GAN_3_64_BC",
+    "GAN_DISCRIMINATORS_3_64_0.50_BetterConv_0.00001": "GAN Def.",
+    "GAN_DISCRIMINATORS_3_64_0.50_BetterConv_0.00001_seg": "GAN Seg.",
+    "GAN_DISCRIMINATORS_3_64_0.50_BetterConv_0.00001_all_image": "GAN Img.",
+    "GAN_DISCRIMINATORS_3_64_0.50_BetterConv_0.00001_WINDOW": "GAN Win.",
+    "GAN_DISCRIMINATORS_3_64_0.50_BetterConv_0.00001_WINDOW_seg": "GAN_3_64_BC_win_seg",
+    "GAN_DISCRIMINATORS_3_64_n-skp_BetterConv_0.00001_WINDOW": "GAN No-ed.",
+    "QUANTILE": "Perc",
+    "HM_QUANTILE": "Perc-HM",
+    "MEAN_STD": "M-Std",
+    "HISTOGRAM_MATCHING": "HM",
+    "WINDOW": "Win",
+    "UNet2D": "UNet",
+    "DeepLabv3plus2D": "DeepLabV3+",
+    "Frankfurt": "Center 1",
+    "Regensburg": "Center 2",
+    "Mannheim-not-from-study": "Center 3",
+    "Mannheim": "Center 4",
+    "Wuerzburg": "Center 5",
+    "Regensburg-UK": "Center 6",
+    "Not-Frankfurt": "Not Center 1",
+    "Not-Regensburg": "Not Center 2",
+    "Not-Mannheim": "Not Center 3 and 4",
+}
+norm_order = [
+    "GAN Def.",
+    "GAN Seg.",
+    "GAN Img.",
+    "GAN Win.",
+    "GAN No-ed.",
+    "Perc",
+    "Perc-HM",
+    "HM",
+    "M-Std",
+    "Win",
+]
 
 grouped_data = (
     results.query(
@@ -1273,22 +760,10 @@ grouped_data = (
         + " & name != 'combined_models' & train_location == 'all'"
     )
     .replace(new_names)
-    .groupby("normalization")
+    .groupby(["normalization", "do_batch_normalization"])
     .Dice
 )
 data = pd.DataFrame(grouped_data.median())
-
-display_markdown("Models trained on all images.")
-display_dataframe(data.round(2))
-differences = pd.DataFrame(index=data.index, columns=data.index)
-
-for first, first_data in grouped_data:
-    for second, second_data in grouped_data:
-        tscore, pvalue = ttest_ind(first_data, second_data)
-        differences.loc[first, second] = np.round(pvalue, 3)
-display_markdown("P-Values")
-display_dataframe(differences.round(2))
-display_dataframe(differences < 0.05)
 
 display_markdown("## Compare Normalization")
 
@@ -1299,7 +774,7 @@ grouped_data = (
         + " & name != 'combined_models' & train_location == 'all' & not external"
     )
     .replace(new_names)
-    .groupby("normalization")
+    .groupby(["normalization", "do_batch_normalization"])
     .Dice
 )
 data = pd.DataFrame(grouped_data.mean())

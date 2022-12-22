@@ -11,11 +11,11 @@ import pandas as pd
 import SimpleITK as sitk
 import telegram
 import yaml
-from matplotlib import pyplot as plt
-from tqdm.autonotebook import tqdm
+from tqdm import tqdm
 
 from networks import ResNet
 from SegClassRegBasis.architecture import DeepLabv3plus, DenseTiramisu, UNet
+from SegClassRegBasis.evaluation import calculate_classification_metrics
 from SegClassRegBasis.normalization import NORMALIZING
 from SegClassRegBasis.utils import gather_results
 
@@ -553,256 +553,6 @@ class TelegramBot:
                 print("Sending of message failed, no internet.")
 
 
-def plot_metrics(data: pd.DataFrame, metrics: List[str]):
-    """Plot the listed metrics including the validation
-
-    Parameters
-    ----------
-    data : pd.DataFrame
-        The data to plot
-    metrics : List[str]
-        The metrics to plot
-    """
-    data = data.dropna(axis="columns")
-    metrics_present = [t for t in metrics if f"val_{t}" in data]
-    if len(metrics_present) == 0:
-        return
-    nrows = int(np.ceil(len(metrics_present) / 4))
-    _, axes = plt.subplots(
-        nrows=nrows,
-        ncols=4,
-        sharex=True,
-        sharey=False,
-        figsize=(16, nrows * 3.5),
-    )
-    for metric, ax in zip(metrics_present, axes.flat):
-        plot_with_ma(ax, data, metric)
-        ax.set_ylabel(metric)
-    for ax in axes.flat[3 : 4 : len(metrics_present)]:
-        ax.legend()
-    for ax in axes.flat[len(metrics_present) :]:
-        ax.set_axis_off()
-    plt.tight_layout()
-    plt.show()
-    plt.close()
-
-
-def plot_disc(res: pd.DataFrame, disc_type: str):
-    """Plot the image or latent discriminators"""
-    res = res.dropna(axis="columns")
-    disc = [
-        c[6 + len(disc_type) : -5]
-        for c in res.columns
-        if c.startswith(f"disc_{disc_type}/") and c.endswith("loss") and len(c) > 17
-    ]
-    if len(disc) == 0:
-        return
-    img_gen_list = [c for c in res.columns if c.startswith("disc_image_gen")]
-    image_gen_pres = len(img_gen_list) > 0 and disc_type == "image"
-    if image_gen_pres:
-        ncols = 6
-    else:
-        ncols = 4
-    _, axes_disc = plt.subplots(
-        nrows=len(disc),
-        ncols=ncols,
-        sharex=True,
-        sharey=False,
-        figsize=(4 * ncols, len(disc) * 4),
-    )
-    for disc, axes_line in zip(disc, axes_disc):
-        disc_start = f"disc_{disc_type}/{disc}_"
-        disc_metric = [c for c in res.columns if c.startswith(disc_start)][0].partition(
-            disc_start
-        )[-1]
-        if disc_metric == "RootMeanSquaredError":
-            disc_metric_name = "RMSE"
-        else:
-            disc_metric_name = disc_metric
-        last_present = 0
-        fields = [
-            f"disc_{disc_type}/{disc}/loss",
-            f"disc_{disc_type}/{disc}_{disc_metric}",
-            f"generator-{disc_type}/{disc}/loss",
-            f"generator-{disc_type}/{disc}_{disc_metric}",
-        ]
-        names = [
-            f"Disc-{disc_type.capitalize()} {disc} loss",
-            f"Disc-{disc_type.capitalize()} {disc} {disc_metric_name}",
-            f"Generator {disc} loss",
-            f"Generator {disc} {disc_metric_name}",
-        ]
-        if image_gen_pres:
-            fields = (
-                fields[:2]
-                + [
-                    f"disc_image_gen/{disc}/loss",
-                    f"disc_image_gen/{disc}_{disc_metric}",
-                ]
-                + fields[2:]
-            )
-            names = (
-                names[:2]
-                + [
-                    f"Disc-Image-Gen {disc} loss",
-                    f"Disc-Image-Gen {disc} {disc_metric_name}",
-                ]
-                + names[2:]
-            )
-        for num, (field, y_label) in enumerate(
-            zip(
-                fields,
-                names,
-            )
-        ):
-            if field in res.columns:
-                plot_with_ma(axes_line[num], res, field)
-                axes_line[num].set_ylabel(y_label)
-                last_present = max(last_present, num)
-        axes_line[last_present].legend()
-
-    plt.tight_layout()
-    plt.show()
-    plt.close()
-
-
-def plot_disc_exp(res, experiments, prefixes, disc_type, channel=0):
-    "Plot one channel over multiple experiments"
-    res = res.query(f"channel=='{channel}'")
-    if res.size == 0:
-        return
-    disc_list = [
-        c[6 + len(disc_type) : -5]
-        for c in res
-        if c.startswith(f"disc_{disc_type}/") and c.endswith("loss") and len(c) > 17
-    ]
-    img_gen_list = [c for c in res.columns if c.startswith("disc_image_gen")]
-    image_gen_pres = len(img_gen_list) > 0 and disc_type == "image"
-    if image_gen_pres:
-        ncols = 6
-    else:
-        ncols = 4
-    _, axes_disc = plt.subplots(
-        nrows=len(disc_list),
-        ncols=ncols,
-        sharex=True,
-        sharey=False,
-        figsize=(4 * ncols, len(disc_list) * 4),
-    )
-
-    for experiment, pre in zip(experiments, prefixes):
-        res_exp = res.query(f"experiment == '{experiment}'")
-        if res_exp.size == 0:
-            continue
-        if np.any(res_exp.epoch.value_counts() > 1):
-            raise ValueError("Multiple data points for one epoch, check for duplicates")
-        for disc, axes_line in zip(disc_list, axes_disc):
-            disc_start = f"disc_{disc_type}/{disc}_"
-            disc_metric = [c for c in res_exp.columns if c.startswith(disc_start)][
-                0
-            ].partition(disc_start)[-1]
-            if disc_metric == "RootMeanSquaredError":
-                disc_metric_name = "RMSE"
-            else:
-                disc_metric_name = disc_metric
-            last_present = 0
-            fields = [
-                f"disc_{disc_type}/{disc}/loss",
-                f"disc_{disc_type}/{disc}_{disc_metric}",
-                f"generator-{disc_type}/{disc}/loss",
-                f"generator-{disc_type}/{disc}_{disc_metric}",
-            ]
-            names = [
-                f"Disc-{disc_type.capitalize()} {disc} loss",
-                f"Disc-{disc_type.capitalize()} {disc} {disc_metric_name}",
-                f"Generator {disc} loss",
-                f"Generator {disc} {disc_metric_name}",
-            ]
-            if image_gen_pres:
-                fields = (
-                    fields[:2]
-                    + [
-                        f"disc_image_gen/{disc}/loss",
-                        f"disc_image_gen/{disc}_{disc_metric}",
-                    ]
-                    + fields[2:]
-                )
-                names = (
-                    names[:2]
-                    + [
-                        f"Disc-Image-Gen {disc} loss",
-                        f"Disc-Image-Gen {disc} {disc_metric_name}",
-                    ]
-                    + names[2:]
-                )
-            for num, (field, y_label) in enumerate(
-                zip(
-                    fields,
-                    names,
-                )
-            ):
-                if field in res_exp.columns:
-                    plot_with_ma(
-                        axes_line[num], res_exp, field, label_prefix=pre, dash_val=True
-                    )
-                    axes_line[num].set_ylabel(y_label)
-                    last_present = max(last_present, num)
-            axes_line[last_present].legend()
-
-    plt.tight_layout()
-    plt.show()
-    plt.close()
-
-
-def plot_with_ma(
-    ax_ma: plt.Axes,
-    data_frame: pd.DataFrame,
-    field: str,
-    window_size=5,
-    label_prefix="",
-    dash_val=False,
-):
-    """Plot a line with the value in the background and the moving average on top"""
-    for val in ("", "val_"):
-        for channel in range(3):
-            df_channel = data_frame.query(f"channel == '{channel}'")
-            if df_channel.size == 0:
-                continue
-            if dash_val and val == "val_":
-                linestyle = "dashed"
-            else:
-                linestyle = "solid"
-            plot = ax_ma.plot(
-                df_channel.epoch,
-                df_channel[val + field],
-                alpha=0.4,
-                linestyle=linestyle,
-            )
-            # plot with moving average
-            color = plot[-1].get_color()
-            if dash_val and val == "val_":
-                color = color_not_val
-                label = None
-            else:
-                color_not_val: str = color
-                label = f"{label_prefix}{val}{channel}"
-            ax_ma.plot(
-                df_channel.epoch,
-                np.convolve(
-                    np.pad(
-                        df_channel[val + field],
-                        (window_size // 2 - 1 + window_size % 2, window_size // 2),
-                        mode="edge",
-                    ),
-                    np.ones(window_size) / window_size,
-                    mode="valid",
-                ),
-                label=label,
-                linestyle=linestyle,
-                color=color,
-            )
-
-
 def gather_all_results(task="segmentation") -> pd.DataFrame:
     """Gather all results from the normalization experiment
 
@@ -949,3 +699,55 @@ def gather_all_results(task="segmentation") -> pd.DataFrame:
     # set location
     results = results.merge(right=acquisition_params.location, on="File Number")
     return results, acquisition_params
+
+
+def calculate_auc(df: pd.DataFrame, task: str) -> pd.DataFrame:
+    """Calculate the AUC and other statistics for one task in the dataframe
+
+    Parameters
+    ----------
+    df : pd.DataFrame
+        The dataframe with the columns {task}_probability_{lbl},
+        {task}_ground_truth and {task}_top_prediction
+    task : str
+        The task name
+
+    Returns
+    -------
+    pd.DataFrame
+        The resulting metrics with the names as columns and the individual labels as rows
+    """
+    prob_prefix = f"{task}_probability_"
+    prob_col_names = [c for c in df if prob_prefix in c]
+
+    # remove missing values
+    ground_truth = df[f"{task}_ground_truth"]
+    probabilities = df[prob_col_names].values
+    not_na = np.all(np.isfinite(probabilities), axis=-1)
+    # if np.sum(~not_na):
+    #     print(f"Nans found in {task}")
+    mask = (ground_truth != -1) & not_na
+
+    top_pred = df[f"{task}_top_prediction"][mask]
+    probabilities = probabilities[mask]
+    ground_truth = ground_truth[mask]
+    if pd.api.types.is_numeric_dtype(ground_truth.dtype):
+        ground_truth = ground_truth.astype(int)
+    labels = np.array([val.partition(prob_prefix)[-1] for val in prob_col_names])
+
+    if np.all(~mask):
+        results = {}
+    else:
+        results = calculate_classification_metrics(
+            prediction=top_pred,
+            probabilities=probabilities,
+            ground_truth=ground_truth,
+            labels=labels,
+        )
+
+    res_df = pd.DataFrame(results)
+    if pd.DataFrame(results).size > 0:
+        res_df["task"] = task
+        if not res_df.index.name == "label":
+            res_df.set_index("label", inplace=True)
+    return res_df

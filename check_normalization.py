@@ -20,7 +20,7 @@ from tqdm import tqdm
 from networks import auto_encoder
 from SegClassRegBasis import evaluation
 from SegClassRegBasis.normalization import NORMALIZING
-from utils import plot_disc, plot_disc_exp, plot_metrics
+from plot_utils import plot_disc, plot_disc_exp, plot_metrics
 
 
 def read_norm_exp(norm_suffix: str, silent=False) -> pd.DataFrame:

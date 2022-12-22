@@ -12,7 +12,7 @@ os.environ["CUDA_VISIBLE_DEVICES"] = "3"
 import pandas as pd
 
 from prepare_disc_test import preprocessing_parameters
-from utils import plot_disc, plot_disc_exp, plot_metrics
+from plot_utils import plot_metrics, plot_disc, plot_disc_exp
 
 # %%
 
