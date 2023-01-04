@@ -1,5 +1,7 @@
 """Make the figures for the paper"""
 
+# pylint:disable=too-many-lines
+
 # %%
 import os
 from pathlib import Path
@@ -13,6 +15,7 @@ import yaml
 from matplotlib.transforms import Bbox
 from tqdm import tqdm
 
+from gan_normalization import GanDiscriminators
 from plot_utils import create_axes, display_dataframe, display_markdown, plot_significance
 from SegClassRegBasis import normalization
 from utils import calculate_auc, gather_all_results
@@ -24,7 +27,7 @@ def save_pub(filename, **kwargs):
     if not pub_dir.exists():
         pub_dir.mkdir()
     plt.savefig(pub_dir / f"{filename}.png", dpi=600, **kwargs)
-    # plt.savefig(pub_dir / f"{name}.pdf", dpi=600, **kwargs)
+    plt.savefig(pub_dir / f"{filename}.eps", dpi=600, **kwargs)
     plt.show()
     plt.close()
 
@@ -70,12 +73,14 @@ results_reg, _ = gather_all_results(task="regression")
 regression_tasks = [c.partition("_rmse")[0] for c in results_reg if c.endswith("_rmse")]
 
 # set the experiment type
+experiment_types = ["All", "Single-Center", "Except-One"]
 for df in [results_seg, results_class, results_reg]:
-    df.loc[df.train_location.apply(lambda x: "Not" in x), "experiment_type"] = "except_one"
+    df.loc[df.train_location.apply(lambda x: "Not" in x), "experiment_type"] = "Except-One"
     df.loc[
         df.train_location.apply(lambda x: "Not" not in x), "experiment_type"
-    ] = "single_center"
-    df.loc[df.train_location == "all", "experiment_type"] = "all"
+    ] = "Single-Center"
+    df.loc[df.train_location == "all", "experiment_type"] = "All"
+    df.experiment_type = pd.Categorical(df.experiment_type, categories=experiment_types)
 
 # %%
 
@@ -154,12 +159,13 @@ new_names = {
     "Frankfurt": "Center 1",
     "Regensburg": "Center 2",
     "Mannheim-not-from-study": "Center 3",
-    "Mannheim": "Center 4",
-    "Wuerzburg": "Center 5",
-    "Regensburg-UK": "Center 6",
+    "Mannheim": "Center 3",
+    "Wuerzburg": "Center 4",
+    "Regensburg-UK": "Center 5",
+    "Freiburg": "Center 6",
     "Not-Frankfurt": "Not Center 1",
     "Not-Regensburg": "Not Center 2",
-    "Not-Mannheim": "Not Center 3 and 4",
+    "Not-Mannheim": "Not Center 3",
 }
 norm_order = [
     "GAN-Def",
@@ -210,7 +216,7 @@ def turn_ticks(axes_to_turn):
         label.set_rotation(40)
 
 
-for experiment_type in ["all", "single_center", "except_one"]:
+for experiment_type in experiment_types:
 
     print(f"Performance on {experiment_type.replace('_', ' ')}")
 
@@ -263,12 +269,14 @@ for experiment_type in ["all", "single_center", "except_one"]:
         data=data_reg,
         x="normalization",
         y="age_rmse",
-        ax=axes[1, 2],
+        ax=axes[1, 1],
     )
-    axes[1, 2].set_title("Age")
-    axes[1, 2].set_ylabel("RMSE")
-    axes[1, 2].set_ylim(-1, 25)
-    turn_ticks(axes[1, 2])
+    axes[1, 1].set_title("Age")
+    axes[1, 1].set_ylabel("RMSE")
+    axes[1, 1].set_ylim(-1, 25)
+    turn_ticks(axes[1, 1])
+
+    axes[1, 2].remove()
 
     plt.tight_layout()
     save_pub(f"{experiment_type}_summary")
@@ -283,15 +291,22 @@ fig, axes = plt.subplots(nrows=2, ncols=3, figsize=(20 / 2.54, 16 / 2.54))
 
 data_seg = results_seg_new_names.query(
     "before_therapy & postprocessed & name != 'combined_models' & version == 'best'"
-)
-data_class = results_class_task_new_names.query("version == 'best'")
-data_reg = results_reg_new_names.query("version == 'best'")
+).copy()
+data_class = results_class_task_new_names.query("version == 'best'").copy()
+data_reg = results_reg_new_names.query("version == 'best'").copy()
+
+data_seg = data_seg[np.logical_or(data_seg.external, data_seg.experiment_type == "All")]
+data_class = data_class[
+    np.logical_or(data_class.external, data_class.experiment_type == "All")
+]
+data_reg = data_reg[np.logical_or(data_reg.external, data_reg.experiment_type == "All")]
 
 sns.boxplot(
     data=data_seg.query("do_batch_normalization"),
     x="normalization",
     y="Dice",
     hue="experiment_type",
+    hue_order=experiment_types,
     ax=axes[0, 0],
 )
 axes[0, 0].set_title("Segmentation Batch Norm")
@@ -317,6 +332,7 @@ for ax, task in zip(axes.flat[2:], good_classification_tasks):
         x="normalization",
         y="auc_ovo",
         hue="experiment_type",
+        hue_order=experiment_types,
         ax=ax,
     )
     ax.set_title(task.replace("_", " ").capitalize())
@@ -325,33 +341,120 @@ for ax, task in zip(axes.flat[2:], good_classification_tasks):
     if task != "sex":
         ax.legend([], [], frameon=False)
 
-axes[0, 2].legend(
-    bbox_to_anchor=(1.05, 1),
+legend = axes[0, 2].legend(
+    bbox_to_anchor=(0, 0),
     loc="upper left",
     borderaxespad=0,
     title="Experiment Type",
 )
-new_labels = ["all", "except one", "single center"]
-for t, l in zip(axes[0, 2].get_legend().texts, new_labels):
-    t.set_text(l)
-axes[1, 0].set_ylim(0.295, 0.755)
-axes[1, 1].set_ylim(0.295, 0.805)
 
 sns.boxplot(
     data=data_reg,
     x="normalization",
     y="age_rmse",
     hue="experiment_type",
-    ax=axes[1, 2],
+    hue_order=experiment_types,
+    ax=axes[1, 1],
 )
-axes[1, 2].set_title("Age")
-axes[1, 2].set_ylabel("RMSE")
-turn_ticks(axes[1, 2])
-axes[1, 2].set_ylim(-1, 25)
-axes[1, 2].legend([], [], frameon=False)
+axes[1, 1].set_title("Age")
+axes[1, 1].set_ylabel("RMSE")
+turn_ticks(axes[1, 1])
+axes[1, 1].set_ylim(-1, 25)
+axes[1, 1].legend([], [], frameon=False)
+
+axes[1, 2].remove()
 
 plt.tight_layout()
+legend.set(bbox_to_anchor=[-0.0, -1.45, 0, 1])
 save_pub("all_experiment_types_summary")
+plt.show()
+plt.close()
+# %%
+
+print("Performance in all experiments")
+
+fig, axes = plt.subplots(nrows=2, ncols=3, figsize=(20 / 2.54, 16 / 2.54))
+
+data_seg = results_seg_new_names.query(
+    "before_therapy & postprocessed & name != 'combined_models' & version == 'best'"
+).copy()
+data_class = results_class_task_new_names.query("version == 'best'").copy()
+data_reg = results_reg_new_names.query("version == 'best'").copy()
+
+data_seg = data_seg[np.logical_or(data_seg.external, data_seg.experiment_type == "All")]
+data_class = data_class[
+    np.logical_or(data_class.external, data_class.experiment_type == "All")
+]
+data_reg = data_reg[np.logical_or(data_reg.external, data_reg.experiment_type == "All")]
+
+sns.barplot(
+    data=data_seg.query("do_batch_normalization"),
+    x="normalization",
+    y="Dice",
+    hue="experiment_type",
+    hue_order=experiment_types,
+    ax=axes[0, 0],
+)
+axes[0, 0].set_title("Segmentation Batch Norm")
+turn_ticks(axes[0, 0])
+axes[0, 0].legend([], [], frameon=False)
+axes[0, 0].set_ylim(0, 0.75)
+
+sns.barplot(
+    data=data_seg.query("not do_batch_normalization"),
+    x="normalization",
+    y="Dice",
+    hue="experiment_type",
+    ax=axes[0, 1],
+)
+axes[0, 1].set_title("Segmentation without Batch Norm")
+turn_ticks(axes[0, 1])
+axes[0, 1].legend([], [], frameon=False)
+axes[0, 1].set_ylim(0, 0.75)
+
+for ax, task in zip(axes.flat[2:], good_classification_tasks):
+    sns.barplot(
+        data=data_class.query(f"task == '{task}'"),
+        x="normalization",
+        y="auc_ovo",
+        hue="experiment_type",
+        hue_order=experiment_types,
+        ax=ax,
+    )
+    ax.set_title(task.replace("_", " ").capitalize())
+    ax.set_ylabel("AUC")
+    turn_ticks(ax)
+    if task != "sex":
+        ax.legend([], [], frameon=False)
+axes[0, 2].set_ylim(0.46, 1)
+axes[1, 0].set_ylim(0.46, 0.7)
+
+legend = axes[0, 2].legend(
+    bbox_to_anchor=(0, 0),
+    loc="upper left",
+    borderaxespad=0,
+    title="Experiment Type",
+)
+
+sns.barplot(
+    data=data_reg,
+    x="normalization",
+    y="age_rmse",
+    hue="experiment_type",
+    hue_order=experiment_types,
+    ax=axes[1, 1],
+)
+axes[1, 1].set_title("Age")
+axes[1, 1].set_ylabel("RMSE")
+turn_ticks(axes[1, 1])
+axes[1, 1].set_ylim(10, 20)
+axes[1, 1].legend([], [], frameon=False)
+
+axes[1, 2].remove()
+
+plt.tight_layout()
+legend.set(bbox_to_anchor=[-0.0, -1.45, 0, 1])
+save_pub("all_experiment_types_summary_bars")
 plt.show()
 plt.close()
 
@@ -359,14 +462,14 @@ plt.close()
 
 print("Look for significance")
 
-for experiment_type in ["all", "single_center", "except_one"]:
+for experiment_type in experiment_types:
     display_markdown(f"### {experiment_type}")
 
     data_seg = results_seg_new_names.query(
         "before_therapy & postprocessed & name != 'combined_models' & version == 'best'"
         f" & experiment_type == '{experiment_type}'"
     )
-    if experiment_type == "all":
+    if experiment_type == "All":
         grouped_data = data_seg.groupby(["do_batch_normalization", "normalization"])
         plot_significance(grouped_data, f"{experiment_type} - Segmentation", "Dice")
     else:
@@ -384,7 +487,7 @@ for experiment_type in ["all", "single_center", "except_one"]:
         # only use first label to not overstate the significance
         first_label = data_class.label.unique()[0]
         data_class = data_class.query(f"label == '{first_label}'")
-        if experiment_type == "all":
+        if experiment_type == "All":
             grouped_data = data_class.groupby(["normalization"])
             plot_significance(grouped_data, f"{experiment_type} - {task}", "auc_ovo")
         else:
@@ -397,7 +500,7 @@ for experiment_type in ["all", "single_center", "except_one"]:
     data_reg = results_reg_new_names.query(
         f"experiment_type == '{experiment_type}' & version == 'best'"
     )
-    if experiment_type == "all":
+    if experiment_type == "All":
         grouped_data = data_reg.groupby(["normalization"])
         plot_significance(grouped_data, f"{experiment_type} - Age", "age_rmse")
     else:
@@ -408,11 +511,67 @@ for experiment_type in ["all", "single_center", "except_one"]:
 
 # %%
 
+print("Acquisition parameters")
+
+fig, axes = plt.subplots(nrows=1, ncols=2, sharex=False, sharey=True, figsize=(5, 2.3))
+
+sns.histplot(
+    data=acquisition_params.replace(new_names),
+    hue="location",
+    x="pixel_spacing",
+    multiple="stack",
+    binwidth=0.2,
+    binrange=(0, 1.8),
+    hue_order=[f"Center {i}" for i in range(1, 7)],
+    ax=axes[0],
+    legend=False,
+)
+axes[0].set_xlabel("in-plane resolution (mm)")
+
+sns.histplot(
+    data=acquisition_params.replace(new_names),
+    hue="location",
+    x="echo_time",
+    multiple="stack",
+    binwidth=10,
+    binrange=(55, 155),
+    hue_order=[f"Center {i}" for i in range(1, 7)],
+    ax=axes[1],
+    legend=True,
+)
+axes[1].set_xlabel("echo time (ms)")
+
+axes[1].get_legend().set(bbox_to_anchor=[0.9, 0, 0, 1], title="Location")
+
+titles = [
+    "A",
+    "B",
+]
+for ax, tlt in zip(axes, titles):
+    ax.set_title(tlt)
+
+plt.tight_layout()
+save_pub("params", bbox_inches="tight")
+
+print(f"In-Plane Min: {acquisition_params.pixel_spacing.min():.2f} mm")
+print(f"In-Plane Max: {acquisition_params.pixel_spacing.max():.2f} mm")
+
+print(f"Echo Time Min: {acquisition_params.echo_time.min():.2f} ms")
+print(f"Echo Time Max: {acquisition_params.echo_time.max():.2f} ms")
+
+display_dataframe(
+    pd.DataFrame(acquisition_params.echo_time.round(-1).value_counts()).sort_index()
+)
+
+display_dataframe(acquisition_params.replace(new_names)[acquisition_params.echo_time > 200])
+
+# %%
+
 display_markdown("### Calculations for the paper")
 
 seg_all = results_seg_new_names.query(
     "before_therapy & postprocessed & name != 'combined_models' & version == 'best'"
-    " & experiment_type == 'all'"
+    " & experiment_type == 'All'"
 )
 dice_all_bn = seg_all.query("do_batch_normalization").Dice
 print(f"Dice all BN mean:   {dice_all_bn.mean():.2f} ± {dice_all_bn.std():.2f}")
@@ -830,6 +989,88 @@ for i, (n, lbl, img, img_norm, ax_line) in enumerate(
         ax_line[3].set_title("Normalized Image")
 
 save_pub("perc-hm", bbox_inches=Bbox.from_extents(-0.8, 1.9, 10.5, 8.3))
+
+# %%
+# make a nice description of the GAN-Def methods
+image = sitk.ReadImage(
+    str(experiment_dir / "data_preprocessed" / "QUANTILE" / "sample-1001_1_l0_d0.nii.gz")
+)
+images_sitk = [sitk.VectorIndexSelectionCast(image, i) for i in range(3)]
+norm_dir_hist = (
+    experiment_dir
+    / "Normalization_all"
+    / "data_preprocessed"
+    / "GAN_DISCRIMINATORS_3_64_0.50_BetterConv_0.00001"
+)
+norm_files = [norm_dir_hist / f"normalization_mod{i}.yaml" for i in range(3)]
+norms = [GanDiscriminators.from_file(f) for f in norm_files]
+images_normed = [n.normalize(img) for img, n in zip(images_sitk, norms)]
+# %%
+axes = create_axes()
+for i, (n, lbl, img, img_norm, ax_line) in enumerate(
+    zip(norms, ["T2w", "b800", "ADC"], images_sitk, images_normed, axes)
+):
+    # ax_line[0].plot(n.quantiles * 100, n.standard_scale, label=f"{lbl} - std.")
+    # quant = normalization.Quantile(lower_q=n.quantiles[0], upper_q=n.quantiles[-1])
+    # landmarks = n.get_landmarks(quant.normalize(img))[0]
+    # landmarks = landmarks / landmarks.max()
+    # ax_line[0].plot(n.quantiles * 100, landmarks, label=f"{lbl} - img.")
+    # ax_line[0].set_ylabel("Intensity")
+    # ax_line[0].set_xlim((0, 100))
+    # ax_line[0].set_xticks(norms[0].quantiles * 100)
+    # if i == 2:
+    #     ax_line[0].set_xlabel("Percentile")
+    # else:
+    #     ax_line[0].axes.set_xlabel(None)
+    # if i == 0:
+    #     ax_line[0].legend()
+    #     ax_line[0].set_title("Landmarks")
+
+    img_np = sitk.GetArrayFromImage(img)
+    img_np = 2 * img_np / img_np.max() - 1
+    img_flat = img_np.reshape(-1)
+    img_norm_np = sitk.GetArrayFromImage(img_norm)
+    image_norm_flat = img_norm_np.reshape(-1)
+    dataframe = pd.DataFrame(
+        {
+            "Intensity": np.concatenate((img_flat, image_norm_flat)),
+            "image": ["orig. img."] * len(img_flat) + ["norm. img."] * len(image_norm_flat),
+        },
+    )
+    sns.histplot(
+        data=dataframe,
+        x="Intensity",
+        hue="image",
+        bins=20,
+        stat="proportion",
+        ax=ax_line[1],
+        legend=i == 0,
+    )
+    if i == 0:
+        ax_line[1].set_title("Histogram")
+    ax_line[0].set_xlim((-1, 1))
+    if i != 2:
+        ax_line[0].axes.set_xlabel(None)
+
+    ax_line[2].imshow(
+        img_np[img_np.shape[0] // 2], interpolation="nearest", cmap="gray", vmin=-1, vmax=1
+    )
+    ax_line[2].axis("off")
+    if i == 0:
+        ax_line[2].set_title("Original Image")
+
+    ax_line[3].imshow(
+        img_norm_np[img_norm_np.shape[0] // 2],
+        interpolation="nearest",
+        cmap="gray",
+        vmin=-1,
+        vmax=1,
+    )
+    ax_line[3].axis("off")
+    if i == 0:
+        ax_line[3].set_title("Normalized Image")
+
+save_pub("GAN-Def", bbox_inches=Bbox.from_extents(-0.8, 1.9, 10.5, 8.3))
 
 # %%
 # plot means and std
