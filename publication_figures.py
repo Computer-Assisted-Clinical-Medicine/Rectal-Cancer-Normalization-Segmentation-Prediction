@@ -21,6 +21,12 @@ from SegClassRegBasis import normalization
 from utils import calculate_auc, gather_all_results
 
 
+def turn_ticks(axes_to_turn):
+    for label in axes_to_turn.get_xticklabels():
+        label.set_ha("right")
+        label.set_rotation(40)
+
+
 def save_pub(filename, **kwargs):
     """Save the figure for publication"""
     pub_dir = Path(os.environ["experiment_dir"]) / "Normalization_Experiment" / "pub"
@@ -31,6 +37,11 @@ def save_pub(filename, **kwargs):
     plt.show()
     plt.close()
 
+
+# %%
+
+sns.set_style("whitegrid")
+plt.style.use("seaborn-paper")
 
 SMALL_SIZE = 8
 MEDIUM_SIZE = 10
@@ -65,15 +76,36 @@ results_seg = results_seg.copy()
 results_seg["do_batch_normalization"] = results_seg["do_batch_normalization"].astype(bool)
 
 results_class, acquisition_params = gather_all_results(task="classification")
-classification_tasks = [
-    c.partition("_accuracy")[0] for c in results_class if "accuracy" in c
-]
+
+# add pCR as task
+results_class["pCR_accuracy"] = 0
+results_class.loc[results_class.dworak_top_prediction >= 3, "pCR_top_prediction"] = "yes"
+results_class.loc[results_class.dworak_top_prediction < 3, "pCR_top_prediction"] = "no"
+results_class.loc[results_class.dworak_top_prediction < 0, "pCR_top_prediction"] = -1
+
+results_class.loc[results_class.dworak_ground_truth >= 3, "pCR_ground_truth"] = "yes"
+results_class.loc[results_class.dworak_ground_truth < 3, "pCR_ground_truth"] = "no"
+results_class.loc[results_class.dworak_ground_truth < 0, "pCR_ground_truth"] = -1
+
+results_class["pCR_probability_yes"] = (
+    results_class.dworak_probability_3 + results_class.dworak_probability_4
+)
+results_class["pCR_probability_no"] = 1 - results_class.pCR_probability_yes
+
+results_class.pCR_accuracy = (
+    results_class.dworak_ground_truth == results_class.dworak_top_prediction
+).astype(float)
+results_class["pCR_std"] = results_class.dworak_std
 
 results_reg, _ = gather_all_results(task="regression")
 regression_tasks = [c.partition("_rmse")[0] for c in results_reg if c.endswith("_rmse")]
 
+classification_tasks = [
+    c.partition("_accuracy")[0] for c in results_class if "accuracy" in c
+]
+
 # set the experiment type
-experiment_types = ["All", "Single-Center", "Except-One"]
+experiment_types = ["All", "Except-One", "Single-Center"]
 for df in [results_seg, results_class, results_reg]:
     df.loc[df.train_location.apply(lambda x: "Not" in x), "experiment_type"] = "Except-One"
     df.loc[
@@ -81,6 +113,36 @@ for df in [results_seg, results_class, results_reg]:
     ] = "Single-Center"
     df.loc[df.train_location == "all", "experiment_type"] = "All"
     df.experiment_type = pd.Categorical(df.experiment_type, categories=experiment_types)
+
+extended_experiment_types = [
+    "All",
+    "Except-One-Internal",
+    "Except-One-External",
+    "Single-Center-Internal",
+    "Single-Center-External",
+]
+for df in [results_seg, results_class, results_reg]:
+    not_centers = df.train_location.apply(lambda x: "Not" in x)
+    df.loc[
+        not_centers & (~df.external),
+        "extended_experiment_type",
+    ] = "Except-One-Internal"
+    df.loc[
+        not_centers & df.external,
+        "extended_experiment_type",
+    ] = "Except-One-External"
+    df.loc[
+        (~not_centers) & (~df.external),
+        "extended_experiment_type",
+    ] = "Single-Center-Internal"
+    df.loc[
+        (~not_centers) & df.external,
+        "extended_experiment_type",
+    ] = "Single-Center-External"
+    df.loc[df.train_location == "all", "extended_experiment_type"] = "All"
+    df.extended_experiment_type = pd.Categorical(
+        df.extended_experiment_type, categories=extended_experiment_types
+    )
 
 # %%
 
@@ -92,6 +154,7 @@ for class_task in classification_tasks:
     res_tsk = results_class.groupby(
         [
             "experiment_type",
+            "extended_experiment_type",
             "train_location",
             "normalization",
             "name",
@@ -168,16 +231,16 @@ new_names = {
     "Not-Mannheim": "Not Center 3",
 }
 norm_order = [
+    "Perc",
+    "HM",
+    "Perc-HM",
+    "M-Std",
+    "Win",
     "GAN-Def",
     "GAN-Seg",
     "GAN-Img",
     "GAN-Win",
     "GAN-No-ed",
-    "Perc",
-    "Perc-HM",
-    "HM",
-    "M-Std",
-    "Win",
 ]
 external_order = ["test", False, True]
 
@@ -196,6 +259,7 @@ for df in [
     df.normalization = df.normalization.cat.remove_categories(
         [c for c in df.normalization.cat.categories if c not in norm_order]
     )
+    df.normalization = df.normalization.cat.reorder_categories(norm_order)
 
 # for some reason, drop does not work
 results_seg_new_names = results_seg_new_names[results_seg_new_names.normalization.notna()]
@@ -208,13 +272,6 @@ results_class_task_new_names = results_class_task_new_names[
 results_reg_new_names = results_reg_new_names[results_reg_new_names.normalization.notna()]
 
 # %%
-
-
-def turn_ticks(axes_to_turn):
-    for label in axes_to_turn.get_xticklabels():
-        label.set_ha("right")
-        label.set_rotation(40)
-
 
 for experiment_type in experiment_types:
 
@@ -371,7 +428,7 @@ plt.show()
 plt.close()
 # %%
 
-print("Performance in all experiments")
+print("Performance in all experiments as bar graph")
 
 fig, axes = plt.subplots(nrows=2, ncols=3, figsize=(20 / 2.54, 16 / 2.54))
 
@@ -387,47 +444,51 @@ data_class = data_class[
 ]
 data_reg = data_reg[np.logical_or(data_reg.external, data_reg.experiment_type == "All")]
 
+bar_settings = dict(
+    errwidth=1,
+    hue="experiment_type",
+    hue_order=experiment_types,
+)
+
 sns.barplot(
     data=data_seg.query("do_batch_normalization"),
     x="normalization",
     y="Dice",
-    hue="experiment_type",
-    hue_order=experiment_types,
     ax=axes[0, 0],
+    **bar_settings,
 )
 axes[0, 0].set_title("Segmentation Batch Norm")
 turn_ticks(axes[0, 0])
 axes[0, 0].legend([], [], frameon=False)
-axes[0, 0].set_ylim(0, 0.75)
+axes[0, 0].set_ylim(0, 0.8)
 
 sns.barplot(
     data=data_seg.query("not do_batch_normalization"),
     x="normalization",
     y="Dice",
-    hue="experiment_type",
     ax=axes[0, 1],
+    **bar_settings,
 )
 axes[0, 1].set_title("Segmentation without Batch Norm")
 turn_ticks(axes[0, 1])
 axes[0, 1].legend([], [], frameon=False)
-axes[0, 1].set_ylim(0, 0.75)
+axes[0, 1].set_ylim(0, 0.8)
 
 for ax, task in zip(axes.flat[2:], good_classification_tasks):
     sns.barplot(
         data=data_class.query(f"task == '{task}'"),
         x="normalization",
         y="auc_ovo",
-        hue="experiment_type",
-        hue_order=experiment_types,
         ax=ax,
+        **bar_settings,
     )
     ax.set_title(task.replace("_", " ").capitalize())
     ax.set_ylabel("AUC")
     turn_ticks(ax)
     if task != "sex":
         ax.legend([], [], frameon=False)
-axes[0, 2].set_ylim(0.46, 1)
-axes[1, 0].set_ylim(0.46, 0.7)
+axes[0, 2].set_ylim(0.2, 1)
+axes[1, 0].set_ylim(0.45, 0.7)
 
 legend = axes[0, 2].legend(
     bbox_to_anchor=(0, 0),
@@ -440,9 +501,8 @@ sns.barplot(
     data=data_reg,
     x="normalization",
     y="age_rmse",
-    hue="experiment_type",
-    hue_order=experiment_types,
     ax=axes[1, 1],
+    **bar_settings,
 )
 axes[1, 1].set_title("Age")
 axes[1, 1].set_ylabel("RMSE")
@@ -457,6 +517,423 @@ legend.set(bbox_to_anchor=[-0.0, -1.45, 0, 1])
 save_pub("all_experiment_types_summary_bars")
 plt.show()
 plt.close()
+
+# %%
+
+print("Performance in all experiments as bar graph without nBN")
+
+fig, axes = plt.subplots(nrows=2, ncols=2, figsize=(16 / 2.54, 16 / 2.54))
+
+data_seg = results_seg_new_names.query(
+    "before_therapy & postprocessed & name != 'combined_models' & version == 'best'"
+).copy()
+data_class = results_class_task_new_names.query("version == 'best'").copy()
+data_reg = results_reg_new_names.query("version == 'best'").copy()
+
+data_seg = data_seg[np.logical_or(data_seg.external, data_seg.experiment_type == "All")]
+data_class = data_class[
+    np.logical_or(data_class.external, data_class.experiment_type == "All")
+]
+data_reg = data_reg[np.logical_or(data_reg.external, data_reg.experiment_type == "All")]
+
+bar_settings = dict(
+    errwidth=1,
+    hue="experiment_type",
+    hue_order=experiment_types,
+)
+
+sns.barplot(
+    data=data_seg.query("do_batch_normalization"),
+    x="normalization",
+    y="Dice",
+    ax=axes[0, 0],
+    **bar_settings,
+)
+axes[0, 0].set_title("Segmentation")
+turn_ticks(axes[0, 0])
+axes[0, 0].legend([], [], frameon=False)
+axes[0, 0].set_ylim(0, 0.8)
+
+for ax, task in zip(axes.flat[1:], good_classification_tasks):
+    sns.barplot(
+        data=data_class.query(f"task == '{task}'"),
+        x="normalization",
+        y="auc_ovo",
+        ax=ax,
+        **bar_settings,
+    )
+    ax.set_title(task.replace("_", " ").capitalize())
+    ax.set_ylabel("AUC")
+    turn_ticks(ax)
+    if task != "sex":
+        ax.legend([], [], frameon=False)
+axes[0, 1].set_ylim(0.2, 1)
+axes[1, 0].set_ylim(0.45, 0.7)
+
+sns.barplot(
+    data=data_reg,
+    x="normalization",
+    y="age_rmse",
+    ax=axes[1, 1],
+    **bar_settings,
+)
+axes[1, 1].set_title("Age")
+axes[1, 1].set_ylabel("RMSE")
+turn_ticks(axes[1, 1])
+axes[1, 1].set_ylim(10, 20)
+axes[1, 1].legend([], [], frameon=False)
+
+plt.tight_layout()
+axes[0, 1].legend().set(
+    bbox_to_anchor=[0.95, 0, 0, 1],
+    title="Experiment Type",
+)
+save_pub("all_experiment_types_summary_bars_nnBN")
+plt.show()
+plt.close()
+# %%
+
+print("Performance in all experiments as par graph with extended experiments")
+
+fig, axes = plt.subplots(nrows=2, ncols=3, figsize=(20 / 2.54, 16 / 2.54))
+
+data_seg = results_seg_new_names.query(
+    "before_therapy & postprocessed & name != 'combined_models' & version == 'best'"
+).copy()
+data_class = results_class_task_new_names.query("version == 'best'").copy()
+data_reg = results_reg_new_names.query("version == 'best'").copy()
+
+bar_settings = dict(
+    errwidth=0.8,
+    hue="extended_experiment_type",
+    hue_order=extended_experiment_types,
+)
+
+sns.barplot(
+    data=data_seg.query("do_batch_normalization"),
+    x="normalization",
+    y="Dice",
+    ax=axes[0, 0],
+    **bar_settings,
+)
+axes[0, 0].set_title("Segmentation Batch Norm")
+turn_ticks(axes[0, 0])
+axes[0, 0].legend([], [], frameon=False)
+axes[0, 0].set_ylim(0, 0.8)
+
+sns.barplot(
+    data=data_seg.query("not do_batch_normalization"),
+    x="normalization",
+    y="Dice",
+    ax=axes[0, 1],
+    **bar_settings,
+)
+axes[0, 1].set_title("Segmentation without Batch Norm")
+turn_ticks(axes[0, 1])
+axes[0, 1].legend([], [], frameon=False)
+axes[0, 1].set_ylim(0, 0.8)
+
+for ax, task in zip(axes.flat[2:], good_classification_tasks):
+    sns.barplot(
+        data=data_class.query(f"task == '{task}'"),
+        x="normalization",
+        y="auc_ovo",
+        ax=ax,
+        **bar_settings,
+    )
+    ax.set_title(task.replace("_", " ").capitalize())
+    ax.set_ylabel("AUC")
+    turn_ticks(ax)
+    if task != "sex":
+        ax.legend([], [], frameon=False)
+axes[0, 2].set_ylim(0.2, 1)
+axes[1, 0].set_ylim(0.45, 0.7)
+
+legend = axes[0, 2].legend(
+    bbox_to_anchor=(0, 0),
+    loc="upper left",
+    borderaxespad=0,
+    title="Experiment Type",
+)
+
+sns.barplot(
+    data=data_reg,
+    x="normalization",
+    y="age_rmse",
+    **bar_settings,
+    ax=axes[1, 1],
+)
+axes[1, 1].set_title("Age")
+axes[1, 1].set_ylabel("RMSE")
+turn_ticks(axes[1, 1])
+axes[1, 1].set_ylim(10, 20)
+axes[1, 1].legend([], [], frameon=False)
+
+axes[1, 2].remove()
+
+plt.tight_layout()
+legend.set(bbox_to_anchor=[-0.0, -1.45, 0, 1])
+save_pub("all_extended_experiment_types_summary_bars")
+plt.show()
+plt.close()
+
+# %%
+
+print("Performance in all experiments as par graph with extended experiments without nBN")
+
+fig, axes = plt.subplots(nrows=2, ncols=2, figsize=(20 / 2.54, 16 / 2.54))
+
+data_seg = results_seg_new_names.query(
+    "before_therapy & postprocessed & name != 'combined_models' & version == 'best'"
+).copy()
+data_class = results_class_task_new_names.query("version == 'best'").copy()
+data_reg = results_reg_new_names.query("version == 'best'").copy()
+
+bar_settings = dict(
+    errwidth=1,
+    hue="extended_experiment_type",
+    hue_order=extended_experiment_types,
+)
+
+sns.barplot(
+    data=data_seg.query("do_batch_normalization"),
+    x="normalization",
+    y="Dice",
+    ax=axes[0, 0],
+    **bar_settings,
+)
+axes[0, 0].set_title("Segmentation")
+turn_ticks(axes[0, 0])
+axes[0, 0].legend([], [], frameon=False)
+axes[0, 0].set_ylim(0, 0.8)
+
+for ax, task in zip(axes.flat[1:], good_classification_tasks):
+    sns.barplot(
+        data=data_class.query(f"task == '{task}'"),
+        x="normalization",
+        y="auc_ovo",
+        ax=ax,
+        **bar_settings,
+    )
+    ax.set_title(task.replace("_", " ").capitalize())
+    ax.set_ylabel("AUC")
+    turn_ticks(ax)
+    if task != "sex":
+        ax.legend([], [], frameon=False)
+axes[0, 1].set_ylim(0.2, 1)
+axes[1, 0].set_ylim(0.45, 0.7)
+
+sns.barplot(
+    data=data_reg,
+    x="normalization",
+    y="age_rmse",
+    ax=axes[1, 1],
+    **bar_settings,
+)
+axes[1, 1].set_title("Age")
+axes[1, 1].set_ylabel("RMSE")
+turn_ticks(axes[1, 1])
+axes[1, 1].set_ylim(10, 20)
+axes[1, 1].legend([], [], frameon=False)
+
+plt.tight_layout()
+axes[0, 1].legend().set(
+    bbox_to_anchor=[0.97, 0, 0, 1],
+    title="Experiment Type",
+)
+save_pub("all_extended_experiment_types_summary_bars_nnBN")
+plt.show()
+plt.close()
+# %%
+
+print("Make a table")
+
+results_seg = results_seg_new_names.query(
+    "before_therapy & postprocessed & name != 'combined_models' & version == 'best'"
+).copy()
+data_class = results_class_task_new_names.query("version == 'best'").copy()
+data_reg = results_reg_new_names.query("version == 'best'").copy()
+
+res_table_list = []
+
+res_table_list.append(
+    results_seg.query("do_batch_normalization")
+    .groupby(["normalization", "extended_experiment_type"])
+    .Dice.mean()
+    .unstack(level=0)
+    .round(2)
+)
+res_table_list.append(
+    results_seg.query("not do_batch_normalization")
+    .groupby(["normalization", "extended_experiment_type"])
+    .Dice.mean()
+    .unstack(level=0)
+    .round(2)
+)
+
+for ax, task in zip(axes.flat[2:], good_classification_tasks):
+    res_table_list.append(
+        data_class.query(f"task == '{task}'")
+        .groupby(["normalization", "extended_experiment_type"])
+        .auc_ovo.mean()
+        .unstack(level=0)
+        .round(2)
+    )
+    data = data_class.query(f"task == '{task}'")
+
+res_table_list.append(
+    data_reg.groupby(["normalization", "extended_experiment_type"])
+    .age_rmse.mean()
+    .unstack(level=0)
+    .round(2)
+)
+
+res_table = pd.concat(res_table_list)
+display_dataframe(res_table)
+
+# %%
+
+print("Make a reduced table without nBN")
+
+results_seg = results_seg_new_names.query(
+    "before_therapy & postprocessed & name != 'combined_models' & version == 'best'"
+    + " & (experiment_type == 'All' or experiment_type == 'Except-One')"
+).copy()
+data_class = results_class_task_new_names.query(
+    "version == 'best' & (experiment_type == 'All' or experiment_type == 'Except-One')"
+).copy()
+data_reg = results_reg_new_names.query(
+    "version == 'best' & (experiment_type == 'All' or experiment_type == 'Except-One')"
+).copy()
+
+
+res_table = pd.DataFrame(
+    index=results_seg.normalization.cat.categories,
+    columns=pd.MultiIndex.from_product(
+        [
+            ["Segmentation", "Sex", "Dworak", "Age"],
+            ["All", "Except-One-Internal", "Except-One-External"],
+        ]
+    ),
+)
+
+res_table["Segmentation"] = (
+    results_seg.query("do_batch_normalization")
+    .groupby(["normalization", "extended_experiment_type"])
+    .Dice.mean()
+    .dropna()
+    .unstack(level=1)
+    .round(2)
+)
+
+res_table["Sex"] = (
+    data_class.query("task == 'sex'")
+    .groupby(["normalization", "extended_experiment_type"])
+    .auc_ovo.mean()
+    .dropna()
+    .unstack(level=1)
+    .round(2)
+)
+
+res_table["Dworak"] = (
+    data_class.query("task == 'dworak'")
+    .groupby(["normalization", "extended_experiment_type"])
+    .auc_ovo.mean()
+    .dropna()
+    .unstack(level=1)
+    .round(2)
+)
+
+res_table["Age"] = (
+    data_reg.groupby(["normalization", "extended_experiment_type"])
+    .age_rmse.mean()
+    .dropna()
+    .unstack(level=1)
+    .round(2)
+)
+
+styler = res_table.style
+styler = styler.format(precision=2)
+display_dataframe(styler)
+print(
+    styler.to_latex(
+        convert_css=True,
+        caption="Caption.",
+        label="results_table",
+    )
+)
+
+# %%
+
+print("Make a reduced table without nBN without internal data")
+
+results_seg = results_seg_new_names.query(
+    "before_therapy & postprocessed & name != 'combined_models' & version == 'best'"
+    + " & (experiment_type == 'All' or external)"
+).copy()
+data_class = results_class_task_new_names.query(
+    "version == 'best' & (experiment_type == 'All' or external)"
+).copy()
+data_reg = results_reg_new_names.query(
+    "version == 'best' & (experiment_type == 'All' or external)"
+).copy()
+
+
+res_table = pd.DataFrame(
+    index=results_seg.normalization.cat.categories,
+    columns=pd.MultiIndex.from_product(
+        [
+            ["Segmentation", "Sex", "Dworak", "Age"],
+            ["All", "Except-One-External", "Single-Center-External"],
+        ]
+    ),
+)
+
+res_table["Segmentation"] = (
+    results_seg.query("do_batch_normalization")
+    .groupby(["normalization", "extended_experiment_type"])
+    .Dice.mean()
+    .dropna()
+    .unstack(level=1)
+    .round(2)
+)
+
+res_table["Sex"] = (
+    data_class.query("task == 'sex'")
+    .groupby(["normalization", "extended_experiment_type"])
+    .auc_ovo.mean()
+    .dropna()
+    .unstack(level=1)
+    .round(2)
+)
+
+res_table["Dworak"] = (
+    data_class.query("task == 'dworak'")
+    .groupby(["normalization", "extended_experiment_type"])
+    .auc_ovo.mean()
+    .dropna()
+    .unstack(level=1)
+    .round(2)
+)
+
+res_table["Age"] = (
+    data_reg.groupby(["normalization", "extended_experiment_type"])
+    .age_rmse.mean()
+    .dropna()
+    .unstack(level=1)
+    .round(2)
+)
+
+styler = res_table.style
+styler = styler.format(precision=2)
+display_dataframe(styler)
+print(
+    styler.to_latex(
+        convert_css=True,
+        caption="Caption.",
+        label="results_table",
+    )
+)
 
 # %%
 
@@ -480,13 +957,24 @@ for experiment_type in experiment_types:
                 grouped_data, f"{experiment_type} - {ext} - Segmentation", "Dice"
             )
 
+    if experiment_type == "All":
+        grouped_data = data_seg.query("do_batch_normalization").groupby("normalization")
+        plot_significance(grouped_data, f"{experiment_type} - Segmentation - BN", "Dice")
+    else:
+        for ext in ["not external", "external"]:
+            data_seg_ext = data_seg.query(ext)
+            grouped_data = data_seg_ext.query("do_batch_normalization").groupby(
+                "normalization"
+            )
+            plot_significance(
+                grouped_data, f"{experiment_type} - {ext} - Segmentation - BN", "Dice"
+            )
+
     for task in good_classification_tasks:
         data_class = results_class_task_new_names.query(
             f"experiment_type == '{experiment_type}' & version == 'best' & task == '{task}'"
         )
         # only use first label to not overstate the significance
-        first_label = data_class.label.unique()[0]
-        data_class = data_class.query(f"label == '{first_label}'")
         if experiment_type == "All":
             grouped_data = data_class.groupby(["normalization"])
             plot_significance(grouped_data, f"{experiment_type} - {task}", "auc_ovo")
@@ -520,28 +1008,28 @@ sns.histplot(
     hue="location",
     x="pixel_spacing",
     multiple="stack",
-    binwidth=0.2,
-    binrange=(0, 1.8),
+    bins=np.arange(0.25, 1.66, 0.1),
     hue_order=[f"Center {i}" for i in range(1, 7)],
     ax=axes[0],
     legend=False,
 )
 axes[0].set_xlabel("in-plane resolution (mm)")
+axes[0].set_ylim(-4, 250)
 
 sns.histplot(
     data=acquisition_params.replace(new_names),
     hue="location",
     x="echo_time",
     multiple="stack",
-    binwidth=10,
-    binrange=(55, 155),
+    bins=np.arange(65, 226, 10),
     hue_order=[f"Center {i}" for i in range(1, 7)],
     ax=axes[1],
     legend=True,
 )
 axes[1].set_xlabel("echo time (ms)")
+axes[1].set_ylim(-4, 250)
 
-axes[1].get_legend().set(bbox_to_anchor=[0.9, 0, 0, 1], title="Location")
+axes[1].get_legend().set(bbox_to_anchor=[0.56, 0, 0, 1], title="Location")
 
 titles = [
     "A",
@@ -1075,6 +1563,7 @@ save_pub("GAN-Def", bbox_inches=Bbox.from_extents(-0.8, 1.9, 10.5, 8.3))
 # %%
 # plot means and std
 mean_stds_list = []
+n_labels = []
 modalities = ["T2w", "b800", "ADC"]
 for lbl, data in tqdm(orig_dataset.items()):
     image_paths = [data_dir / p for p in data["images"]]
@@ -1091,6 +1580,15 @@ for lbl, data in tqdm(orig_dataset.items()):
         }
         for img, mod in zip(images_np, modalities)
     ]
+    if "labels" in data:
+        labels_image = sitk.ReadImage(str(data_dir / data["labels"]))
+        labels_image_np = sitk.GetArrayFromImage(labels_image)
+        n_labels.append((labels_image_np == 1).sum())
+
+print(f"Average number of segmentation labels per image: {np.mean(n_labels):.0f}")
+print(f"Median number of segmentation labels per image: {np.median(n_labels):.0f}")
+labels_pp = np.sum(n_labels) / len(set(d.partition("_")[0] for d in orig_dataset))
+print(f"Average number of segmentation labels per patient: {labels_pp:.0f}")
 
 mean_stds = pd.DataFrame(mean_stds_list)
 mean_stds["patientID"] = mean_stds["Name"].str.partition("_")[0]

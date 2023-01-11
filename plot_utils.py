@@ -367,7 +367,8 @@ def plot_significance(grouped_data, name: str, metric: str):
                 text = f"{significance.values[i, j]:0.2f}"
             ax.text(j, i, text, ha="center", va="center", color="black")
 
-    ax.set_title(f"{name} - P-values (green > 0.05, red < 0.05)")
+    ax.set_title(f"{name} - P-values (green < 0.05, red > 0.05)")
+    plt.grid(False)
     fig.tight_layout()
     plt.show()
     plt.close()
