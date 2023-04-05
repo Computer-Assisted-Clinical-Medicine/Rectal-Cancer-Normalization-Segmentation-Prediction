@@ -176,12 +176,12 @@ if __name__ == "__main__":
         "attention": False,
         "encoder_attention": None,
     }
-    np_UNet_nb = copy.deepcopy(np_UNet)
-    np_UNet_nb["do_batch_normalization"] = False
+    # np_UNet_nb = copy.deepcopy(np_UNet)
+    # np_UNet_nb["do_batch_normalization"] = False
 
     np_ResNet = {"weights": None, "resnet_type": "ResNet50"}
 
-    network_parameters = [np_ResNet, np_UNet, np_UNet_nb]
+    network_parameters = [np_ResNet, np_UNet]  # , np_UNet_nb]
     architectures = [ResNet, UNet, UNet]
 
     hyper_parameters_new = []
@@ -397,6 +397,9 @@ if __name__ == "__main__":
     additional_info: List[Dict[str, Any]] = []
 
     for location in [
+        "Frankfurt-all",
+        "Regensburg-all",
+        "Mannheim-all",
         "Frankfurt",
         "Regensburg",
         "Mannheim",
@@ -423,6 +426,7 @@ if __name__ == "__main__":
 
             if location == "all":
                 query = "index == index"  # pylint:disable=invalid-name
+                query_norm = query  # pylint:disable=invalid-name
                 N_EPOCHS = 100
             elif location in timepoints_to_use.location.unique():
                 if location == "Mannheim":
@@ -430,19 +434,42 @@ if __name__ == "__main__":
                 else:
                     query = f"'{location}' in location"
                 N_EPOCHS = 200
+                query_norm = query  # pylint:disable=invalid-name
             elif "Not" in location:
                 if location == "Not-Mannheim":
                     query = "location not in ('Mannheim', 'Mannheim-not-from-study')"  # pylint:disable=invalid-name
                 else:
                     query = f"'{location.partition('-')[2]}' != location"
+                query_norm = query
                 N_EPOCHS = 100
+            elif "all" in location:
+                if location == "Mannheim-all":
+                    query = "location in ('Mannheim', 'Mannheim-not-from-study')"  # pylint:disable=invalid-name
+                else:
+                    query = f"'{location[:-4]}' in location"
+                query_norm = "index == index"  # pylint:disable=invalid-name
+                N_EPOCHS = 200
 
             timepoints_train = timepoints_to_use.query(query).index
-            timepoints_train_norm = timepoints.query(query).index
+            timepoints_train_norm = timepoints.query(query_norm).index
 
             experiment_group_name = f"Normalization_{location}"
+
+            # set a name for the preprocessing dir
+            # so the same method will also use the same directory
+            pre_params = hyp["preprocessing_parameters"]
+            norm_type = pre_params["normalizing_method"]
+
+            if "all" in location and not norm_type == GAN_NORMALIZING.GAN_DISCRIMINATORS:
+                continue
+
             current_exp_dir = experiment_dir / experiment_group_name
             group_dir_rel = Path(GROUP_BASE_NAME) / experiment_group_name
+
+            if "all" in location:
+                group_dir_norm = Path(GROUP_BASE_NAME) / "Normalization_all"
+            else:
+                group_dir_norm = group_dir_rel
 
             if hyp["architecture"] is ResNet:
 
@@ -472,11 +499,6 @@ if __name__ == "__main__":
 
             # define experiment (not a constant)
             experiment_name = generate_folder_name(hyp)  # pylint: disable=invalid-name
-
-            # set a name for the preprocessing dir
-            # so the same method will also use the same directory
-            pre_params = hyp["preprocessing_parameters"]
-            norm_type = pre_params["normalizing_method"]
 
             if norm_type == GAN_NORMALIZING.GAN_DISCRIMINATORS:
                 # make the base dat set
@@ -513,7 +535,7 @@ if __name__ == "__main__":
                                 timepoints_train=timepoints_train_norm,
                                 mod_num=mod_num,
                                 preprocessed_dir=PREPROCESSED_DIR,
-                                experiment_group=group_dir_rel,
+                                experiment_group=group_dir_norm,
                                 modality=MODALITIES[mod_num],
                                 gan_suffix=gan_suffix,
                                 n_epochs=N_EPOCHS,
@@ -542,7 +564,7 @@ if __name__ == "__main__":
                 NORMALIZING.HM_QUANTILE,
             ]:
                 preprocessed_dir_exp = (
-                    group_dir_rel / "data_preprocessed" / preprocessing_name
+                    group_dir_norm / "data_preprocessed" / preprocessing_name
                 )
             else:
                 preprocessed_dir_exp = PREPROCESSED_DIR / preprocessing_name
