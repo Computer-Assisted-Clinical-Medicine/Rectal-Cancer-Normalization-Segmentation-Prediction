@@ -6,12 +6,14 @@
 import os
 from pathlib import Path
 
+import matplotlib
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import seaborn as sns
 import SimpleITK as sitk
 import yaml
+from IPython import display
 from matplotlib.transforms import Bbox
 from tqdm import tqdm
 
@@ -34,28 +36,56 @@ def save_pub(filename, **kwargs):
         pub_dir.mkdir()
     plt.savefig(pub_dir / f"{filename}.png", dpi=600, **kwargs)
     plt.savefig(pub_dir / f"{filename}.eps", dpi=600, **kwargs)
-    plt.show()
+    plt.savefig(pub_dir / f"{filename}.pgf", dpi=600, **kwargs)
+
     plt.close()
+    display.display(display.Image(filename=pub_dir / f"{filename}.png"))
+
+
+def hatch_plot(plot_ax, hatches=None):
+    """Add hatches to a plot"""
+    if hatches is None:
+        hatches = ["--", "x", "\\", "/", "o", ".", "+", "*", "O"]
+    # Loop over the bars
+    for bars, hatch in zip(plot_ax.containers, hatches):
+        # Set a different hatch for each group of bars
+        for bar in bars:
+            bar.set_hatch(hatch)
 
 
 # %%
 
-sns.set_style("whitegrid")
+matplotlib.use("pgf")
+sns.set_style()
+sns.set_context("paper")
 plt.style.use("seaborn-paper")
 
 SMALL_SIZE = 8
 MEDIUM_SIZE = 10
 BIGGER_SIZE = 12
 
-plt.rc("font", size=SMALL_SIZE)  # controls default text sizes
-plt.rc("axes", titlesize=SMALL_SIZE)  # fontsize of the axes title
-plt.rc("axes", labelsize=SMALL_SIZE)  # fontsize of the x and y labels
+plt.rc("font", size=MEDIUM_SIZE)  # controls default text sizes
+plt.rc("axes", titlesize=MEDIUM_SIZE)  # fontsize of the axes title
+plt.rc("axes", labelsize=MEDIUM_SIZE)  # fontsize of the x and y labels
 plt.rc("xtick", labelsize=SMALL_SIZE)  # fontsize of the tick labels
 plt.rc("ytick", labelsize=SMALL_SIZE)  # fontsize of the tick labels
 plt.rc("legend", fontsize=SMALL_SIZE)  # legend fontsize
 plt.rc("figure", titlesize=BIGGER_SIZE)  # fontsize of the figure title
+
+plt.rcParams["axes.grid"] = True
+plt.rcParams["axes.axisbelow"] = True
+
 plt.rcParams["font.family"] = "serif"
 plt.rcParams["font.serif"] = ["Times New Roman"]
+
+plt.rcParams["pgf.texsystem"] = "pdflatex"
+plt.rcParams["text.usetex"] = True
+plt.rcParams["pgf.rcfonts"] = False
+
+sns.set_palette(
+    sns.color_palette(["#21a7bf", "#d75109", "#34c165", "#f29e02", "#9d060d", "#515b34"])
+)
+hatch_palette = ["--", "x", "\\", "*", "o", "O", ".", "+"]
 
 # %%
 
@@ -124,19 +154,19 @@ extended_experiment_types = [
 for df in [results_seg, results_class, results_reg]:
     not_centers = df.train_location.apply(lambda x: "Not" in x)
     df.loc[
-        not_centers & (~df.external),
+        (df.experiment_type == "Except-One") & (~df.external),
         "extended_experiment_type",
     ] = "Except-One-Internal"
     df.loc[
-        not_centers & df.external,
+        (df.experiment_type == "Except-One") & df.external,
         "extended_experiment_type",
     ] = "Except-One-External"
     df.loc[
-        (~not_centers) & (~df.external),
+        (df.experiment_type == "Single-Center") & (~df.external),
         "extended_experiment_type",
     ] = "Single-Center-Internal"
     df.loc[
-        (~not_centers) & df.external,
+        (df.experiment_type == "Single-Center") & df.external,
         "extended_experiment_type",
     ] = "Single-Center-External"
     df.loc[df.train_location == "all", "extended_experiment_type"] = "All"
@@ -522,7 +552,7 @@ plt.close()
 
 print("Performance in all experiments as bar graph without nBN")
 
-fig, axes = plt.subplots(nrows=2, ncols=2, figsize=(16 / 2.54, 16 / 2.54))
+fig, axes = plt.subplots(nrows=2, ncols=2, figsize=(5.46, 5.46))
 
 data_seg = results_seg_new_names.query(
     "before_therapy & postprocessed & name != 'combined_models' & version == 'best'"
@@ -588,12 +618,15 @@ axes[0, 1].legend().set(
     bbox_to_anchor=[0.95, 0, 0, 1],
     title="Experiment Type",
 )
-save_pub("all_experiment_types_summary_bars_nnBN")
+save_pub(
+    "all_experiment_types_summary_bars_nnBN",
+    bbox_inches=Bbox.from_extents(0.1, 0.1, 6.5, 5.36),
+)
 plt.show()
 plt.close()
 # %%
 
-print("Performance in all experiments as par graph with extended experiments")
+print("Performance in all experiments as bar graph with extended experiments")
 
 fig, axes = plt.subplots(nrows=2, ncols=3, figsize=(20 / 2.54, 16 / 2.54))
 
@@ -869,14 +902,9 @@ print("Make a reduced table without nBN without internal data")
 
 results_seg = results_seg_new_names.query(
     "before_therapy & postprocessed & name != 'combined_models' & version == 'best'"
-    + " & (experiment_type == 'All' or external)"
 ).copy()
-data_class = results_class_task_new_names.query(
-    "version == 'best' & (experiment_type == 'All' or external)"
-).copy()
-data_reg = results_reg_new_names.query(
-    "version == 'best' & (experiment_type == 'All' or external)"
-).copy()
+data_class = results_class_task_new_names.query("version == 'best'").copy()
+data_reg = results_reg_new_names.query("version == 'best'").copy()
 
 
 res_table = pd.DataFrame(
@@ -884,7 +912,13 @@ res_table = pd.DataFrame(
     columns=pd.MultiIndex.from_product(
         [
             ["Segmentation", "Sex", "Dworak", "Age"],
-            ["All", "Except-One-External", "Single-Center-External"],
+            [
+                "All",
+                "Except-One-Internal",
+                "Except-One-External",
+                "Single-Center-Internal",
+                "Single-Center-External",
+            ],
         ]
     ),
 )
@@ -895,7 +929,7 @@ res_table["Segmentation"] = (
     .Dice.mean()
     .dropna()
     .unstack(level=1)
-    .round(2)
+    .round(3)
 )
 
 res_table["Sex"] = (
@@ -904,7 +938,7 @@ res_table["Sex"] = (
     .auc_ovo.mean()
     .dropna()
     .unstack(level=1)
-    .round(2)
+    .round(3)
 )
 
 res_table["Dworak"] = (
@@ -913,7 +947,7 @@ res_table["Dworak"] = (
     .auc_ovo.mean()
     .dropna()
     .unstack(level=1)
-    .round(2)
+    .round(3)
 )
 
 res_table["Age"] = (
@@ -921,11 +955,84 @@ res_table["Age"] = (
     .age_rmse.mean()
     .dropna()
     .unstack(level=1)
-    .round(2)
+    .round(3)
 )
 
 styler = res_table.style
-styler = styler.format(precision=2)
+styler = styler.format(precision=3)
+display_dataframe(styler)
+print(
+    styler.to_latex(
+        convert_css=True,
+        caption="Caption.",
+        label="results_table",
+    )
+)
+
+# %%
+
+print("Make a reduced table for the error without nBN without internal data")
+
+results_seg = results_seg_new_names.query(
+    "before_therapy & postprocessed & name != 'combined_models' & version == 'best'"
+).copy()
+data_class = results_class_task_new_names.query("version == 'best'").copy()
+data_reg = results_reg_new_names.query("version == 'best'").copy()
+
+
+res_table = pd.DataFrame(
+    index=results_seg.normalization.cat.categories,
+    columns=pd.MultiIndex.from_product(
+        [
+            ["Segmentation", "Sex", "Dworak", "Age"],
+            [
+                "All",
+                "Except-One-Internal",
+                "Except-One-External",
+                "Single-Center-Internal",
+                "Single-Center-External",
+            ],
+        ]
+    ),
+)
+
+res_table["Segmentation"] = (
+    results_seg.query("do_batch_normalization")
+    .groupby(["normalization", "extended_experiment_type"])
+    .Dice.sem()
+    .dropna()
+    .unstack(level=1)
+    .round(3)
+)
+
+res_table["Sex"] = (
+    data_class.query("task == 'sex'")
+    .groupby(["normalization", "extended_experiment_type"])
+    .auc_ovo.sem()
+    .dropna()
+    .unstack(level=1)
+    .round(3)
+)
+
+res_table["Dworak"] = (
+    data_class.query("task == 'dworak'")
+    .groupby(["normalization", "extended_experiment_type"])
+    .auc_ovo.sem()
+    .dropna()
+    .unstack(level=1)
+    .round(3)
+)
+
+res_table["Age"] = (
+    data_reg.groupby(["normalization", "extended_experiment_type"])
+    .age_rmse.sem()
+    .dropna()
+    .unstack(level=1)
+    .round(3)
+)
+
+styler = res_table.style
+styler = styler.format(precision=3)
 display_dataframe(styler)
 print(
     styler.to_latex(
@@ -939,7 +1046,7 @@ print(
 
 print("Look for significance")
 
-for experiment_type in experiment_types:
+for experiment_type in ["Single-Center"]:  # experiment_types:
     display_markdown(f"### {experiment_type}")
 
     data_seg = results_seg_new_names.query(
@@ -1001,7 +1108,94 @@ for experiment_type in experiment_types:
 
 print("Acquisition parameters")
 
-fig, axes = plt.subplots(nrows=1, ncols=2, sharex=False, sharey=True, figsize=(5, 2.3))
+fig, axes = plt.subplots(nrows=1, ncols=1, figsize=(5.46 / 2, 2.3))
+sns.histplot(
+    data=acquisition_params.query("location != 'Mannheim-not-from-study'").replace(
+        new_names
+    ),
+    hue="location",
+    x="pixel_spacing",
+    multiple="stack",
+    bins=np.arange(0.25, 1.66, 0.1),
+    hue_order=[f"Center {i}" for i in range(1, 7)],
+    legend=False,
+    ax=axes,
+)
+plt.xlabel("in-plane resolution (mm)")
+plt.ylim(-4, 175)
+# hatch_plot(axes)
+save_pub("params_pixel_spacing", bbox_inches="tight")
+
+fig, axes = plt.subplots(nrows=1, ncols=1, figsize=(5.46 / 2, 2.3))
+sns.histplot(
+    data=acquisition_params.query("location != 'Mannheim-not-from-study'").replace(
+        new_names
+    ),
+    hue="location",
+    x="echo_time",
+    multiple="stack",
+    bins=np.arange(65, 226, 10),
+    hue_order=[f"Center {i}" for i in range(1, 7)],
+    legend=True,
+    ax=axes,
+)
+plt.xlabel("echo time (ms)")
+plt.ylim(-4, 175)
+# hatch_plot(axes)
+save_pub("params_echo_time", bbox_inches="tight")
+
+fig, axes = plt.subplots(nrows=1, ncols=1, figsize=(5.46 / 2, 2.3))
+sns.histplot(
+    data=acquisition_params.query("location != 'Mannheim-not-from-study'").replace(
+        new_names
+    ),
+    hue="location",
+    x="flip_angle",
+    multiple="stack",
+    bins=np.arange(85, 186, 10),
+    hue_order=[f"Center {i}" for i in range(1, 7)],
+    legend=False,
+    ax=axes,
+)
+plt.xlabel("flip angle (°)")
+plt.ylim(-4, 175)
+save_pub("params_flip_angle", bbox_inches="tight")
+
+fig, axes = plt.subplots(nrows=1, ncols=1, figsize=(5.46 / 2, 2.3))
+sns.histplot(
+    data=acquisition_params.query("location != 'Mannheim-not-from-study'").replace(
+        new_names
+    ),
+    hue="location",
+    x="repetition_time",
+    multiple="stack",
+    bins=np.arange(500, 13000, 1000),
+    hue_order=[f"Center {i}" for i in range(1, 7)],
+    legend=False,
+    ax=axes,
+)
+plt.xlabel("repetition time (ms)")
+plt.ylim(-4, 175)
+save_pub("params_repetition_time", bbox_inches="tight")
+
+fig, axes = plt.subplots(nrows=1, ncols=1, figsize=(5.46 / 2, 2.3))
+sns.histplot(
+    data=acquisition_params.query("location != 'Mannheim-not-from-study'").replace(
+        new_names
+    ),
+    hue="location",
+    x="slice_thickness",
+    multiple="stack",
+    bins=np.arange(0.05, 6.05, 0.2),
+    hue_order=[f"Center {i}" for i in range(1, 7)],
+    legend=False,
+    ax=axes,
+)
+plt.xlabel("slice thickness (mm)")
+plt.ylim(-4, 175)
+save_pub("params_slice_thickness", bbox_inches="tight")
+
+fig, axes = plt.subplots(nrows=1, ncols=2, sharex=False, sharey=True, figsize=(5.46, 2.6))
 
 sns.histplot(
     data=acquisition_params.replace(new_names),
@@ -1029,7 +1223,7 @@ sns.histplot(
 axes[1].set_xlabel("echo time (ms)")
 axes[1].set_ylim(-4, 250)
 
-axes[1].get_legend().set(bbox_to_anchor=[0.56, 0, 0, 1], title="Location")
+axes[1].get_legend().set(bbox_to_anchor=[0.46, 0, 0, 1], title="Location")
 
 titles = [
     "A",
@@ -1046,6 +1240,12 @@ print(f"In-Plane Max: {acquisition_params.pixel_spacing.max():.2f} mm")
 
 print(f"Echo Time Min: {acquisition_params.echo_time.min():.2f} ms")
 print(f"Echo Time Max: {acquisition_params.echo_time.max():.2f} ms")
+
+print(f"Flip Angle Min: {acquisition_params.flip_angle.min():.2f} °")
+print(f"Flip Angle Max: {acquisition_params.flip_angle.max():.2f} °")
+
+print(f"Repetition Time Min: {acquisition_params.repetition_time.min():.2f} ms")
+print(f"Repetition Time Max: {acquisition_params.repetition_time.max():.2f} ms")
 
 display_dataframe(
     pd.DataFrame(acquisition_params.echo_time.round(-1).value_counts()).sort_index()
@@ -1076,8 +1276,124 @@ print(f"Dice all no BN not working: {', '.join(no_bn_mean[no_bn_mean < 0.1].inde
 print(f"Dice all no BN working seg {no_bn_mean[no_bn_mean > 0.1].mean():.2f}")
 
 # %%
+
+# set image parameters
+
+STANDARD_PATIENT = "1031_1_l0_d0"
+STANDARD_SLICES = {
+    "T2w": 33,
+    "b800": 19,
+    "ADC": 19,
+}
+
+# %%
+
+# images for the paper
+MAX_VALUE = 600
+
+image_path = orig_dataset[STANDARD_PATIENT]["images"][0]
+image_sitk = sitk.ReadImage(str(data_dir / image_path))
+norm_dir_hist = experiment_dir / "Normalization_all" / "data_preprocessed" / "HM_QUANTILE"
+norm_file = norm_dir_hist / "normalization_mod0.yaml"
+norm = normalization.HMQuantile.from_file(norm_file)
+image_normed = norm.normalize(image_sitk)
+
+FIG_WIDTH = 6
+FIG_HEIGHT = 1.8
+widths = [0.3, 0.3, 0.2, 0.2]
+paddings = [0.3, 0.3, 0.1, 0.1]
+IMG_WIDTH = FIG_WIDTH * widths[-1] * (1 - paddings[-1])
+heights = [IMG_WIDTH / FIG_HEIGHT] * 4
+rects = []
+OFFSET = -0.02
+for w, h, p in zip(widths, heights, paddings):
+    rects.append([w * p + OFFSET, (1 - h) / 2, w * (1 - p), h])
+    OFFSET += w
+figure = plt.figure(figsize=(FIG_WIDTH, FIG_HEIGHT))
+axes = []
+for r in rects:
+    ax = plt.Axes(figure, r)
+    figure.add_axes(ax)
+    axes.append(ax)
+
+quant = normalization.Quantile(lower_q=norm.quantiles[0], upper_q=norm.quantiles[-1])
+landmarks = norm.get_landmarks(quant.normalize(image_sitk))[0]
+axes[0].plot(norm.quantiles * 100, landmarks, label="Orig.")
+axes[0].plot(norm.quantiles * 100, norm.standard_scale, label="Norm.")
+axes[0].set_ylabel("Intensity")
+axes[0].set_xlim((0, 100))
+axes[0].set_xticks(norm.quantiles * 100)
+axes[0].set_xlabel("Percentile")
+axes[0].legend()
+axes[0].set_title("Landmarks")
+axes[0].yaxis.labelpad = 0
+axes[0].tick_params(axis="y", pad=1)
+axes[0].tick_params(axis="x", pad=1)
+axes[0].set_ylim(-1.05, 1.05)
+
+img_np = sitk.GetArrayFromImage(image_sitk)
+img_np = 2 * img_np / MAX_VALUE - 1
+img_flat = img_np.reshape(-1)
+img_norm_np = sitk.GetArrayFromImage(image_normed)
+image_norm_flat = img_norm_np.reshape(-1)
+dataframe = pd.DataFrame(
+    {
+        "Intensity": np.concatenate((img_flat, image_norm_flat)),
+        "image": ["orig. img."] * len(img_flat) + ["norm. img."] * len(image_norm_flat),
+    },
+)
+ax_norm = axes[1].twiny()
+sns.histplot(
+    data=dataframe,
+    x="Intensity",
+    hue="image",
+    bins=np.arange(-1.05, 1.1, 0.1),
+    stat="proportion",
+    ax=ax_norm,
+    legend=False,
+)
+axes[1].set_xlim((MAX_VALUE / 40, MAX_VALUE + MAX_VALUE / 40))
+axes[1].set_xlabel("Intensity")
+axes[1].set_ylabel("Proportion")
+axes[1].yaxis.labelpad = 1
+axes[1].tick_params(axis="y", pad=1)
+axes[1].tick_params(axis="x", pad=1)
+axes[1].tick_params(bottom=False)
+ax_norm.set_xlim((-1.05, 1.05))
+ax_norm.yaxis.labelpad = 1
+ax_norm.tick_params(axis="y", pad=1)
+ax_norm.tick_params(axis="x", pad=1)
+ax_norm.tick_params(top=False)
+ax_norm.grid()
+# ax_norm.set_ylim(0, .2)
+
+axes[2].imshow(
+    img_np[STANDARD_SLICES["T2w"]],
+    interpolation="nearest",
+    cmap="gray",
+    vmin=-1,
+    vmax=1,
+    aspect="auto",
+)
+axes[2].axis("off")
+axes[2].set_title("Original Image")
+
+axes[3].imshow(
+    img_norm_np[STANDARD_SLICES["T2w"]],
+    interpolation="nearest",
+    cmap="gray",
+    vmin=-1,
+    vmax=1,
+    aspect="auto",
+)
+axes[3].axis("off")
+axes[3].set_title("Normalized Image")
+
+save_pub("perc-hm-paper")
+
+# %%
 # make a nice description of the hm methods
-images = orig_dataset["1001_1_l0_d0"]["images"]
+images = orig_dataset[STANDARD_PATIENT]["images"]
 images_sitk = [sitk.ReadImage(str(data_dir / img)) for img in images]
 norm_dir_hist = (
     experiment_dir / "Normalization_all" / "data_preprocessed" / "HISTOGRAM_MATCHING"
@@ -1132,14 +1448,14 @@ for i, (n, lbl, img, img_norm, ax_line) in enumerate(
     ax_line[1].set_xlim((-1, 1))
 
     ax_line[2].imshow(
-        img_np[img_np.shape[0] // 2], interpolation="nearest", cmap="gray", vmin=-1, vmax=1
+        img_np[STANDARD_SLICES[lbl]], interpolation="nearest", cmap="gray", vmin=-1, vmax=1
     )
     ax_line[2].axis("off")
     if i == 0:
         ax_line[2].set_title("Original Image")
 
     ax_line[3].imshow(
-        img_norm_np[img_norm_np.shape[0] // 2],
+        img_norm_np[STANDARD_SLICES[lbl]],
         interpolation="nearest",
         cmap="gray",
         vmin=-1,
@@ -1154,7 +1470,7 @@ save_pub("hm", bbox_inches=Bbox.from_extents(-0.8, 1.9, 10.5, 8.3))
 
 # %%
 # make a nice description of the window method
-images = orig_dataset["1001_1_l0_d0"]["images"]
+images = orig_dataset[STANDARD_PATIENT]["images"]
 images_sitk = [sitk.ReadImage(str(data_dir / img)) for img in images]
 norm_dir_hist = experiment_dir / "data_preprocessed" / "WINDOW"
 norm_files = [norm_dir_hist / f"normalization_mod{i}.yaml" for i in range(3)]
@@ -1214,7 +1530,7 @@ for i, (n, lbl, img, img_norm, ax_line) in enumerate(
     ax_line[0].set_ylim(ax_line[1].get_ylim())
 
     ax_line[2].imshow(
-        img_np[img_np.shape[0] // 2],
+        img_np[STANDARD_SLICES[lbl]],
         interpolation="nearest",
         cmap="gray",
         vmin=img_np.min(),
@@ -1225,7 +1541,7 @@ for i, (n, lbl, img, img_norm, ax_line) in enumerate(
         ax_line[2].set_title("Original Image")
 
     ax_line[3].imshow(
-        img_norm_np[img_norm_np.shape[0] // 2],
+        img_norm_np[STANDARD_SLICES[lbl]],
         interpolation="nearest",
         cmap="gray",
         vmin=img_norm_np.min(),
@@ -1239,7 +1555,7 @@ save_pub("window", bbox_inches=Bbox.from_extents(-0.8, 1.9, 10.5, 8.3))
 
 # %%
 # make a nice description of the mean-std method
-images = orig_dataset["1001_1_l0_d0"]["images"]
+images = orig_dataset[STANDARD_PATIENT]["images"]
 images_sitk = [sitk.ReadImage(str(data_dir / img)) for img in images]
 norm_dir_hist = experiment_dir / "data_preprocessed" / "MEAN_STD"
 norm_files = [norm_dir_hist / f"normalization_mod{i}.yaml" for i in range(3)]
@@ -1299,7 +1615,7 @@ for i, (n, lbl, img, img_norm, ax_line) in enumerate(
     ax_line[1].set_ylim(ax_line[0].get_ylim())
 
     ax_line[2].imshow(
-        img_np[img_np.shape[0] // 2],
+        img_np[STANDARD_SLICES[lbl]],
         interpolation="nearest",
         cmap="gray",
         vmin=img_np.min(),
@@ -1310,7 +1626,7 @@ for i, (n, lbl, img, img_norm, ax_line) in enumerate(
         ax_line[2].set_title("Original Image")
 
     ax_line[3].imshow(
-        img_norm_np[img_norm_np.shape[0] // 2],
+        img_norm_np[STANDARD_SLICES[lbl]],
         interpolation="nearest",
         cmap="gray",
         vmin=img_norm_np.min(),
@@ -1324,7 +1640,7 @@ save_pub("mean-std", bbox_inches=Bbox.from_extents(-0.8, 1.9, 10.5, 8.3))
 
 # %%
 # make a nice description of the perc method
-images = orig_dataset["1001_1_l0_d0"]["images"]
+images = orig_dataset[STANDARD_PATIENT]["images"]
 images_sitk = [sitk.ReadImage(str(data_dir / img)) for img in images]
 norm_dir_hist = experiment_dir / "data_preprocessed" / "QUANTILE"
 norm_files = [norm_dir_hist / f"normalization_mod{i}.yaml" for i in range(3)]
@@ -1381,7 +1697,7 @@ for i, (n, lbl, img, img_norm, ax_line) in enumerate(
         ax_line[1].axes.set_xlabel(None)
 
     ax_line[2].imshow(
-        img_np[img_np.shape[0] // 2],
+        img_np[STANDARD_SLICES[lbl]],
         interpolation="nearest",
         cmap="gray",
         vmin=img_np.min(),
@@ -1392,7 +1708,7 @@ for i, (n, lbl, img, img_norm, ax_line) in enumerate(
         ax_line[2].set_title("Original Image")
 
     ax_line[3].imshow(
-        img_norm_np[img_norm_np.shape[0] // 2],
+        img_norm_np[STANDARD_SLICES[lbl]],
         interpolation="nearest",
         cmap="gray",
         vmin=img_norm_np.min(),
@@ -1406,7 +1722,7 @@ save_pub("perc", bbox_inches=Bbox.from_extents(-0.8, 1.9, 10.5, 8.3))
 
 # %%
 # make a nice description of the perc-hm methods
-images = orig_dataset["1001_1_l0_d0"]["images"]
+images = orig_dataset[STANDARD_PATIENT]["images"]
 images_sitk = [sitk.ReadImage(str(data_dir / img)) for img in images]
 norm_dir_hist = experiment_dir / "Normalization_all" / "data_preprocessed" / "HM_QUANTILE"
 norm_files = [norm_dir_hist / f"normalization_mod{i}.yaml" for i in range(3)]
@@ -1459,14 +1775,18 @@ for i, (n, lbl, img, img_norm, ax_line) in enumerate(
         ax_line[1].axes.set_xlabel(None)
 
     ax_line[2].imshow(
-        img_np[img_np.shape[0] // 2], interpolation="nearest", cmap="gray", vmin=-1, vmax=1
+        img_np[STANDARD_SLICES[lbl]],
+        interpolation="nearest",
+        cmap="gray",
+        vmin=-1,
+        vmax=1,
     )
     ax_line[2].axis("off")
     if i == 0:
         ax_line[2].set_title("Original Image")
 
     ax_line[3].imshow(
-        img_norm_np[img_norm_np.shape[0] // 2],
+        img_norm_np[STANDARD_SLICES[lbl]],
         interpolation="nearest",
         cmap="gray",
         vmin=-1,
@@ -1481,7 +1801,12 @@ save_pub("perc-hm", bbox_inches=Bbox.from_extents(-0.8, 1.9, 10.5, 8.3))
 # %%
 # make a nice description of the GAN-Def methods
 image = sitk.ReadImage(
-    str(experiment_dir / "data_preprocessed" / "QUANTILE" / "sample-1001_1_l0_d0.nii.gz")
+    str(
+        experiment_dir
+        / "data_preprocessed"
+        / "QUANTILE"
+        / f"sample-{STANDARD_PATIENT}.nii.gz"
+    )
 )
 images_sitk = [sitk.VectorIndexSelectionCast(image, i) for i in range(3)]
 norm_dir_hist = (
@@ -1493,7 +1818,7 @@ norm_dir_hist = (
 norm_files = [norm_dir_hist / f"normalization_mod{i}.yaml" for i in range(3)]
 norms = [GanDiscriminators.from_file(f) for f in norm_files]
 images_normed = [n.normalize(img) for img, n in zip(images_sitk, norms)]
-# %%
+
 axes = create_axes()
 for i, (n, lbl, img, img_norm, ax_line) in enumerate(
     zip(norms, ["T2w", "b800", "ADC"], images_sitk, images_normed, axes)
@@ -1541,14 +1866,14 @@ for i, (n, lbl, img, img_norm, ax_line) in enumerate(
         ax_line[0].axes.set_xlabel(None)
 
     ax_line[2].imshow(
-        img_np[img_np.shape[0] // 2], interpolation="nearest", cmap="gray", vmin=-1, vmax=1
+        img_np[STANDARD_SLICES[lbl]], interpolation="nearest", cmap="gray", vmin=-1, vmax=1
     )
     ax_line[2].axis("off")
     if i == 0:
         ax_line[2].set_title("Original Image")
 
     ax_line[3].imshow(
-        img_norm_np[img_norm_np.shape[0] // 2],
+        img_norm_np[STANDARD_SLICES[lbl]],
         interpolation="nearest",
         cmap="gray",
         vmin=-1,
@@ -1598,9 +1923,10 @@ mean_stds = mean_stds.replace(
         "1": "Center 1",
         "11": "Center 2",
         "99": "Center 3",
-        "13": "Center 4",
-        "12": "Center 5",
-        "5": "Center 6",
+        "13": "Center 3",
+        "12": "Center 4",
+        "5": "Center 5",
+        "8": "Center 6",
     }
 )
 

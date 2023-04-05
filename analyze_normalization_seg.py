@@ -586,6 +586,7 @@ for col in acquisition_params.columns:
     if not pd.api.types.is_numeric_dtype(results_merged[col].dtype):
         continue
     data = results_merged.query("normalization == 'QUANTILE' & before_therapy").copy()
+    data["Dice"] = data["Dice"].astype(float)
 
     N_BINS = 10
 
@@ -647,6 +648,7 @@ for col in acquisition_params.columns:
     if not pd.api.types.is_numeric_dtype(results_merged[col].dtype):
         continue
     data = results_merged.query("before_therapy & normalization != 'combined'").copy()
+    data["Dice"] = data["Dice"].astype(float)
 
     g = sns.lmplot(
         data=data,
