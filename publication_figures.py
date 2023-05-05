@@ -80,7 +80,7 @@ sns.set_palette(
     sns.color_palette(["#21a7bf", "#d75109", "#34c165", "#f29e02", "#9d060d", "#515b34"])
 )
 
-plt.rcParams["hatch.color"] = "#bfbfbf"
+plt.rcParams["hatch.color"] = "#808080"
 
 # %%
 
