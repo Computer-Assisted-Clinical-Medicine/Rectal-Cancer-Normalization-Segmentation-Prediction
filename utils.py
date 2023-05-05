@@ -2,10 +2,12 @@
 Miscellaneous functions
 """
 
+import itertools
 import os
 from pathlib import Path
-from typing import Dict, List, Union
+from typing import Dict, List, Optional, Union
 
+import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import SimpleITK as sitk
@@ -613,10 +615,14 @@ def gather_all_results(task="segmentation") -> pd.DataFrame:
         "Not-Frankfurt",
         "Not-Regensburg",
         "Not-Mannheim",
+        "Frankfurt-all",
+        "Regensburg-all",
+        "Mannheim-all",
     ]
     results["train_location"] = pd.Categorical(
         results.exp_group_name.str.partition("_")[2], categories=location_order
     )
+    assert results["train_location"].isna().sum() == 0
     # set treatment status
     mask = results.index[~results.timepoint.str.startswith("99")]
     results.loc[mask, "treatment_status"] = timepoints.loc[
@@ -751,3 +757,56 @@ def calculate_auc(df: pd.DataFrame, task: str) -> pd.DataFrame:
         if not res_df.index.name == "label":
             res_df.set_index("label", inplace=True)
     return res_df
+
+
+def hatched_histplot(
+    data: pd.DataFrame,
+    x: str,
+    hue: str,
+    multiple="stack",
+    bins: Optional[np.ndarray] = None,
+    hue_order: Optional[List] = None,
+    legend=False,
+    ax=Optional[plt.Axes],
+    hatches: Optional[List] = None,
+):
+    """Add hatches to a plot, the api mirrors the one of the seaborn histogram."""
+    groups = data.groupby(hue)[x]
+    if bins is None:
+        bins = np.linspace(start=groups.min().min(), stop=groups.max().max(), num=21)
+
+    if multiple == "stack":
+        hist_kwargs = dict(
+            stacked=True, histtype="bar", alpha=0.8, edgecolor="gray", linewidth=0.5
+        )
+    else:
+        raise ValueError(f"Multiple type {multiple} unknown.")
+
+    if hue_order is None:
+        hue_order = list(groups.groups)
+    ax.hist(
+        x=[groups.get_group(hue) for hue in hue_order],
+        bins=bins,
+        label=hue_order,
+        hatch=["/"] * len(hue_order),
+        **hist_kwargs,
+    )
+    # apply the hatching
+    hatches = [
+        "////",
+        "\\\\\\\\",
+        "xxxx",
+        "ooo",
+        "OO",
+        "...",
+        "||||",
+        "----",
+        "++++",
+        "***",
+    ]
+    for container, hatch in zip(ax.containers, itertools.cycle(hatches)):
+        for item in container.patches:
+            item.set_hatch(hatch)
+            item.set_edgecolor(plt.rcParams["hatch.color"])
+    if legend:
+        plt.legend()

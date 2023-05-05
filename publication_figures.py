@@ -3,6 +3,7 @@
 # pylint:disable=too-many-lines
 
 # %%
+
 import os
 from pathlib import Path
 
@@ -20,7 +21,7 @@ from tqdm import tqdm
 from gan_normalization import GanDiscriminators
 from plot_utils import create_axes, display_dataframe, display_markdown, plot_significance
 from SegClassRegBasis import normalization
-from utils import calculate_auc, gather_all_results
+from utils import calculate_auc, gather_all_results, hatched_histplot
 
 
 def turn_ticks(axes_to_turn):
@@ -37,25 +38,18 @@ def save_pub(filename, **kwargs):
     plt.savefig(pub_dir / f"{filename}.png", dpi=600, **kwargs)
     plt.savefig(pub_dir / f"{filename}.eps", dpi=600, **kwargs)
     plt.savefig(pub_dir / f"{filename}.pgf", dpi=600, **kwargs)
+    plt.savefig(pub_dir / f"{filename}.pdf", dpi=600, **kwargs)
 
+    if matplotlib.rcParams["backend"] == "pgf":
+        display.display(display.Image(filename=pub_dir / f"{filename}.png"))
+    else:
+        plt.show()
     plt.close()
-    display.display(display.Image(filename=pub_dir / f"{filename}.png"))
-
-
-def hatch_plot(plot_ax, hatches=None):
-    """Add hatches to a plot"""
-    if hatches is None:
-        hatches = ["--", "x", "\\", "/", "o", ".", "+", "*", "O"]
-    # Loop over the bars
-    for bars, hatch in zip(plot_ax.containers, hatches):
-        # Set a different hatch for each group of bars
-        for bar in bars:
-            bar.set_hatch(hatch)
 
 
 # %%
 
-matplotlib.use("pgf")
+# matplotlib.use("pgf")
 sns.set_style()
 sns.set_context("paper")
 plt.style.use("seaborn-paper")
@@ -85,7 +79,8 @@ plt.rcParams["pgf.rcfonts"] = False
 sns.set_palette(
     sns.color_palette(["#21a7bf", "#d75109", "#34c165", "#f29e02", "#9d060d", "#515b34"])
 )
-hatch_palette = ["--", "x", "\\", "*", "o", "O", ".", "+"]
+
+plt.rcParams["hatch.color"] = "#bfbfbf"
 
 # %%
 
@@ -134,13 +129,18 @@ classification_tasks = [
     c.partition("_accuracy")[0] for c in results_class if "accuracy" in c
 ]
 
+# %%
+
 # set the experiment type
-experiment_types = ["All", "Except-One", "Single-Center"]
+experiment_types = ["All", "Except-One", "Single-Center", "Single-Center-All"]
 for df in [results_seg, results_class, results_reg]:
     df.loc[df.train_location.apply(lambda x: "Not" in x), "experiment_type"] = "Except-One"
     df.loc[
         df.train_location.apply(lambda x: "Not" not in x), "experiment_type"
     ] = "Single-Center"
+    df.loc[
+        df.train_location.apply(lambda x: "-all" in x), "experiment_type"
+    ] = "Single-Center-All"
     df.loc[df.train_location == "all", "experiment_type"] = "All"
     df.experiment_type = pd.Categorical(df.experiment_type, categories=experiment_types)
 
@@ -150,6 +150,8 @@ extended_experiment_types = [
     "Except-One-External",
     "Single-Center-Internal",
     "Single-Center-External",
+    "Single-Center-All-Internal",
+    "Single-Center-All-External",
 ]
 for df in [results_seg, results_class, results_reg]:
     not_centers = df.train_location.apply(lambda x: "Not" in x)
@@ -170,6 +172,14 @@ for df in [results_seg, results_class, results_reg]:
         "extended_experiment_type",
     ] = "Single-Center-External"
     df.loc[df.train_location == "all", "extended_experiment_type"] = "All"
+    df.loc[
+        (df.experiment_type == "Single-Center-All") & (~df.external),
+        "extended_experiment_type",
+    ] = "Single-Center-All-Internal"
+    df.loc[
+        (df.experiment_type == "Single-Center-All") & df.external,
+        "extended_experiment_type",
+    ] = "Single-Center-All-External"
     df.extended_experiment_type = pd.Categorical(
         df.extended_experiment_type, categories=extended_experiment_types
     )
@@ -918,6 +928,8 @@ res_table = pd.DataFrame(
                 "Except-One-External",
                 "Single-Center-Internal",
                 "Single-Center-External",
+                "Single-Center-All-Internal",
+                "Single-Center-All-External",
             ],
         ]
     ),
@@ -991,6 +1003,8 @@ res_table = pd.DataFrame(
                 "Except-One-External",
                 "Single-Center-Internal",
                 "Single-Center-External",
+                "Single-Center-All-Internal",
+                "Single-Center-All-External",
             ],
         ]
     ),
@@ -1108,8 +1122,10 @@ for experiment_type in ["Single-Center"]:  # experiment_types:
 
 print("Acquisition parameters")
 
-fig, axes = plt.subplots(nrows=1, ncols=1, figsize=(5.46 / 2, 2.3))
-sns.histplot(
+WIDTH = 193.44536 / 72
+
+fig, axes = plt.subplots(nrows=1, ncols=1, figsize=(WIDTH, 0.84 * WIDTH))
+hatched_histplot(
     data=acquisition_params.query("location != 'Mannheim-not-from-study'").replace(
         new_names
     ),
@@ -1121,13 +1137,13 @@ sns.histplot(
     legend=False,
     ax=axes,
 )
+plt.ylabel("count")
 plt.xlabel("in-plane resolution (mm)")
 plt.ylim(-4, 175)
-# hatch_plot(axes)
 save_pub("params_pixel_spacing", bbox_inches="tight")
 
-fig, axes = plt.subplots(nrows=1, ncols=1, figsize=(5.46 / 2, 2.3))
-sns.histplot(
+fig, axes = plt.subplots(nrows=1, ncols=1, figsize=(WIDTH, 0.84 * WIDTH))
+hatched_histplot(
     data=acquisition_params.query("location != 'Mannheim-not-from-study'").replace(
         new_names
     ),
@@ -1139,13 +1155,13 @@ sns.histplot(
     legend=True,
     ax=axes,
 )
+plt.ylabel("count")
 plt.xlabel("echo time (ms)")
 plt.ylim(-4, 175)
-# hatch_plot(axes)
 save_pub("params_echo_time", bbox_inches="tight")
 
-fig, axes = plt.subplots(nrows=1, ncols=1, figsize=(5.46 / 2, 2.3))
-sns.histplot(
+fig, axes = plt.subplots(nrows=1, ncols=1, figsize=(WIDTH, 0.84 * WIDTH))
+hatched_histplot(
     data=acquisition_params.query("location != 'Mannheim-not-from-study'").replace(
         new_names
     ),
@@ -1158,11 +1174,12 @@ sns.histplot(
     ax=axes,
 )
 plt.xlabel("flip angle (°)")
+plt.ylabel("count")
 plt.ylim(-4, 175)
 save_pub("params_flip_angle", bbox_inches="tight")
 
-fig, axes = plt.subplots(nrows=1, ncols=1, figsize=(5.46 / 2, 2.3))
-sns.histplot(
+fig, axes = plt.subplots(nrows=1, ncols=1, figsize=(WIDTH, 0.84 * WIDTH))
+hatched_histplot(
     data=acquisition_params.query("location != 'Mannheim-not-from-study'").replace(
         new_names
     ),
@@ -1175,24 +1192,25 @@ sns.histplot(
     ax=axes,
 )
 plt.xlabel("repetition time (ms)")
+plt.ylabel("count")
 plt.ylim(-4, 175)
 save_pub("params_repetition_time", bbox_inches="tight")
 
-fig, axes = plt.subplots(nrows=1, ncols=1, figsize=(5.46 / 2, 2.3))
-sns.histplot(
+fig, axes = plt.subplots(nrows=1, ncols=1, figsize=(WIDTH, 0.84 * WIDTH))
+hatched_histplot(
     data=acquisition_params.query("location != 'Mannheim-not-from-study'").replace(
         new_names
     ),
     hue="location",
     x="slice_thickness",
     multiple="stack",
-    bins=np.arange(0.05, 6.05, 0.2),
+    bins=np.arange(0.45, 6.05, 0.4),
     hue_order=[f"Center {i}" for i in range(1, 7)],
     legend=False,
     ax=axes,
 )
 plt.xlabel("slice thickness (mm)")
-plt.ylim(-4, 175)
+plt.ylabel("count")
 save_pub("params_slice_thickness", bbox_inches="tight")
 
 fig, axes = plt.subplots(nrows=1, ncols=2, sharex=False, sharey=True, figsize=(5.46, 2.6))
