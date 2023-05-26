@@ -80,7 +80,7 @@ sns.set_palette(
     sns.color_palette(["#21a7bf", "#d75109", "#34c165", "#f29e02", "#9d060d", "#515b34"])
 )
 
-plt.rcParams["hatch.color"] = "#808080"
+plt.rcParams["hatch.color"] = "#FFFFFF"
 
 # %%
 
@@ -1986,3 +1986,91 @@ for num, (mod, ax_col) in enumerate(zip(modalities, axes.T)):
 
 plt.tight_layout()
 save_pub("mean-std-stat")
+
+# %%
+
+for mod, data in mean_stds[~mean_stds.Name.str.startswith("99")].groupby("Modality"):
+    print(mod)
+    display.display(data.sort_values("Mean").iloc[list(range(5)) + list(range(-5, 0))])
+    display.display(data.sort_values("Std").iloc[list(range(5)) + list(range(-5, 0))])
+
+# %%
+
+image_names = [
+    "11021_1_l0_d0",
+    "1026_2_l0_d0",
+    "1042_1_l0_d0",
+    "1033_1_l0_d0",
+    "13002_1_l1_d0",
+    "13018_3_l0_d0",
+]
+display.display(acquisition_params.loc[image_names])
+slices = [20, 20, 23, 17, 19, 25]
+image_nums = np.arange(3).repeat(2)
+vmax_list = [
+    200,
+    1250,
+    15,
+    200,
+    1500,
+    2500,
+]
+
+cbar_list = []
+fig, axes = plt.subplots(ncols=3, nrows=2, figsize=(6, 3))
+for ax, name, slc, img_num, vmax in zip(
+    axes.T.flat, image_names, slices, image_nums, vmax_list
+):
+
+    img_path = data_dir / orig_dataset[name]["images"][img_num]
+
+    img = sitk.ReadImage(str(img_path))
+
+    img_np = sitk.GetArrayFromImage(img)
+
+    slice_img = img_np[slc]
+    overlap = slice_img.shape[1] - slice_img.shape[0]
+    assert overlap % 2 == 0
+    if overlap != 0:
+        slice_img = slice_img[:, overlap // 2 : -overlap // 2]
+
+    if vmax is None:
+        vmax = np.quantile(slice_img, 0.995)
+
+    im = ax.imshow(
+        slice_img,
+        cmap="gray",
+        vmin=0,
+        vmax=vmax,
+        interpolation="nearest",
+        extent=(0, slice_img.shape[1] / slice_img.shape[0], 0, 1),
+    )
+    ax.axis("off")
+    cbar = plt.colorbar(im, ax=ax, format="%4d")
+    cbar.set_label("Intensity in a. u.")
+    cbar_list.append(cbar)
+    # print(f"{np.quantile(img_np, 0.995)},")
+
+for ax, lbl in zip(axes[0], ["T2w", "b800", "ADC"]):
+    ax.text(
+        x=0.5,
+        y=1.15,
+        s=lbl,
+        fontsize=14,
+        horizontalalignment="center",
+        verticalalignment="center",
+        transform=ax.transAxes,
+        # bbox=dict(facecolor="grey", alpha=0.3, boxstyle="round"),
+    )
+
+plt.tight_layout()
+
+MAX_X = 10
+for cbar_top, cbar_bottom in zip(cbar_list[::2], cbar_list[1::2]):
+    y_lbl_top_pos = cbar_top.ax.yaxis.label.get_position()
+    y_lbl_bottom_pos = cbar_bottom.ax.yaxis.label.get_position()
+
+    cbar_top.ax.yaxis.set_label_coords(MAX_X, y_lbl_top_pos[1])
+    cbar_bottom.ax.yaxis.set_label_coords(MAX_X, y_lbl_bottom_pos[1])
+
+save_pub("example_images")

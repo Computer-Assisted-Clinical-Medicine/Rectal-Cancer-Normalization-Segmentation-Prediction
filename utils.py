@@ -776,9 +776,7 @@ def hatched_histplot(
         bins = np.linspace(start=groups.min().min(), stop=groups.max().max(), num=21)
 
     if multiple == "stack":
-        hist_kwargs = dict(
-            stacked=True, histtype="bar", alpha=0.8, edgecolor="gray", linewidth=0.5
-        )
+        hist_kwargs = dict(stacked=True, histtype="bar", edgecolor="#d9d9d9", linewidth=0.5)
     else:
         raise ValueError(f"Multiple type {multiple} unknown.")
 
@@ -796,7 +794,7 @@ def hatched_histplot(
         "////",
         "\\\\\\\\",
         "xxxx",
-        "ooo",
+        "oo",
         "OO",
         "...",
         "||||",
@@ -807,6 +805,5 @@ def hatched_histplot(
     for container, hatch in zip(ax.containers, itertools.cycle(hatches)):
         for item in container.patches:
             item.set_hatch(hatch)
-            item.set_edgecolor(plt.rcParams["hatch.color"])
     if legend:
         plt.legend()
