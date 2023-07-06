@@ -7,12 +7,14 @@ import os
 from pathlib import Path
 from typing import Dict, List, Optional, Union
 
+import matplotlib as mpl
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import SimpleITK as sitk
 import telegram
 import yaml
+from scipy.stats import rankdata
 from tqdm import tqdm
 
 from networks import ResNet
@@ -769,6 +771,7 @@ def hatched_histplot(
     legend=False,
     ax=Optional[plt.Axes],
     hatches: Optional[List] = None,
+    split_bars=False,
 ):
     """Add hatches to a plot, the api mirrors the one of the seaborn histogram."""
     groups = data.groupby(hue)[x]
@@ -776,19 +779,83 @@ def hatched_histplot(
         bins = np.linspace(start=groups.min().min(), stop=groups.max().max(), num=21)
 
     if multiple == "stack":
-        hist_kwargs = dict(stacked=True, histtype="bar", edgecolor="#d9d9d9", linewidth=0.5)
+        hist_kwargs = dict(
+            stacked=True, histtype="barstacked", edgecolor="#d9d9d9", linewidth=0.5
+        )
+    elif multiple == "dodge":
+        hist_kwargs = dict(histtype="bar", edgecolor="#d9d9d9", linewidth=0.5)
+    elif multiple == "layer":
+        if split_bars:
+            alpha = 0.75
+        else:
+            alpha = 0.75
+        hist_kwargs = dict(histtype="bar", edgecolor="#d9d9d9", linewidth=0.5, alpha=alpha)
     else:
         raise ValueError(f"Multiple type {multiple} unknown.")
 
     if hue_order is None:
         hue_order = list(groups.groups)
-    ax.hist(
-        x=[groups.get_group(hue) for hue in hue_order],
-        bins=bins,
-        label=hue_order,
-        hatch=["/"] * len(hue_order),
-        **hist_kwargs,
-    )
+    hue_order = [h for h in hue_order if h in groups.groups]
+
+    if ax is None:
+        ax = plt.gca()
+
+    if multiple == "layer":
+        counts_list, bars_list = [], []
+        for hue_group in hue_order:
+            counts, _, bars = ax.hist(
+                x=groups.get_group(hue_group),
+                bins=bins,
+                label=hue_group,
+                hatch="/",
+                **hist_kwargs,
+            )
+            counts_list.append(counts)
+            bars_list.append(bars)
+        # now, order the bars according to their size
+        counts = np.array(counts_list)
+        bars = np.array(bars_list)
+        order = 3 + counts.shape[0] - rankdata(counts, method="min", axis=0)
+        for bar_num, (bar_line, order_line) in enumerate(zip(bars.T, order.T)):
+            same: Dict[int, int] = {}
+            for bar, z_order in zip(bar_line, order_line):
+                num_same_order = np.sum(order[:, bar_num] == z_order)
+                num = same.get(z_order, 0)
+                z_min = np.min(order[:, bar_num])
+                # make and outline around the biggest bar
+                if z_order == z_min and split_bars and num == 0:
+                    rect = ax.add_patch(
+                        mpl.patches.Rectangle(
+                            xy=bar.get_xy(),
+                            width=bar.get_width(),
+                            height=bar.get_height(),
+                            linewidth=1,
+                            color="#737373",
+                            fill=False,
+                        ),
+                    )
+                    rect.set_zorder(4 + counts.shape[0])
+                if num_same_order > 1 and split_bars:
+                    # change the width
+                    old_with = bar.get_width()
+                    new_width = old_with / num_same_order
+                    bar.set_width(new_width)
+                    # move the bar if it is not the first
+                    width_offset = new_width * num
+                    x = bar.get_x()
+                    x_new = x + width_offset
+                    bar.set_x(x_new)
+                bar.set_zorder(z_order)
+                num += 1
+                same[z_order] = num
+    else:
+        ax.hist(
+            x=[groups.get_group(hue) for hue in hue_order],
+            bins=bins,
+            label=hue_order,
+            hatch=["/"] * len(hue_order),
+            **hist_kwargs,
+        )
     # apply the hatching
     hatches = [
         "////",
@@ -806,4 +873,6 @@ def hatched_histplot(
         for item in container.patches:
             item.set_hatch(hatch)
     if legend:
-        plt.legend()
+        leg = ax.legend()
+        if split_bars:
+            leg.set_zorder(5 + counts.shape[0])
