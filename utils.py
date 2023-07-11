@@ -613,6 +613,9 @@ def gather_all_results(task="segmentation") -> pd.DataFrame:
         "Not-Frankfurt",
         "Not-Regensburg",
         "Not-Mannheim",
+        "Frankfurt-all",
+        "Regensburg-all",
+        "Mannheim-all",
     ]
     results["train_location"] = pd.Categorical(
         results.exp_group_name.str.partition("_")[2], categories=location_order
