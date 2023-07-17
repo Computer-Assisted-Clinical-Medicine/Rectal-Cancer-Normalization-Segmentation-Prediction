@@ -325,7 +325,7 @@ def plot_significance(grouped_data, name: str, metric: str):
     """
     grouped_data_metric = grouped_data[metric]
     data = pd.DataFrame(grouped_data_metric.mean())
-    print(f"{name}: Mean: {data[metric].mean():.2f}")
+    print(f"{name}: Mean: {data[metric].mean():.2f} pm {data[metric].std():.2f}")
     significance = pd.DataFrame(index=data.index, columns=data.index)
     for first, first_data in grouped_data_metric:
         for second, second_data in grouped_data_metric:

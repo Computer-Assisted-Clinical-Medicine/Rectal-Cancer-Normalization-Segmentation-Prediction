@@ -5,7 +5,6 @@
 # %%
 
 import os
-from datetime import timedelta
 from pathlib import Path
 
 import matplotlib
@@ -58,6 +57,8 @@ plt.style.use("seaborn-paper")
 SMALL_SIZE = 8
 MEDIUM_SIZE = 10
 BIGGER_SIZE = 12
+
+DISS_TEXTWIDTH = 394.78204 / 72
 
 plt.rc("font", size=MEDIUM_SIZE)  # controls default text sizes
 plt.rc("axes", titlesize=MEDIUM_SIZE)  # fontsize of the axes title
@@ -187,6 +188,27 @@ for df in [results_seg, results_class, results_reg]:
 
 # %%
 
+print("Drop the Single-Center-All experiment")
+for df in [results_seg, results_class, results_reg]:
+    to_drop = df.index[df.experiment_type == "Single-Center-All"]
+    df.drop(index=to_drop, inplace=True)
+    # to_drop = df.index[~ df.from_study]
+    # df.drop(index=to_drop, inplace=True)
+    for col in df:
+        if df.dtypes[col].name == "category":
+            df[col] = df[col].cat.remove_unused_categories()
+experiment_types = ["All", "Except-One", "Single-Center"]
+extended_experiment_types = [
+    "All",
+    "Except-One-Internal",
+    "Except-One-External",
+    "Single-Center-Internal",
+    "Single-Center-External",
+]
+
+
+# %%
+
 print("Calculate AUC values")
 
 res_list = []
@@ -243,7 +265,7 @@ good_classification_tasks = list(
 display_markdown("# Publication figures")
 print("Defining the new names")
 
-new_names = {
+new_names_paper = {
     "GAN_DISCRIMINATORS": "GAN",
     "GAN_DISCRIMINATORS_3_64_0.50": "GAN_3_64",
     "GAN_DISCRIMINATORS_3_64_0.50_BetterConv": "GAN_3_64_BC",
@@ -262,8 +284,8 @@ new_names = {
     "DeepLabv3plus2D": "DeepLabV3+",
     "Frankfurt": "Center 1",
     "Regensburg": "Center 2",
-    "Mannheim-not-from-study": "Center 3",
-    "Mannheim": "Center 3",
+    "Mannheim-not-from-study": "Center 3b",
+    "Mannheim": "Center 3a",
     "Wuerzburg": "Center 4",
     "Regensburg-UK": "Center 5",
     "Freiburg": "Center 6",
@@ -271,6 +293,44 @@ new_names = {
     "Not-Regensburg": "Not Center 2",
     "Not-Mannheim": "Not Center 3",
 }
+center_order_paper = [f"Center {i}" for i in range(1, 7)]
+new_names_diss = {
+    "GAN_DISCRIMINATORS": "GAN",
+    "GAN_DISCRIMINATORS_3_64_0.50": "GAN_3_64",
+    "GAN_DISCRIMINATORS_3_64_0.50_BetterConv": "GAN_3_64_BC",
+    "GAN_DISCRIMINATORS_3_64_0.50_BetterConv_0.00001": "GAN-Def",
+    "GAN_DISCRIMINATORS_3_64_0.50_BetterConv_0.00001_seg": "GAN-Seg",
+    "GAN_DISCRIMINATORS_3_64_0.50_BetterConv_0.00001_all_image": "GAN-Img",
+    "GAN_DISCRIMINATORS_3_64_0.50_BetterConv_0.00001_WINDOW": "GAN-Win",
+    "GAN_DISCRIMINATORS_3_64_0.50_BetterConv_0.00001_WINDOW_seg": "GAN_3_64_BC_win_seg",
+    "GAN_DISCRIMINATORS_3_64_n-skp_BetterConv_0.00001_WINDOW": "GAN-No-ed",
+    "QUANTILE": "Perc",
+    "HM_QUANTILE": "Perc-HM",
+    "MEAN_STD": "M-Std",
+    "HISTOGRAM_MATCHING": "HM",
+    "WINDOW": "Win",
+    "UNet2D": "UNet",
+    "DeepLabv3plus2D": "DeepLabV3+",
+    "Frankfurt": "Center 1",
+    "Regensburg": "Center 11",
+    "Mannheim-not-from-study": "In-house",
+    "Mannheim": "Center 13",
+    "Wuerzburg": "Center 12",
+    "Regensburg-UK": "Center 5",
+    "Freiburg": "Center 8",
+    "Not-Frankfurt": "Not Center 1",
+    "Not-Regensburg": "Not Center 11",
+    "Not-Mannheim": "Not Center 13",
+}
+center_order_diss = [
+    "Center 1",
+    "Center 5",
+    "Center 8",
+    "Center 11",
+    "Center 12",
+    "Center 13",
+    "in-house",
+]
 norm_order = [
     "Perc",
     "HM",
@@ -285,6 +345,10 @@ norm_order = [
 ]
 external_order = ["test", False, True]
 
+# change this to adjust the center names
+NEW_NAMES = new_names_diss
+CENTER_ORDER = center_order_diss
+
 results_seg_new_names = results_seg.copy()
 results_class_new_names = results_class.copy()
 results_class_task_new_names = results_class_task.copy()
@@ -296,7 +360,7 @@ for df in [
     results_class_task_new_names,
     results_reg_new_names,
 ]:
-    df.replace(new_names, inplace=True)
+    df.replace(NEW_NAMES, inplace=True)
     df.normalization = df.normalization.cat.remove_categories(
         [c for c in df.normalization.cat.categories if c not in norm_order]
     )
@@ -385,7 +449,9 @@ for experiment_type in experiment_types:
 
 print("Performance in all experiments")
 
-fig, axes = plt.subplots(nrows=2, ncols=3, figsize=(20 / 2.54, 16 / 2.54))
+fig, axes = plt.subplots(
+    nrows=3, ncols=2, figsize=(DISS_TEXTWIDTH * 0.9, 20 / 2.54), sharey="row"
+)
 
 data_seg = results_seg_new_names.query(
     "before_therapy & postprocessed & name != 'combined_models' & version == 'best'"
@@ -407,7 +473,7 @@ sns.boxplot(
     hue_order=experiment_types,
     ax=axes[0, 0],
 )
-axes[0, 0].set_title("Segmentation Batch Norm")
+axes[0, 0].set_title("Segmentation with Batch Norm")
 turn_ticks(axes[0, 0])
 axes[0, 0].legend([], [], frameon=False)
 axes[0, 0].set_ylim(-0.05, 0.95)
@@ -436,15 +502,13 @@ for ax, task in zip(axes.flat[2:], good_classification_tasks):
     ax.set_title(task.replace("_", " ").capitalize())
     ax.set_ylabel("AUC")
     turn_ticks(ax)
-    if task != "sex":
-        ax.legend([], [], frameon=False)
+    ax.legend([], [], frameon=False)
 
-legend = axes[0, 2].legend(
-    bbox_to_anchor=(0, 0),
-    loc="upper left",
-    borderaxespad=0,
-    title="Experiment Type",
-)
+axes[0, 1].set_ylabel("")
+axes[1, 1].set_ylabel("")
+
+for ax in axes.flat[:4]:
+    ax.set_xlabel("")
 
 sns.boxplot(
     data=data_reg,
@@ -452,18 +516,23 @@ sns.boxplot(
     y="age_rmse",
     hue="experiment_type",
     hue_order=experiment_types,
-    ax=axes[1, 1],
+    ax=axes[2, 0],
 )
-axes[1, 1].set_title("Age")
-axes[1, 1].set_ylabel("RMSE")
-turn_ticks(axes[1, 1])
-axes[1, 1].set_ylim(-1, 25)
-axes[1, 1].legend([], [], frameon=False)
+axes[2, 0].set_title("Age")
+axes[2, 0].set_ylabel("RMSE")
+turn_ticks(axes[2, 0])
+axes[2, 0].set_ylim(-2, 45)
+legend = axes[2, 0].legend(
+    borderaxespad=0,
+    title="Experiment Type",
+)
 
-axes[1, 2].remove()
+axes[2, 1].remove()
 
 plt.tight_layout()
-legend.set(bbox_to_anchor=[-0.0, -1.45, 0, 1])
+
+legend.set(bbox_to_anchor=[1.1, 0, 0, 1])
+
 save_pub("all_experiment_types_summary")
 plt.show()
 plt.close()
@@ -471,7 +540,9 @@ plt.close()
 
 print("Performance in all experiments as bar graph")
 
-fig, axes = plt.subplots(nrows=2, ncols=3, figsize=(20 / 2.54, 16 / 2.54))
+fig, axes = plt.subplots(
+    nrows=3, ncols=2, figsize=(DISS_TEXTWIDTH * 0.9, 20 / 2.54), sharey="row"
+)
 
 data_seg = results_seg_new_names.query(
     "before_therapy & postprocessed & name != 'combined_models' & version == 'best'"
@@ -501,7 +572,7 @@ sns.barplot(
 axes[0, 0].set_title("Segmentation Batch Norm")
 turn_ticks(axes[0, 0])
 axes[0, 0].legend([], [], frameon=False)
-axes[0, 0].set_ylim(0, 0.8)
+axes[0, 0].set_ylim(0, 0.78)
 
 sns.barplot(
     data=data_seg.query("not do_batch_normalization"),
@@ -513,7 +584,7 @@ sns.barplot(
 axes[0, 1].set_title("Segmentation without Batch Norm")
 turn_ticks(axes[0, 1])
 axes[0, 1].legend([], [], frameon=False)
-axes[0, 1].set_ylim(0, 0.8)
+axes[0, 1].set_ylim(0, 0.78)
 
 for ax, task in zip(axes.flat[2:], good_classification_tasks):
     sns.barplot(
@@ -526,35 +597,44 @@ for ax, task in zip(axes.flat[2:], good_classification_tasks):
     ax.set_title(task.replace("_", " ").capitalize())
     ax.set_ylabel("AUC")
     turn_ticks(ax)
-    if task != "sex":
-        ax.legend([], [], frameon=False)
-axes[0, 2].set_ylim(0.2, 1)
-axes[1, 0].set_ylim(0.45, 0.7)
+    ax.legend([], [], frameon=False)
+axes[1, 0].set_ylim(0.4, 1)
+# axes[1, 0].set_ylim(0.45, 0.7)
 
-legend = axes[0, 2].legend(
+legend = axes[2, 0].legend(
     bbox_to_anchor=(0, 0),
     loc="upper left",
     borderaxespad=0,
     title="Experiment Type",
 )
 
+axes[0, 1].set_ylabel("")
+axes[1, 1].set_ylabel("")
+
+for ax in axes.flat[:4]:
+    ax.set_xlabel("")
+
 sns.barplot(
     data=data_reg,
     x="normalization",
     y="age_rmse",
-    ax=axes[1, 1],
+    ax=axes[2, 0],
     **bar_settings,
 )
-axes[1, 1].set_title("Age")
-axes[1, 1].set_ylabel("RMSE")
-turn_ticks(axes[1, 1])
-axes[1, 1].set_ylim(10, 20)
-axes[1, 1].legend([], [], frameon=False)
+axes[2, 0].set_title("Age")
+axes[2, 0].set_ylabel("RMSE")
+turn_ticks(axes[2, 0])
+axes[2, 0].set_ylim(10, 20)
+legend = axes[2, 0].legend(
+    borderaxespad=0,
+    title="Experiment Type",
+)
 
-axes[1, 2].remove()
+axes[2, 1].remove()
 
 plt.tight_layout()
-legend.set(bbox_to_anchor=[-0.0, -1.45, 0, 1])
+
+legend.set(bbox_to_anchor=[1.1, 0, 0, 1])
 save_pub("all_experiment_types_summary_bars")
 plt.show()
 plt.close()
@@ -929,8 +1009,6 @@ res_table = pd.DataFrame(
                 "Except-One-External",
                 "Single-Center-Internal",
                 "Single-Center-External",
-                "Single-Center-All-Internal",
-                "Single-Center-All-External",
             ],
         ]
     ),
@@ -974,13 +1052,13 @@ res_table["Age"] = (
 styler = res_table.style
 styler = styler.format(precision=3)
 display_dataframe(styler)
-print(
-    styler.to_latex(
-        convert_css=True,
-        caption="Caption.",
-        label="results_table",
-    )
-)
+# print(
+#     styler.to_latex(
+#         convert_css=True,
+#         caption="Caption.",
+#         label="results_table",
+#     )
+# )
 
 # %%
 
@@ -1004,8 +1082,6 @@ res_table = pd.DataFrame(
                 "Except-One-External",
                 "Single-Center-Internal",
                 "Single-Center-External",
-                "Single-Center-All-Internal",
-                "Single-Center-All-External",
             ],
         ]
     ),
@@ -1049,19 +1125,19 @@ res_table["Age"] = (
 styler = res_table.style
 styler = styler.format(precision=3)
 display_dataframe(styler)
-print(
-    styler.to_latex(
-        convert_css=True,
-        caption="Caption.",
-        label="results_table",
-    )
-)
+# print(
+#     styler.to_latex(
+#         convert_css=True,
+#         caption="Caption.",
+#         label="results_table",
+#     )
+# )
 
 # %%
 
 print("Look for significance")
 
-for experiment_type in ["Single-Center"]:  # experiment_types:
+for experiment_type in ["All", "Except-One", "Single-Center"]:
     display_markdown(f"### {experiment_type}")
 
     data_seg = results_seg_new_names.query(
@@ -1090,6 +1166,19 @@ for experiment_type in ["Single-Center"]:  # experiment_types:
             )
             plot_significance(
                 grouped_data, f"{experiment_type} - {ext} - Segmentation - BN", "Dice"
+            )
+
+    if experiment_type == "All":
+        grouped_data = data_seg.query("do_batch_normalization").groupby("normalization")
+        plot_significance(grouped_data, f"{experiment_type} - Segmentation - BN", "Dice")
+    else:
+        for ext in ["not external", "external"]:
+            data_seg_ext = data_seg.query(ext)
+            grouped_data = data_seg_ext.query("not do_batch_normalization").groupby(
+                "normalization"
+            )
+            plot_significance(
+                grouped_data, f"{experiment_type} - {ext} - Segmentation - no BN", "Dice"
             )
 
     for task in good_classification_tasks:
@@ -1128,13 +1217,13 @@ WIDTH = 193.44536 / 72
 fig, axes = plt.subplots(nrows=1, ncols=1, figsize=(WIDTH, 0.84 * WIDTH))
 hatched_histplot(
     data=acquisition_params.query("location != 'Mannheim-not-from-study'").replace(
-        new_names
+        NEW_NAMES
     ),
     hue="location",
     x="pixel_spacing",
     multiple="stack",
     bins=np.arange(0.25, 1.66, 0.1),
-    hue_order=[f"Center {i}" for i in range(1, 7)],
+    hue_order=CENTER_ORDER,
     legend=False,
     ax=axes,
 )
@@ -1146,13 +1235,13 @@ save_pub("params_pixel_spacing", bbox_inches="tight")
 fig, axes = plt.subplots(nrows=1, ncols=1, figsize=(WIDTH, 0.84 * WIDTH))
 hatched_histplot(
     data=acquisition_params.query("location != 'Mannheim-not-from-study'").replace(
-        new_names
+        NEW_NAMES
     ),
     hue="location",
     x="echo_time",
     multiple="stack",
     bins=np.arange(65, 226, 10),
-    hue_order=[f"Center {i}" for i in range(1, 7)],
+    hue_order=CENTER_ORDER,
     legend=True,
     ax=axes,
 )
@@ -1164,13 +1253,13 @@ save_pub("params_echo_time", bbox_inches="tight")
 fig, axes = plt.subplots(nrows=1, ncols=1, figsize=(WIDTH, 0.84 * WIDTH))
 hatched_histplot(
     data=acquisition_params.query("location != 'Mannheim-not-from-study'").replace(
-        new_names
+        NEW_NAMES
     ),
     hue="location",
     x="flip_angle",
     multiple="stack",
     bins=np.arange(85, 186, 10),
-    hue_order=[f"Center {i}" for i in range(1, 7)],
+    hue_order=CENTER_ORDER,
     legend=False,
     ax=axes,
 )
@@ -1182,13 +1271,13 @@ save_pub("params_flip_angle", bbox_inches="tight")
 fig, axes = plt.subplots(nrows=1, ncols=1, figsize=(WIDTH, 0.84 * WIDTH))
 hatched_histplot(
     data=acquisition_params.query("location != 'Mannheim-not-from-study'").replace(
-        new_names
+        NEW_NAMES
     ),
     hue="location",
     x="repetition_time",
     multiple="stack",
     bins=np.arange(500, 13000, 1000),
-    hue_order=[f"Center {i}" for i in range(1, 7)],
+    hue_order=CENTER_ORDER,
     legend=False,
     ax=axes,
 )
@@ -1200,13 +1289,13 @@ save_pub("params_repetition_time", bbox_inches="tight")
 fig, axes = plt.subplots(nrows=1, ncols=1, figsize=(WIDTH, 0.84 * WIDTH))
 hatched_histplot(
     data=acquisition_params.query("location != 'Mannheim-not-from-study'").replace(
-        new_names
+        NEW_NAMES
     ),
     hue="location",
     x="slice_thickness",
     multiple="stack",
     bins=np.arange(0.45, 6.05, 0.4),
-    hue_order=[f"Center {i}" for i in range(1, 7)],
+    hue_order=CENTER_ORDER,
     legend=False,
     ax=axes,
 )
@@ -1217,12 +1306,12 @@ save_pub("params_slice_thickness", bbox_inches="tight")
 fig, axes = plt.subplots(nrows=1, ncols=2, sharex=False, sharey=True, figsize=(5.46, 2.6))
 
 sns.histplot(
-    data=acquisition_params.replace(new_names),
+    data=acquisition_params.replace(NEW_NAMES),
     hue="location",
     x="pixel_spacing",
     multiple="stack",
     bins=np.arange(0.25, 1.66, 0.1),
-    hue_order=[f"Center {i}" for i in range(1, 7)],
+    hue_order=CENTER_ORDER,
     ax=axes[0],
     legend=False,
 )
@@ -1230,12 +1319,12 @@ axes[0].set_xlabel("in-plane resolution (mm)")
 axes[0].set_ylim(-4, 250)
 
 sns.histplot(
-    data=acquisition_params.replace(new_names),
+    data=acquisition_params.replace(NEW_NAMES),
     hue="location",
     x="echo_time",
     multiple="stack",
     bins=np.arange(65, 226, 10),
-    hue_order=[f"Center {i}" for i in range(1, 7)],
+    hue_order=CENTER_ORDER,
     ax=axes[1],
     legend=True,
 )
@@ -1270,7 +1359,7 @@ display_dataframe(
     pd.DataFrame(acquisition_params.echo_time.round(-1).value_counts()).sort_index()
 )
 
-display_dataframe(acquisition_params.replace(new_names)[acquisition_params.echo_time > 200])
+display_dataframe(acquisition_params.replace(NEW_NAMES)[acquisition_params.echo_time > 200])
 
 # %%
 
@@ -1703,6 +1792,117 @@ for ax in axes[:, 3:].flat:
 for ax in axes[-1, :3]:
     ax.set_xlabel("Intensity")
 for ax in axes[:-1, :3].flat:
+    ax.set_xlabel("")
+
+for ax in axes[:, 0]:
+    ax.set_ylabel("Proportion")
+for ax in axes[:, 1:].flat:
+    ax.set_ylabel("")
+    ax.set_yticklabels([])
+    ax.tick_params(axis="y", which="both", length=0)
+
+save_pub("norm-summary-paper", bbox_inches="tight")
+
+# %%
+# make an image containing all normalizations
+# fig, axes = plt.subplots(ncols=6, nrows=3, figsize=(7, 4), layout="constrained")
+
+fig = plt.figure(figsize=(0.8, 0.8))
+axes = []
+
+bottom = 0
+height_diff = 0.6
+for row in range(4):
+    ax_line = []
+    axes.append(ax_line)
+    left = 0
+    for col in range(4):
+        height = 1
+        padding = (1 - (col + 1) // 3) * 0.0 + 0.1
+        width = 1
+        # (left, bottom, width, height)
+        ax = plt.Axes(fig, [left, bottom, width, height])
+        left += width + padding
+        fig.add_axes(ax)
+        ax_line.append(ax)
+    bottom -= height + height_diff
+axes = np.array(axes)
+
+names = [
+    "Perc",
+    "HM",
+    "Perc-HM",
+    "M-STD",
+    "Win",
+    "GAN-Seg",
+    "GAN-Def",
+    "GAN-Img",
+    "GAN-Win",
+]
+
+sns.histplot(
+    data=dataframe.query("image == 'original image'"),
+    x="Intensity",
+    hue="image",
+    bins=20,
+    stat="proportion",
+    ax=axes[0, 0],
+    legend=False,
+)
+axes[0, 0].set_title("Original Histogram", fontsize=8)
+axes[0, 0].set_ylim(0, 0.4)
+axes[0, 0].set_yticks([0.0, 0.1, 0.2, 0.3, 0.4])
+axes[0, 0].set_xticks([0, 500, 1000])
+
+axes[0, 3].imshow(
+    slice_original,
+    interpolation="nearest",
+    cmap="gray",
+    vmin=slice_original.min(),
+    vmax=slice_original.max(),
+    aspect="equal",
+)
+axes[0, 3].set_title("Original Image", fontsize=8)
+
+for ax, df, n in zip(axes[1:, :2].flat, dataframes, names):
+    if n not in ("M-STD",):  # "Win"):
+        bins = np.arange(-1.05, 1.06, 0.1)
+    else:
+        bins = 21
+    sns.histplot(
+        data=df.query("image == 'normalized image'"),
+        x="Intensity",
+        hue="image",
+        bins=bins,
+        stat="proportion",
+        ax=ax,
+        legend=False,
+    )
+    ax.set_title(n, fontsize=8)
+    ax.set_ylim(0, 0.4)
+    ax.set_yticks([0.0, 0.1, 0.2, 0.3, 0.4])
+    if n not in ("M-STD"):
+        ax.set_xlim(-1.15, 1.15)
+
+for ax, slc, n in zip(axes[1:, 2:].flat, slices_normed, names):
+    ax.imshow(
+        slc,
+        interpolation="nearest",
+        cmap="gray",
+        vmin=slc.min(),
+        vmax=slc.max(),
+        aspect="equal",
+    )
+    ax.set_title(n, fontsize=8)
+
+axes[0, 1].axis("off")
+axes[0, 2].axis("off")
+for ax in axes[:, 2:].flat:
+    ax.axis("off")
+
+for ax in axes[-1, :2]:
+    ax.set_xlabel("Intensity")
+for ax in axes[:-1, :2].flat:
     ax.set_xlabel("")
 
 for ax in axes[:, 0]:
@@ -2209,403 +2409,40 @@ save_pub("GAN-Def", bbox_inches=Bbox.from_extents(-0.8, 1.9, 10.5, 8.3))
 # %%
 # Make a graph of the patients treatment intervals
 
-patient_data_path = data_dir / "Patient Data"
-# only use columns present in both datasets
-columns_to_extract = {
-    "mnpaid": "PatientID",
-    # Meldebogen
-    "v859_1_meld_sex": "sex",
-    "v859_1_meld_birth_d": "birthday",
-    # Tumoranamnese
-    "v859_1_tu_anam_endo_t_stage_5062_1": "T-stage_first_diagnosis",
-    "v859_1_tu_anam_n_stage_5062_1": "N-stage_first_diagnosis",
-    "v859_1_tu_anam_mnpvisfdt": "Staging date_first_diagnosis",
-    "v859_1_tu_anam_infil_anam": "Infiltration ins perirektale Fettgewebe",
-    "v859_1_tu_anam_crm_anam": "Kleinste Entfernung zum CRM",
-    "v859_1_tu_anam_linano_mrt1": "localisation",
-    # Tumordiagnostik pre-OP
-    "v862_1_tu_dia2_mrt_t_stage_5009_1": "pre OP T-Stage_0",
-    "v862_1_tu_dia2_mrt_n_stage_5009_1": "pre OP N-Stage_0",
-    "v862_1_tu_dia2_staging_d_5009_1": "pre OP Staging date_0",
-    "v853_1_tu_dia2_staging_d_5009_1": "pre OP Staging date_1",
-    "v853_1_tu_dia2_mrt_t_stage_5009_1": "pre OP T-Stage_1",
-    "v853_1_tu_dia2_mrt_n_stage_5009_1": "pre OP N-Stage_1",
-    # OP
-    "v850_1_op_op_d": "OP date",
-    # Pathologie
-    "v850_1_patho_tu_rr_meso1": "post OP distance of tumor to CRM",
-    "v850_1_patho_ypt": "post OP pathological T-Stage",
-    "v850_1_patho_ypn": "post OP pathological N-Stage",
-    "v850_1_patho_r_class": "post OP R-classification",
-    "v850_1_patho_reg_gr_dworak": "post OP regressions Dworak",
-}
-
-patient_data_study = pd.read_csv(
-    os.path.join(patient_data_path, "patient_data.csv"),
-    sep=";",
-    index_col=0,
-    usecols=columns_to_extract.keys(),
-    low_memory=False,
-)
-assert isinstance(patient_data_study, pd.DataFrame)
-
-patient_data_study.rename(columns=columns_to_extract, inplace=True)
-patient_data_study.index.name = "patientID"
-
-# join the duplicate columns
-dupes = [
-    "pre OP T-Stage",
-    "pre OP N-Stage",
-    # 'pre OP Metastasis Stage',
-    # 'pre OP Staging was performed',
-    "pre OP Staging date",
-]
-for d in dupes:
-    c0 = d + "_0"
-    c1 = d + "_1"
-    # make sure that both are never not NA
-    assert np.all(patient_data_study[c0].isna() | patient_data_study[c1].isna())
-    patient_data_study.loc[patient_data_study[c1].notna(), c0] = patient_data_study[
-        c1
-    ].dropna()
-    patient_data_study.drop(columns=[c1], inplace=True)
-    # rename the remaining columns (preserves their order)
-    patient_data_study.rename(columns={c0: d}, inplace=True)
-
-# rename some values
-patient_data_study.replace(
-    {
-        "männlich": "male",
-        "weiblich": "female",
-        "kein Residualtumor (R0)": "R0",
-        "makroskopischer Residualtumor lokal (R2a)": "R2a",
-        "nur mikroskopischer Residualtumor (R1)": "R1",
-        "Grad 0: keine Regression": 0,
-        "Grad 1: Tumormasse dominierend mit deutlicher Fibrose und/oder Vaskulopathie": 1,
-        "Grad 2: Fibrotische Veränderungen dominierend mit (einfach zu findenen) Tumorzellen oder Tumorzellgruppen": 2,
-        (
-            "Grad 3: Mikroskopisch nur noch schwierig auffindbare Tumorzellen"
-            + " inmitten fibrotischen Gewebes mit oder ohne muzinöse Veränderungen"
-        ): 3,
-        'Grad 4: Keinerlei Tumorzellen, nur Fibrose (\\total regression\\")"': 4,
-        "1 bis 2": "T1-T2",
-    },
-    inplace=True,
-)
-# replace the localization distances with values
-lower = patient_data_study.localisation < 6
-middle = (patient_data_study.localisation >= 6) & (patient_data_study.localisation < 12)
-upper = patient_data_study.localisation >= 12
-patient_data_study.loc[lower, "localisation"] = "lower third"
-patient_data_study.loc[middle, "localisation"] = "middle third"
-patient_data_study.loc[upper, "localisation"] = "upper third"
-
-# add dates of MRIs
-# add columns
-timepoints = pd.read_csv(data_dir / "timepoints.csv", sep=";")
-patient_data_study.insert(2, "date before therapy MRT", pd.NA)
-patient_data_study.insert(7, "date after therapy MRT", pd.NA)
-# fill them with data
-before_therapy_tp = timepoints.query(
-    "treatment_status == 'before therapy' & segmented & complete"
-)
-assert np.all(before_therapy_tp["patientID"].value_counts() == 1)
-for index, row in before_therapy_tp.iterrows():
-    patient_data_study.loc[row.patientID, "date before therapy MRT"] = row.date
-before_op_tp = timepoints.query("treatment_status == 'before OP' & segmented & complete")
-assert np.all(before_op_tp["patientID"].value_counts() == 1)
-for index, row in before_op_tp.iterrows():
-    patient_data_study.loc[row.patientID, "date after therapy MRT"] = row.date
-
-# treat the datetimes
-dt_columns_study = {
-    "birthday": "%Y%m",
-    "Staging date_first_diagnosis": None,
-    "pre OP Staging date": "%Y%m%d",
-    "OP date": "%Y%m%d",
-    "date before therapy MRT": None,
-    "date after therapy MRT": None,
-}
-for col, dt_format in dt_columns_study.items():
-    patient_data_study[col] = pd.to_datetime(
-        patient_data_study[col], format=dt_format
-    ).dt.date
-
-extract_mannheim = {
-    "Patient ID": "patientID",
-    "Geb": "birthday",
-    "Geschl": "sex",
-    "MRT1": "date before therapy MRT",
-    "praeT": "T-stage_first_diagnosis",
-    "praeN": "N-stage_first_diagnosis",
-    "Faszie": "Kleinste Entfernung zum CRM",
-    "Lokalisation": "localisation",
-    "MRT2": "date after therapy MRT",
-    "postT": "pre OP T-Stage",
-    "postN": "pre OP N-Stage",
-    "OP": "OP date",
-    "pT": "post OP pathological T-Stage",
-    "pN": "post OP pathological N-Stage",
-    "R_lokal": "post OP R-classification",
-    "Regression": "post OP regressions Dworak",
-}
-
-patient_data_mannheim = pd.read_excel(
-    os.path.join(patient_data_path, "patient_data_mannheim.xlsx"),
-    usecols=extract_mannheim.keys(),
-)
-patient_data_mannheim.rename(columns=extract_mannheim, inplace=True)
-patient_data_mannheim.set_index("patientID", inplace=True)
-# rename some values
-patient_data_mannheim.replace(
-    {
-        "m": "male",
-        "w": "female",
-        "fraglich T1,\nkaum noch abzugrenzen": "T1",
-        "oben T2\nunten T1": "upper T2 lower T1",
-        "Zwei Läsionen\noben T3\nunten T3": "T3",
-        "oben T2\nunten T1 bis 2": "upper T2 lower T1-T2",
-        "oben T2\nunten T3": "upper T2 lower T3",
-        "1 bis 2": "T1-T2",
-        "T1 bis 2": "T1-T2",
-        "unteres Rektumdrittel": "lower third",
-        "unteres/mittleres Rektumdrittel": "lower/middle third",
-        "mittleres Rektumdrittel\nunteres Rektumdrittel": "lower/middle third",
-        "mittleres Rektumdrittel": "middle third",
-        "mittleres/oberes Rektumdrittel": "middle/upper third",
-        "oberes Rektumdrittel": "upper third",
-    },
-    inplace=True,
-)
-
-# treat the datetimes
-dt_columns_mannheim = {
-    "birthday": None,
-    "date before therapy MRT": None,
-    "date after therapy MRT": None,
-    "OP date": None,
-}
-for col, dt_format in dt_columns_mannheim.items():
-    patient_data_mannheim[col] = pd.to_datetime(
-        patient_data_mannheim[col], format=dt_format
-    ).dt.date
-
-# convert floats to ints (there are no floats)
-for c in patient_data_mannheim:
-    if isinstance(patient_data_mannheim[c].dtype, float):
-        patient_data_mannheim[c] = patient_data_mannheim[c].astype(int)
-
-# add leters to the stages
-letters = {
-    "T": ["T-stage_first_diagnosis", "pre OP T-Stage", "post OP pathological T-Stage"],
-    "N": ["N-stage_first_diagnosis", "pre OP N-Stage", "post OP pathological N-Stage"],
-    "R": ["post OP R-classification"],
-}
-for letter, cols in letters.items():
-    for c in cols:
-        patient_data_mannheim[c] = patient_data_mannheim[c].apply(
-            (
-                lambda x, letter: x
-                if letter in str(x) or pd.isna(x) or len(str(x)) > 5
-                else letter + str(int(x))
-            ),
-            letter,
-        )
-
-patient_data_study["dataset"] = "train"
-patient_data_mannheim["dataset"] = "external"
-
-# join the data (for some reason, concat fails)
-patient_data = patient_data_study.copy()
-for pat in patient_data_mannheim.index:
-    patient_data.loc[pat] = patient_data_mannheim.loc[pat]
-# make dworak and integer
-patient_data["post OP regressions Dworak"] = patient_data[
-    "post OP regressions Dworak"
-].astype(pd.Int64Dtype())
-
-# make categorical columns
-T_cats = [
-    "T0",
-    "Tis",
-    "T1",
-    "T1-T2",
-    "upper T2 lower T1",
-    "upper T2 lower T1-T2",
-    "T2",
-    "upper T2 lower T3",
-    "T3",
-    "T4",
-    "T4a",
-    "T4b",
-]
-N_cats = ["N0", "N positiv", "N1", "N1a", "N1b", "N1c", "N2", "N2a", "N2b", "Nx"]
-R_cats = ["R0", "R1", "R2a"]
-loc_cats = [
-    "lower third",
-    "lower/middle third",
-    "middle third",
-    "middle/upper third",
-    "upper third",
-]
-cat_cols = {
-    "sex": ["female", "male"],
-    "T-stage_first_diagnosis": T_cats,
-    "N-stage_first_diagnosis": N_cats,
-    "pre OP T-Stage": T_cats,
-    "pre OP N-Stage": N_cats,
-    "post OP pathological T-Stage": T_cats,
-    "post OP pathological N-Stage": N_cats,
-    "post OP R-classification": R_cats,
-    "localisation": loc_cats,
-}
-for c, categories in cat_cols.items():
-    if categories is None:
-        patient_data[c] = pd.Categorical(patient_data[c])
-    else:
-        # make sure all are in the categories
-        for index, val in patient_data[c].iteritems():
-            if val not in categories and pd.notna(val):
-                raise ValueError(f"{val} not found in {categories}")
-        patient_data[c] = pd.Categorical(
-            patient_data[c], ordered=True, categories=categories
-        )
-
-# derive some columns
-# age at start of therapy
-timediff = patient_data["date before therapy MRT"] - patient_data["birthday"]
-timediff_years = timediff / timedelta(days=365.25)
-patient_data["age"] = np.floor(timediff_years).astype(pd.Int64Dtype())
-# time between staging MRT and OP
-timediff = patient_data["OP date"] - patient_data["date after therapy MRT"]
-timediff_days = timediff / timedelta(days=1)
-patient_data["time between staging and OP"] = np.floor(timediff_days).astype(
-    pd.Int64Dtype()
-)
-# time between first and second staging MRT
-timediff = patient_data["date after therapy MRT"] - patient_data["date before therapy MRT"]
-timediff_days = timediff / timedelta(days=1)
-patient_data["time between first and second MRT"] = np.floor(timediff_days).astype(
-    pd.Int64Dtype()
-)
-# time between first MRT and OP
-timediff = patient_data["OP date"] - patient_data["date before therapy MRT"]
-timediff_days = timediff / timedelta(days=1)
-patient_data["time between first MRT and OP"] = np.floor(timediff_days).astype(
-    pd.Int64Dtype()
-)
+patient_data = pd.read_csv(data_dir / "patients.csv", sep=";", index_col=0).infer_objects()
+dt_columns = ["birthday"] + [col for col in patient_data if "date" in col]
 
 # correct type
-patient_data = patient_data.infer_objects()
-for col in set(dt_columns_study.keys()).union(set(dt_columns_mannheim.keys())):
+for col in dt_columns:
     patient_data[col] = pd.to_datetime(patient_data[col])
 
+patient_data["from_study"] = True
+patient_data.loc[patient_data.location == "Mannheim-not-from-study", "from_study"] = False
+patient_data["location"] = patient_data.location.replace(NEW_NAMES)
+
 # %%
-patient_data_study = pd.read_csv(data_dir / "patients.csv", sep=";")
-patient_data_mannheim = pd.read_excel(
-    data_dir / "Patient Data" / "patient_data_mannheim.xlsx"
-)
 
-patients_seg = results_seg["File Number"].apply(lambda s: s.partition("_")[0]).astype(int)
-patients = patients_seg.unique()
-# get the center for each patient
-patient_center = pd.DataFrame(results_seg.groupby(patients_seg).location.unique())
-patient_center.location = patient_center.location.apply(lambda x: x[0])
-patient_center.index.name = "mnpaid"
-
-# drop patients not in patients
-to_keep = patient_data_study.mnpaid.apply(lambda p: p in patients)
-patient_data_study = patient_data_study[to_keep].set_index("mnpaid")
-new_var = patient_data_mannheim["Patient ID"].apply(lambda p: p in patients)
-patient_data_mannheim = patient_data_mannheim[new_var]
-
-patient_data_mannheim = patient_data_mannheim.rename(
-    columns={
-        "Patient ID": "mnpaid",
-        "Geb": "birthday",
-        "OP": "op_date",
-        "MRT1": "mri_1_date",
-        "MRT2": "mri_2_date",
-    }
-).set_index("mnpaid")
-
-main_images = (timepoints.treatment_substatus == "before therapy") | (
-    timepoints.treatment_substatus == "before OP"
-)
-timepoints = timepoints[main_images]
-to_keep = timepoints.patientID.apply(lambda p: p in patients) & (
-    timepoints.location != "Mannheim-not-from-study"
-)
-timepoints = timepoints[to_keep]
-
-important_columns = [
-    "birthday",
-    "op_date",
-    "ct_start_date",
-    "ct_last_date",
-    "rct_start_date",
-    "rct_end_date",
-    "treatment_start_date",
-    "treatment_end_date",
-    "mri_1_date",
-    "mri_2_date",
-]
-for c in important_columns:
-    if c not in patient_data_study:
-        patient_data_study[c] = pd.NA
-    else:
-        patient_data_study[c] = pd.to_datetime(patient_data_study[c]).dt.date
-    if c not in patient_data_mannheim:
-        patient_data_mannheim[c] = pd.NA
-    else:
-        patient_data_mannheim[c] = pd.to_datetime(patient_data_mannheim[c]).dt.date
-patient_data_study = patient_data_study[important_columns]
-
-mask_therapy = timepoints.treatment_substatus == "before therapy"
-for pat, data in timepoints[mask_therapy].groupby("patientID"):
-    if len(data) == 1:
-        mri_date = pd.to_datetime(data.date.iloc[0]).date()
-    else:
-        mri_date = pd.to_datetime(data.sort_values("date").date.iloc[-1]).date()
-    patient_data_study.loc[pat, "mri_1_date"] = mri_date
-
-mask_therapy = timepoints.treatment_substatus == "before OP"
-for pat, data in timepoints[mask_therapy].groupby("patientID"):
-    mri_date = pd.to_datetime(data.sort_values("date").date.iloc[0]).date()
-    patient_data_study.loc[pat, "mri_2_date"] = mri_date
-
-patient_data_mannheim = patient_data_mannheim[important_columns]
-
-patient_data_study["from_study"] = "from study"
-patient_data_mannheim["from_study"] = "not from study"
-patient_data = pd.concat((patient_data_study, patient_data_mannheim))
-
-for c in important_columns:
-    patient_data[c] = pd.to_datetime(patient_data[c])
-
-patient_data["location"] = patient_center
-
-patient_data["mri_1_to_op"] = (patient_data.op_date - patient_data.mri_1_date).dt.days
-patient_data["mri_2_to_op"] = (patient_data.op_date - patient_data.mri_2_date).dt.days
-patient_data["mri_1_to_mri_2"] = (patient_data.mri_2_date - patient_data.mri_1_date).dt.days
-
-patient_data["mri_1_to_treatment"] = (
-    patient_data.op_date - patient_data.treatment_start_date
+patient_data["mri_1_to_op"] = (
+    patient_data.OP_date - patient_data.date_before_therapy_MRI
 ).dt.days
-patient_data["treatment_end_to_mri_2"] = (
-    patient_data.mri_2_date - patient_data.treatment_end_date
+patient_data["mri_2_to_op"] = (
+    patient_data.OP_date - patient_data.date_after_therapy_MRI
+).dt.days
+patient_data["mri_1_to_mri_2"] = (
+    patient_data.date_after_therapy_MRI - patient_data.date_before_therapy_MRI
 ).dt.days
 
 split_bars = True
 
 fig, axes = plt.subplots(nrows=1, ncols=1, figsize=(WIDTH, 0.84 * WIDTH))
-patient_data["mri_1_date_frac"] = (
-    patient_data.mri_1_date.dt.year + patient_data.mri_1_date.dt.day_of_year / 365
+patient_data["date_before_therapy_MRI_frac"] = (
+    patient_data.date_before_therapy_MRI.dt.year
+    + patient_data.date_before_therapy_MRI.dt.day_of_year / 365
 )
 hatched_histplot(
-    data=patient_data[patient_data.mri_1_date_frac.notna()],
+    data=patient_data[patient_data.date_before_therapy_MRI_frac.notna()],
     hue="from_study",
-    x="mri_1_date_frac",
+    x="date_before_therapy_MRI_frac",
     multiple="layer",
     bins=np.arange(2009.75, 2019, 0.5),
     legend=True,
@@ -2615,10 +2452,10 @@ hatched_histplot(
 plt.ylabel("count")
 plt.xlabel("date of the first MRI (year)")
 # plt.ylim(0, 22)
-save_pub("mri_1_date", bbox_inches="tight")
+save_pub("date_before_therapy_MRI", bbox_inches="tight")
 display.display(
-    patient_data[patient_data.mri_1_date_frac.notna()]
-    .groupby("from_study")["mri_1_date_frac"]
+    patient_data[patient_data.date_before_therapy_MRI_frac.notna()]
+    .groupby("from_study")["date_before_therapy_MRI_frac"]
     .describe()
 )
 
@@ -2687,56 +2524,12 @@ display.display(
 
 fig, axes = plt.subplots(nrows=1, ncols=1, figsize=(WIDTH, 0.84 * WIDTH))
 hatched_histplot(
-    data=patient_data[patient_data.mri_1_to_treatment.notna()],
-    hue="location",
-    x="mri_1_to_treatment",
-    multiple="layer",
-    # bins=np.arange(0, 71, 4),
-    hue_order=[f"Center {i}" for i in range(1, 6)],
-    legend=True,
-    ax=axes,
-    split_bars=split_bars,
-)
-plt.ylabel("count")
-plt.xlabel("time from MRI 1 to treatment start (days)")
-# plt.ylim(0,40)
-save_pub("mri_1_to_treatment", bbox_inches="tight")
-display.display(
-    patient_data[patient_data.mri_1_to_treatment.notna()]
-    .groupby("location")["mri_1_to_treatment"]
-    .describe()
-)
-
-fig, axes = plt.subplots(nrows=1, ncols=1, figsize=(WIDTH, 0.84 * WIDTH))
-hatched_histplot(
-    data=patient_data[patient_data.treatment_end_to_mri_2.notna()],
-    hue="location",
-    x="treatment_end_to_mri_2",
-    multiple="layer",
-    bins=np.arange(10, 51, 4),
-    hue_order=[f"Center {i}" for i in range(1, 6)],
-    legend=True,
-    ax=axes,
-    split_bars=split_bars,
-)
-plt.ylabel("count")
-plt.xlabel("time from treatment end to MRI 2 (days)")
-# plt.ylim(0,40)
-save_pub("treatment_end_to_mri_2", bbox_inches="tight")
-display.display(
-    patient_data[patient_data.treatment_end_to_mri_2.notna()]
-    .groupby("location")["treatment_end_to_mri_2"]
-    .describe()
-)
-
-fig, axes = plt.subplots(nrows=1, ncols=1, figsize=(WIDTH, 0.84 * WIDTH))
-hatched_histplot(
     data=patient_data[patient_data.mri_2_to_op.notna()],
     hue="location",
     x="mri_2_to_op",
     multiple="layer",
     bins=np.arange(10, 51, 4),
-    hue_order=[f"Center {i}" for i in range(1, 6)],
+    hue_order=CENTER_ORDER,
     legend=True,
     ax=axes,
     split_bars=split_bars,
@@ -2745,11 +2538,6 @@ plt.ylabel("count")
 plt.xlabel("time from MRI 2 to OP (days)")
 # plt.ylim(0,40)
 save_pub("mri_2_to_op", bbox_inches="tight")
-display.display(
-    patient_data[patient_data.treatment_end_to_mri_2.notna()]
-    .groupby("location")["mri_2_to_op"]
-    .describe()
-)
 
 # %%
 # plot means and std
@@ -2811,7 +2599,7 @@ for num, (mod, ax_col) in enumerate(zip(modalities, axes.T)):
         stat="proportion",
         bins=20,
         common_norm=False,
-        hue_order=[f"Center {i}" for i in range(1, 6)],
+        hue_order=CENTER_ORDER,
         ax=ax_col[0],
         legend=num == 0,
         element="poly",
@@ -2824,7 +2612,7 @@ for num, (mod, ax_col) in enumerate(zip(modalities, axes.T)):
         stat="proportion",
         bins=20,
         common_norm=False,
-        hue_order=[f"Center {i}" for i in range(1, 6)],
+        hue_order=CENTER_ORDER,
         ax=ax_col[1],
         legend=False,
         element="poly",
