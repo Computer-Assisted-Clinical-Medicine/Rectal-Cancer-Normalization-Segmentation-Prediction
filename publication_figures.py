@@ -293,7 +293,15 @@ new_names_paper = {
     "Not-Regensburg": "Not Center 2",
     "Not-Mannheim": "Not Center 3",
 }
-center_order_paper = [f"Center {i}" for i in range(1, 7)]
+center_order_paper = [
+    "Center 1",
+    "Center 2",
+    "Center 3a",
+    "Center 3b",
+    "Center 4",
+    "Center 5",
+    "Center 6",
+]
 new_names_diss = {
     "GAN_DISCRIMINATORS": "GAN",
     "GAN_DISCRIMINATORS_3_64_0.50": "GAN_3_64",
@@ -329,7 +337,7 @@ center_order_diss = [
     "Center 11",
     "Center 12",
     "Center 13",
-    "in-house",
+    "In-house",
 ]
 norm_order = [
     "Perc",
@@ -346,6 +354,8 @@ norm_order = [
 external_order = ["test", False, True]
 
 # change this to adjust the center names
+# NEW_NAMES = new_names_paper
+# CENTER_ORDER = center_order_paper
 NEW_NAMES = new_names_diss
 CENTER_ORDER = center_order_diss
 
@@ -1303,6 +1313,51 @@ plt.xlabel("slice thickness (mm)")
 plt.ylabel("count")
 save_pub("params_slice_thickness", bbox_inches="tight")
 
+# %%
+
+print("Acquisition parameters")
+
+WIDTH = 193.44536 / 72
+
+
+def plot_params(param):
+    """Do the plots for the parameters"""
+    _, axes_params = plt.subplots(nrows=1, ncols=1, figsize=(WIDTH, 0.84 * WIDTH))
+    sns.boxplot(
+        data=acquisition_params.replace(NEW_NAMES),
+        x="location",
+        y=param,
+        ax=axes_params,
+        medianprops={"color": "#21A6BFFF", "linestyle": "-"},
+    )
+    plt.xlabel("location")
+    turn_ticks(axes_params)
+    return axes_params
+
+
+axes = plot_params("pixel_spacing")
+plt.ylabel("in-plane resolution (mm)")
+save_pub("params_pixel_spacing_box", bbox_inches=Bbox.from_extents(-0.4, -0.5, 2.5, 2.05))
+
+axes = plot_params("echo_time")
+plt.ylabel("echo time (ms)")
+save_pub("params_echo_time_box", bbox_inches=Bbox.from_extents(-0.4, -0.5, 2.5, 2.05))
+
+axes = plot_params("flip_angle")
+plt.ylabel("flip angle (°)")
+save_pub("params_flip_angle_box", bbox_inches=Bbox.from_extents(-0.4, -0.5, 2.5, 2.05))
+
+axes = plot_params("repetition_time")
+plt.ylabel("repetition time (ms)")
+save_pub("params_repetition_time_box", bbox_inches=Bbox.from_extents(-0.4, -0.5, 2.5, 2.05))
+
+axes = plot_params("slice_thickness")
+plt.ylabel("slice thickness (mm)")
+save_pub("params_slice_thickness_box", bbox_inches=Bbox.from_extents(-0.4, -0.5, 2.5, 2.05))
+
+
+# %%
+
 fig, axes = plt.subplots(nrows=1, ncols=2, sharex=False, sharey=True, figsize=(5.46, 2.6))
 
 sns.histplot(
@@ -1342,6 +1397,37 @@ for ax, tlt in zip(axes, titles):
 
 plt.tight_layout()
 save_pub("params", bbox_inches="tight")
+
+fig, axes = plt.subplots(
+    nrows=7, ncols=2, sharex="col", sharey="row", figsize=(3.7, 7 * 1.2)
+)
+
+for ax_line, center in zip(axes, CENTER_ORDER):
+    sns.histplot(
+        data=acquisition_params.replace(NEW_NAMES).query(f"location == '{center}'"),
+        x="pixel_spacing",
+        multiple="stack",
+        bins=np.arange(0.25, 1.66, 0.1),
+        ax=ax_line[0],
+        legend=False,
+    )
+    ax_line[0].set_xlabel("in-plane resolution (mm)")
+
+    sns.histplot(
+        data=acquisition_params.replace(NEW_NAMES).query(f"location == '{center}'"),
+        x="echo_time",
+        multiple="stack",
+        bins=np.arange(65, 226, 10),
+        ax=ax_line[1],
+        legend=False,
+    )
+    ax_line[1].set_xlabel("echo time (ms)")
+
+    for ax in ax_line:
+        ax.set_title(center)
+
+plt.tight_layout()
+save_pub("params_sep", bbox_inches="tight")
 
 print(f"In-Plane Min: {acquisition_params.pixel_spacing.min():.2f} mm")
 print(f"In-Plane Max: {acquisition_params.pixel_spacing.max():.2f} mm")
@@ -2701,3 +2787,25 @@ for cbar_top, cbar_bottom in zip(cbar_list[::2], cbar_list[1::2]):
     cbar_bottom.ax.yaxis.set_label_coords(MAX_X, y_lbl_bottom_pos[1])
 
 save_pub("example_images")
+
+# %%
+
+results_class.groupby(
+    results_class["File Number"].str.partition("_")[0]
+).dworak_ground_truth.mean().value_counts()
+
+# %%
+# count labelled voxels
+mean_stds_list = []
+n_labels = []
+for lbl, data in tqdm(orig_dataset.items()):
+    if "labels" in data:
+        labels_image = sitk.ReadImage(str(data_dir / data["labels"]))
+        labels_image_np = sitk.GetArrayFromImage(labels_image)
+        n_labels.append((labels_image_np == 1).sum())
+
+print(f"Total number of segmentation labels: {np.sum(n_labels):.0f}")
+print(f"Average number of segmentation labels per image: {np.mean(n_labels):.0f}")
+print(f"Median number of segmentation labels per image: {np.median(n_labels):.0f}")
+labels_pp = np.sum(n_labels) / len(set(d.partition("_")[0] for d in orig_dataset))
+print(f"Average number of segmentation labels per patient: {labels_pp:.0f}")
