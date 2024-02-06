@@ -1,6 +1,6 @@
 [submodule "SegmentationArchitectures"]
 	path = SegmentationArchitectures
-	url = http://ckmsrv/Bonobo.Git.Server/SegmentationArchitectures.git
+	url = https://github.com/Computer-Assisted-Clinical-Medicine/UMM-CKM-Segmentation-Architectures.git
 [submodule "SegClassRegBasis"]
 	path = SegClassRegBasis
-	url = http://ckmsrv/Bonobo.Git.Server/SegClassRegBasis.git
+	url = https://github.com/Computer-Assisted-Clinical-Medicine/Seg-Class-Reg-Basis.git
