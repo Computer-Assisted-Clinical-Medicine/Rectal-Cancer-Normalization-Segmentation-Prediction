@@ -1,6 +1,14 @@
 # Segmentation of rectal cancer tumors
 
-This repository runs the training for rectal cancer segmentation using multiple 2D and 3D networks.
+This repository runs the training for rectal cancer segmentation and classification using multiple 2D and 3D networks using different normalization methods. Sadly, the training data cannot be made freely available due to data protection. But you are welcome to cooperate with our research group if you want access to the data.
+
+If you use our code in your work please cite the following paper:
+
+Albert, S.; Wichtmann, B.D.; Zhao, W.; Maurer, A.; Hesser, J.; Attenberger, U.I.; Schad, L.R.; Zöllner, F.G. Comparison of Image Normalization Methods for Multi-Site Deep Learning. Appl. Sci. 2023, 13, 8923. https://doi.org/10.3390/app13158923
+
+More details can be found in my dissertation
+
+Albert, Steffen. Prediction of treatment response and outcome in locally advanced rectal cancer using radiomics. Diss. 2023. https://doi.org/10.11588/heidok.00034188
 
 ## Getting Started
 
